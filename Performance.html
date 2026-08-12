@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body { background-color: #f4f7fc; padding: 40px; height: 100vh; overflow-x: hidden; }
+
+    /* --- PAGE HEADER --- */
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+    .page-title { font-size: 22px; color: #0f172a; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .page-title span { color: #64748b; font-weight: 400; font-size: 16px; background: #e2e8f0; padding: 2px 10px; border-radius: 20px; }
+    .action-btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+    .action-btn:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3); }
+
+    /* --- TOOLBAR --- */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px 10px 0 0; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px; margin: 0 -40px; }
+    .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .search-box { display: flex; align-items: center; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 8px; width: 250px; background: #f8fafc; }
+    .search-box input { border: none; outline: none; background: transparent; width: 100%; margin-left: 8px; font-size: 14px; color: #333; }
+    .form-input, .form-select { padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; outline: none; transition: border-color 0.2s; }
+    .form-input:focus, .form-select:focus { border-color: #3b82f6; }
+
+    /* --- TABLE --- */
+    .table-container { background: white; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow-x: auto; margin: 0 -40px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+    th { text-align: left; padding: 16px 20px; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+    td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
+    tr:hover { background-color: #f8fafc; }
+
+    /* --- LOADING --- */
+    #loading { text-align: center; padding: 40px; color: #64748b; }
+
+    /* --- MODALS --- */
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+    .modal-backdrop.active { opacity: 1; pointer-events: auto; }
+    .modal-content { background: white; width: 90%; max-width: 700px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); transform: scale(0.95); transition: transform 0.25s ease; overflow: hidden; display: flex; flex-direction: column; }
+    .modal-backdrop.active .modal-content { transform: scale(1); }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 18px; color: #0f172a; font-weight: 600; }
+    .modal-close { color: #94a3b8; font-size: 24px; background: none; border: none; cursor: pointer; transition: color 0.15s; }
+    .modal-close:hover { color: #334155; }
+    .modal-body { padding: 24px; max-height: 75vh; overflow-y: auto; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid #f1f5f9; background: #f8fafc; display: flex; justify-content: flex-end; gap: 12px; }
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; margin-bottom: 6px; letter-spacing: 0.5px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .btn { padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; }
+    .btn-secondary { background: #e2e8f0; color: #475569; }
+    .btn-secondary:hover { background: #cbd5e1; color: #1e293b; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .icon-btn { width: 36px; min-width: 36px; height: 36px; padding: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; border: 1px solid transparent; transition: transform 0.2s, background 0.2s, border-color 0.2s; }
+    .icon-btn:hover { transform: translateY(-1px); }
+    .icon-btn.edit { background: #f8fafc; color: #0f172a; border-color: #cbd5e1; }
+    .icon-btn.delete { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+
+    .btn-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .searchable-select-container { position: relative; }
+    .searchable-select-list { position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #cbd5e1; border-radius: 8px; margin-top: 4px; max-height: 180px; overflow-y: auto; z-index: 1050; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); display: none; }
+    .searchable-select-item { padding: 10px 14px; font-size: 14px; color: #0f172a; cursor: pointer; transition: background-color 0.15s; }
+    .searchable-select-item:hover { background-color: #f1f5f9; }
+    .searchable-select-no-results { padding: 10px 14px; font-size: 14px; color: #64748b; text-align: center; }
+    .field-error { color: #dc2626; font-size: 12px; margin-top: 4px; display: none; }
+    @media (max-width: 768px) { body { padding: 20px; } .table-container { margin: 0 -20px; } .page-header { flex-direction: column; align-items: flex-start; } .toolbar { flex-direction: column; align-items: flex-start; } .toolbar-left, .toolbar-right { width: 100%; flex-direction: column; } .search-box { width: 100%; } .form-grid { grid-template-columns: 1fr; } }
+
+    /* --- DARK MODE STYLES --- */
+    body.dark-mode { background-color: #0f172a; color: #f1f5f9; }
+    body.dark-mode .page-title { color: #f1f5f9; }
+    body.dark-mode .page-title span { background: #1e293b; color: #94a3b8; }
+    body.dark-mode .toolbar { background: #1e293b; border-bottom-color: #334155; }
+    body.dark-mode .search-box { background: #0f172a; border-color: #334155; }
+    body.dark-mode .search-box input { color: #f1f5f9; }
+    body.dark-mode .form-input, body.dark-mode .form-select { background: #1e293b; border-color: #334155; color: #f1f5f9; }
+    body.dark-mode .table-container { background: #1e293b; }
+    body.dark-mode thead { background: #0f172a; border-bottom-color: #334155; }
+    body.dark-mode th { color: #94a3b8; }
+    body.dark-mode td { color: #f1f5f9; border-bottom-color: #334155; }
+    body.dark-mode tr:hover { background-color: #334155; }
+    body.dark-mode .modal-content { background: #1e293b; }
+    body.dark-mode .modal-header { border-bottom-color: #334155; }
+    body.dark-mode .modal-header h3 { color: #f1f5f9; }
+    body.dark-mode .modal-footer { background: #0f172a; border-top-color: #334155; }
+    body.dark-mode .form-label { color: #94a3b8; }
+    body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
+    body.dark-mode .searchable-select-list { background: #1e293b; border-color: #334155; }
+    body.dark-mode .searchable-select-item { color: #f1f5f9; }
+    body.dark-mode .searchable-select-item:hover { background-color: #334155; }
+    body.dark-mode .field-error { color: #fca5a5; }
+    body.dark-mode #toast { background: #1e293b !important; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="page-title">
+      📈 Student Performance
+      <span id="recordCount">0</span>
+    </div>
+    <div class="btn-group">
+      <button class="action-btn" onclick="openAddModal()">+ Add Performance Record</button>
+      <button class="action-btn" style="background: #10b981;" onclick="openTerminalReportModal()">📋 Terminal Report</button>
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="Search Student Name..." onkeyup="filterTable()">
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <select id="classFilter" class="form-select" onchange="filterTable()">
+        <option value="">All Classes</option>
+      </select>
+      <select id="yearFilter" class="form-select" onchange="filterTable()">
+        <option value="">All Years</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-container">
+    <div id="loading">Loading performance data...</div>
+    <table id="performanceTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Student Name</th>
+          <th>Class</th>
+          <th>Term</th>
+          <th>Academic Year</th>
+          <th>Course</th>
+          <th>Class Score (50%)</th>
+          <th>Exam Score (100%)</th>
+          <th>Exam Score (50%)</th>
+          <th>Total</th>
+          <th>Rank</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- ADD MODAL -->
+  <div class="modal-backdrop" id="performanceModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add Performance Record</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <form id="performanceForm" onsubmit="handleSubmit(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="classSelect">Select Class</label>
+            <select id="classSelect" class="form-select" required onchange="filterStudentsByClass(this.value)">
+              <option value="" disabled selected>Select Class</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="studentSearchInput">Student Name</label>
+            <div class="searchable-select-container">
+              <input type="text" id="studentSearchInput" class="form-input" placeholder="Select Class first" readonly onclick="openStudentDropdown()">
+              <input type="hidden" id="studentIdHidden" required>
+              <div id="studentSearchDropdown" class="searchable-select-list"></div>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="termSelect">Term</label>
+              <select id="termSelect" class="form-select" required>
+                <option value="" disabled selected>Select Term</option>
+                <option value="Term 1">Term 1</option>
+                <option value="Term 2">Term 2</option>
+                <option value="Term 3">Term 3</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="yearSelect">Academic Year</label>
+              <select id="yearSelect" class="form-select" required>
+                <option value="" disabled selected>Select Year</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="courseSelect">Course / Subject</label>
+            <select id="courseSelect" class="form-select" required>
+              <option value="" disabled selected>Select Course</option>
+            </select>
+          </div>
+          <hr style="border:0; border-top:1px solid #e2e8f0; margin: 4px 0 16px;">
+          <div class="form-group">
+            <label class="form-label" for="classScoreInput">Class Score (50%)</label>
+            <input type="number" step="0.1" min="0" max="50" id="classScoreInput" class="form-input" placeholder="0 � 50" oninput="calculateScores()" required>
+            <div class="field-error" id="classScoreError">Class Score cannot exceed 50.</div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="examScore100Input">Exam Score (out of 100)</label>
+              <input type="number" step="0.1" min="0" max="100" id="examScore100Input" class="form-input" placeholder="0 � 100" oninput="calculateScores()" required>
+              <div class="field-error" id="examScoreError">Exam Score cannot exceed 100.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="examScore50Input">Exam Score (50%)</label>
+              <input type="number" id="examScore50Input" class="form-input readonly-field" readonly placeholder="Calculated automatically">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="totalInput">Total Marks (100%)</label>
+            <input type="number" id="totalInput" class="form-input readonly-field" readonly placeholder="Calculated automatically">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveBtn">Save Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- EDIT MODAL -->
+  <div class="modal-backdrop" id="performanceEditModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Edit Performance Record</h3>
+        <button class="modal-close" onclick="closeEditModal()">&times;</button>
+      </div>
+      <form id="performanceEditForm" onsubmit="handleEditSubmit(event)">
+        <div class="modal-body">
+          <div style="margin-bottom:12px;"><strong>ID: <span id="edit_performanceId"></span></strong></div>
+          <div class="form-group">
+            <label class="form-label" for="edit_studentClass">Class</label>
+            <select id="edit_studentClass" class="form-select" required onchange="filterEditStudentsByClass(this.value)">
+              <option value="" disabled>Select Class</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit_studentSearchInput">Student Name</label>
+            <div class="searchable-select-container">
+              <input type="text" id="edit_studentSearchInput" class="form-input" placeholder="Select Class first" readonly onclick="openEditStudentDropdown()">
+              <input type="hidden" id="edit_studentIdHidden" required>
+              <div id="edit_studentSearchDropdown" class="searchable-select-list"></div>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="edit_term">Term</label>
+              <select id="edit_term" class="form-select" required>
+                <option value="" disabled>Select Term</option>
+                <option value="Term 1">Term 1</option>
+                <option value="Term 2">Term 2</option>
+                <option value="Term 3">Term 3</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit_academicYear">Academic Year</label>
+              <select id="edit_academicYear" class="form-select" required>
+                <option value="" disabled>Select Year</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit_course">Course / Subject</label>
+            <select id="edit_course" class="form-select" required>
+              <option value="" disabled>Select Course</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit_classScore">Class Score (50%)</label>
+            <input type="number" step="0.1" min="0" max="50" id="edit_classScore" class="form-input" placeholder="0 � 50" oninput="calculateEditScores()" required>
+            <div class="field-error" id="edit_classScoreError">Class Score cannot exceed 50.</div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="edit_examScore100">Exam Score (out of 100)</label>
+              <input type="number" step="0.1" min="0" max="100" id="edit_examScore100" class="form-input" placeholder="0 � 100" oninput="calculateEditScores()" required>
+              <div class="field-error" id="edit_examScoreError">Exam Score cannot exceed 100.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit_examScore50">Exam Score (50%)</label>
+              <input type="number" id="edit_examScore50" class="form-input readonly-field" readonly placeholder="Calculated automatically">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit_total">Total Marks (100%)</label>
+            <input type="number" id="edit_total" class="form-input readonly-field" readonly placeholder="Calculated automatically">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit_rank">Rank</label>
+            <input type="text" id="edit_rank" class="form-input" placeholder="Rank" readonly>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="editSaveBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRM MODAL -->
+  <div class="modal-backdrop" id="deleteConfirmModal">
+    <div class="modal-content">
+      <div class="modal-header"><h3>Confirm Delete</h3></div>
+      <div class="modal-body"><p>Delete this performance record? This action cannot be undone.</p></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeDeleteConfirm()">Cancel</button>
+        <button class="btn btn-primary" style="background:#ef4444;border:none;" onclick="doDeleteConfirmed()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TERMINAL REPORT GENERATOR MODAL -->
+  <div class="modal-backdrop" id="terminalReportModal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h3>📋 Terminal Report Generator</h3>
+        <button class="modal-close" onclick="closeTerminalReportModal()">&times;</button>
+      </div>
+      <form id="terminalReportForm" onsubmit="return false;">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="reportClass">Class <span style="color: #dc2626;">*</span></label>
+              <select id="reportClass" class="form-select" required onchange="validateReportFilters()">
+                <option value="" disabled selected>Select Class</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="reportTerm">Term <span style="color: #dc2626;">*</span></label>
+              <select id="reportTerm" class="form-select" required onchange="validateReportFilters()">
+                <option value="" disabled selected>Select Term</option>
+                <option value="Term 1">Term 1</option>
+                <option value="Term 2">Term 2</option>
+                <option value="Term 3">Term 3</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="reportYear">Academic Year <span style="color: #3b82f6;">(Auto-selected)</span></label>
+            <select id="reportYear" class="form-select" required onchange="validateReportFilters()">
+              <option value="" disabled selected>Select Year</option>
+            </select>
+          </div>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 16px 0;">
+          <div class="form-group">
+            <label class="form-label">Select Students <span style="color: #64748b;">(Select all or individual students)</span></label>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; max-height: 320px; overflow-y: auto;">
+              <div style="margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600; color: #0f172a;">
+                  <input type="checkbox" id="selectAllStudents" onchange="toggleAllStudents()" style="width: 18px; height: 18px; margin-right: 10px; cursor: pointer;" disabled>
+                  <span>Select All Students</span>
+                </label>
+                <button type="button" class="btn btn-primary" style="background: #0f766e; padding: 8px 14px; font-size: 13px;" onclick="downloadSelectedReportsZip()" id="downloadZipBtn" disabled>📦 Download Selected ZIP</button>
+              </div>
+              <div id="studentListContainer">
+                <p style="color: #64748b; text-align: center; padding: 20px;">Please select Class, Term and Academic Year first</p>
+              </div>
+            </div>
+            <div id="studentCountBadge" style="margin-top: 8px; font-size: 13px; color: #64748b; display: none;">
+              <span id="selectedCount">0</span> student(s) selected
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end;">
+          <button type="button" class="btn btn-secondary" onclick="closeTerminalReportModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" id="generateReportBtn" style="background: #0ea5e9;" onclick="handleGenerateReports()" disabled>🔍 Generate Report</button>
+          <button type="button" class="btn btn-primary" id="downloadZipFooterBtn" style="background: #10b981;" onclick="downloadSelectedReportsZip()" disabled>📦 Bulk ZIP Download</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let performanceList = [];
+    let allStudents = [];
+    let scorePercentages = {
+      classScorePercentage: 50,
+      examScorePercentage: 50,
+      classScoreDecimal: 0.5,
+      examScoreDecimal: 0.5
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        console.log('Performance page: DOMContentLoaded fired');
+        
+        // Ensure google.script is available
+        if (typeof google === 'undefined' || !google.script || !google.script.run) {
+          console.error('google.script.run is not available!');
+          alert('Error: Unable to connect to backend. Please refresh the page.');
+          return;
+        }
+        
+        // Load score percentages from settings
+        loadScorePercentages();
+        
+        loadDropdowns();
+      refreshData();
+      document.addEventListener('click', function(e) {
+        const addContainer = document.getElementById('studentSearchInput') && document.getElementById('studentSearchInput').closest('.searchable-select-container');
+        if (addContainer && !addContainer.contains(e.target)) {
+          document.getElementById('studentSearchDropdown').style.display = 'none';
+        }
+        const editContainer = document.getElementById('edit_studentSearchInput') && document.getElementById('edit_studentSearchInput').closest('.searchable-select-container');
+        if (editContainer && !editContainer.contains(e.target)) {
+          document.getElementById('edit_studentSearchDropdown').style.display = 'none';
+        }
+      });
+      document.getElementById('studentSearchInput').addEventListener('input', function() {
+        renderStudentList(this.value, 'studentSearchDropdown', document.getElementById('classSelect').value);
+      });
+      document.getElementById('studentSearchInput').addEventListener('focus', function() {
+        const cls = document.getElementById('classSelect').value;
+        if (cls) {
+          document.getElementById('studentSearchDropdown').style.display = 'block';
+          renderStudentList(this.value, 'studentSearchDropdown', cls);
+        }
+      });
+      document.getElementById('edit_studentSearchInput').addEventListener('input', function() {
+        renderStudentList(this.value, 'edit_studentSearchDropdown', document.getElementById('edit_studentClass').value);
+      });
+      document.getElementById('edit_studentSearchInput').addEventListener('focus', function() {
+        const cls = document.getElementById('edit_studentClass').value;
+        if (cls) {
+          document.getElementById('edit_studentSearchDropdown').style.display = 'block';
+          renderStudentList(this.value, 'edit_studentSearchDropdown', cls);
+        }
+      });
+      } catch (err) {
+        console.error('Error in DOMContentLoaded:', err);
+        alert('Error initializing page: ' + err.message);
+      }
+    });
+
+    function loadScorePercentages() {
+      google.script.run
+        .withSuccessHandler(function(percentages) {
+          if (percentages) {
+            scorePercentages = percentages;
+            
+            // Update labels to show dynamic percentages
+            const classScoreLabel = document.querySelector('label[for="classScoreInput"]');
+            if (classScoreLabel) {
+              classScoreLabel.textContent = `Class Score (${percentages.classScorePercentage}%)`;
+            }
+            const editClassScoreLabel = document.querySelector('label[for="edit_classScore"]');
+            if (editClassScoreLabel) {
+              editClassScoreLabel.textContent = `Class Score (${percentages.classScorePercentage}%)`;
+            }
+            
+            const examWeightedLabel = document.querySelector('label[for="examScore50Input"]');
+            if (examWeightedLabel) {
+              examWeightedLabel.textContent = `Exam Score (${percentages.examScorePercentage}%)`;
+            }
+            const editExamWeightedLabel = document.querySelector('label[for="edit_examScore50"]');
+            if (editExamWeightedLabel) {
+              editExamWeightedLabel.textContent = `Exam Score (${percentages.examScorePercentage}%)`;
+            }
+            
+            // Update input max attributes and placeholders
+            const classScoreInput = document.getElementById('classScoreInput');
+            if (classScoreInput) {
+              classScoreInput.setAttribute('max', percentages.classScorePercentage);
+              classScoreInput.setAttribute('placeholder', `0 – ${percentages.classScorePercentage}`);
+            }
+            const editClassScoreInput = document.getElementById('edit_classScore');
+            if (editClassScoreInput) {
+              editClassScoreInput.setAttribute('max', percentages.classScorePercentage);
+              editClassScoreInput.setAttribute('placeholder', `0 – ${percentages.classScorePercentage}`);
+            }
+            
+            // Update error messages
+            const classScoreError = document.getElementById('classScoreError');
+            if (classScoreError) {
+              classScoreError.textContent = `Class Score cannot exceed ${percentages.classScorePercentage}.`;
+            }
+            const editClassScoreError = document.getElementById('edit_classScoreError');
+            if (editClassScoreError) {
+              editClassScoreError.textContent = `Class Score cannot exceed ${percentages.classScorePercentage}.`;
+            }
+            
+            console.log('Score percentages loaded:', percentages);
+          }
+        })
+        .withFailureHandler(function(err) {
+          console.error('Failed to load score percentages:', err);
+          // Keep using default 50/50 split
+        })
+        .getScorePercentages();
+    }
+
+    function calculateScores() {
+      const classScore = parseFloat(document.getElementById('classScoreInput').value) || 0;
+      const exam100 = parseFloat(document.getElementById('examScore100Input').value) || 0;
+      const classErr = document.getElementById('classScoreError');
+      const examErr = document.getElementById('examScoreError');
+      
+      // Use dynamic percentages from settings
+      const maxClassScore = scorePercentages.classScorePercentage;
+      const maxExamScore = 100;
+      
+      classErr.style.display = classScore > maxClassScore ? 'block' : 'none';
+      examErr.style.display = exam100 > maxExamScore ? 'block' : 'none';
+      
+      const examWeighted = Math.round((exam100 * scorePercentages.examScoreDecimal) * 10) / 10;
+      document.getElementById('examScore50Input').value = examWeighted;
+      const total = Math.round((classScore + examWeighted) * 10) / 10;
+      document.getElementById('totalInput').value = total;
+    }
+
+    function calculateEditScores() {
+      const classScore = parseFloat(document.getElementById('edit_classScore').value) || 0;
+      const exam100 = parseFloat(document.getElementById('edit_examScore100').value) || 0;
+      const classErr = document.getElementById('edit_classScoreError');
+      const examErr = document.getElementById('edit_examScoreError');
+      
+      // Use dynamic percentages from settings
+      const maxClassScore = scorePercentages.classScorePercentage;
+      const maxExamScore = 100;
+      
+      classErr.style.display = classScore > maxClassScore ? 'block' : 'none';
+      examErr.style.display = exam100 > maxExamScore ? 'block' : 'none';
+      
+      const examWeighted = Math.round((exam100 * scorePercentages.examScoreDecimal) * 10) / 10;
+      document.getElementById('edit_examScore50').value = examWeighted;
+      const total = Math.round((classScore + examWeighted) * 10) / 10;
+      document.getElementById('edit_total').value = total;
+    }
+
+    function openStudentDropdown() {
+      const cls = document.getElementById('classSelect').value;
+      if (!cls) { alert('Please select a Class first.'); return; }
+      const dd = document.getElementById('studentSearchDropdown');
+      dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+      document.getElementById('studentSearchInput').select && document.getElementById('studentSearchInput').select();
+    }
+
+    function openEditStudentDropdown() {
+      const cls = document.getElementById('edit_studentClass').value;
+      if (!cls) { alert('Please select a Class first.'); return; }
+      const dd = document.getElementById('edit_studentSearchDropdown');
+      dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function filterStudentsByClass(cls) {
+      document.getElementById('studentIdHidden').value = '';
+      document.getElementById('studentSearchInput').value = '';
+      document.getElementById('studentSearchInput').readOnly = false;
+      document.getElementById('studentSearchInput').placeholder = 'Type to search student...';
+      document.getElementById('studentSearchDropdown').innerHTML = '';
+      renderStudentList('', 'studentSearchDropdown', cls);
+    }
+
+    function filterEditStudentsByClass(cls) {
+      document.getElementById('edit_studentIdHidden').value = '';
+      document.getElementById('edit_studentSearchInput').value = '';
+      document.getElementById('edit_studentSearchInput').readOnly = false;
+      document.getElementById('edit_studentSearchInput').placeholder = 'Type to search student...';
+      document.getElementById('edit_studentSearchDropdown').innerHTML = '';
+      renderStudentList('', 'edit_studentSearchDropdown', cls);
+    }
+
+    function renderStudentList(filterText, dropdownId, selectedClass) {
+      const dropdown = document.getElementById(dropdownId);
+      dropdown.innerHTML = '';
+      if (!selectedClass) return;
+      const filtered = allStudents.filter(s => s.studentClass === selectedClass && (s.studentId.toLowerCase().includes(filterText.toLowerCase()) || s.fullName.toLowerCase().includes(filterText.toLowerCase())));
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div class="searchable-select-no-results">No students found</div>';
+        dropdown.style.display = 'block';
+        return;
+      }
+      filtered.forEach(s => {
+        const item = document.createElement('div');
+        item.className = 'searchable-select-item';
+        item.innerText = `${s.fullName} (${s.studentId})`;
+        item.onclick = function() {
+          if (dropdownId === 'studentSearchDropdown') {
+            selectStudent(s.studentId, s.fullName, 'studentIdHidden', 'studentSearchInput', 'studentSearchDropdown');
+          } else {
+            selectStudent(s.studentId, s.fullName, 'edit_studentIdHidden', 'edit_studentSearchInput', 'edit_studentSearchDropdown');
+          }
+        };
+        dropdown.appendChild(item);
+      });
+      dropdown.style.display = 'block';
+    }
+
+    function selectStudent(studentId, fullName, hiddenId, inputId, dropdownId) {
+      document.getElementById(hiddenId).value = studentId;
+      document.getElementById(inputId).value = `${fullName} (${studentId})`;
+      document.getElementById(dropdownId).style.display = 'none';
+    }
+
+    function loadDropdowns() {
+      google.script.run.withSuccessHandler(function(classes) {
+        const addSelect = document.getElementById('classSelect');
+        const editSelect = document.getElementById('edit_studentClass');
+        const filter = document.getElementById('classFilter');
+        addSelect.innerHTML = '<option value="" disabled selected>Select Class</option>';
+        editSelect.innerHTML = '<option value="" disabled>Select Class</option>';
+        classes.forEach(c => {
+          [addSelect, editSelect].forEach(sel => {
+            const o = document.createElement('option'); o.value = c; o.innerText = c; sel.appendChild(o);
+          });
+          const o = document.createElement('option'); o.value = c; o.innerText = c; filter.appendChild(o);
+        });
+      }).getClassNames();
+
+      google.script.run.withSuccessHandler(function(years) {
+        const addSelect = document.getElementById('yearSelect');
+        const editSelect = document.getElementById('edit_academicYear');
+        const filter = document.getElementById('yearFilter');
+        addSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
+        editSelect.innerHTML = '<option value="" disabled>Select Year</option>';
+        const activeYears = years.filter(y => y.status === 'Active');
+        
+        // Populate add/edit modals with active years and label them
+        activeYears.forEach(y => {
+          [addSelect, editSelect].forEach(sel => {
+            const o = document.createElement('option'); 
+            o.value = y.academicYear; 
+            o.innerText = y.academicYear + ' (Active)'; 
+            sel.appendChild(o);
+          });
+        });
+        
+        // Auto-select active year in modals if only one active year exists
+        if (activeYears.length === 1) {
+          addSelect.value = activeYears[0].academicYear;
+          editSelect.value = activeYears[0].academicYear;
+        }
+        
+        // Populate filter with all years and auto-select active
+        let activeYear = null;
+        years.forEach(y => {
+          const o = document.createElement('option'); 
+          o.value = y.academicYear; 
+          o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : ''); 
+          filter.appendChild(o);
+          if (y.status === 'Active') activeYear = y.academicYear;
+        });
+        
+        // Auto-select active year in filter (apply after data loads)
+        if (activeYear) {
+          filter.value = activeYear;
+        }
+      }).withFailureHandler(function(err) { console.error('Error loading years:', err); }).getAcademicYearsData();
+
+      google.script.run.withSuccessHandler(function(courses) {
+        const addSelect = document.getElementById('courseSelect');
+        const editSelect = document.getElementById('edit_course');
+        addSelect.innerHTML = '<option value="" disabled selected>Select Course</option>';
+        editSelect.innerHTML = '<option value="" disabled>Select Course</option>';
+        courses.forEach(c => {
+          [addSelect, editSelect].forEach(sel => {
+            const o = document.createElement('option'); o.value = c.courseName; o.innerText = c.courseName; sel.appendChild(o);
+          });
+        });
+      }).withFailureHandler(function(err) { console.error('Error loading courses:', err); }).getCoursesData();
+
+      google.script.run.withSuccessHandler(function(students) {
+        allStudents = students || [];
+      }).withFailureHandler(function(err) { console.error('Error loading students:', err); }).getStudentIdNamePairs();
+    }
+
+    function refreshData() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('performanceTable').style.display = 'none';
+      google.script.run
+        .withSuccessHandler(renderTable)
+        .withFailureHandler(function(err) {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('performanceTable').style.display = 'table';
+          document.getElementById('tableBody').innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:#ef4444;">Error loading performance data: ' + (err && err.message ? err.message : 'Unknown error') + '</td></tr>';
+          showToast('Error loading performance data', 'error');
+        })
+        .getPerformanceData();
+    }
+
+    function renderTable(data) {
+      performanceList = computeRanks(data || []);
+      const tbody = document.getElementById('tableBody');
+      const loading = document.getElementById('loading');
+      const table = document.getElementById('performanceTable');
+      const countBadge = document.getElementById('recordCount');
+      loading.style.display = 'none';
+      table.style.display = 'table';
+      countBadge.innerText = performanceList.length;
+      tbody.innerHTML = '';
+      if (performanceList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:30px; color:#64748b;">No performance records found.</td></tr>`;
+        return;
+      }
+      performanceList.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-class', row.studentClass || '');
+        tr.setAttribute('data-id', row.performanceId || '');
+        tr.setAttribute('data-year', row.academicYear || '');
+        const examWeighted = row.examScore50 !== undefined ? row.examScore50 : (row.examScore60 !== undefined ? row.examScore60 : '-');
+        tr.innerHTML = `
+          <td><strong>${row.performanceId || '-'}</strong></td>
+          <td>${row.studentName || '-'}</td>
+          <td>${row.studentClass || '-'}</td>
+          <td>${row.term || '-'}</td>
+          <td>${row.academicYear || '-'}</td>
+          <td>${row.course || '-'}</td>
+          <td>${row.classScore !== undefined ? row.classScore : '-'}</td>
+          <td>${row.examScore100 !== undefined ? row.examScore100 : '-'}</td>
+          <td>${examWeighted}</td>
+          <td><strong>${row.total !== undefined ? row.total : '-'}</strong></td>
+          <td><span style="font-weight:600; color:#3b82f6;">${row.rank || '-'}</span></td>
+          <td style="white-space:nowrap;"><button class="icon-btn edit" title="Edit" onclick="openEditModal('${row.performanceId || ''}')">✏️</button><button class="icon-btn delete" title="Delete" onclick="confirmDelete('${row.performanceId || ''}')">🗑️</button></td>`;
+        tbody.appendChild(tr);
+      });
+      filterTable();
+    }
+
+    function openAddModal() {
+      document.getElementById('performanceForm').reset();
+      document.getElementById('classSelect').value = '';
+      document.getElementById('studentIdHidden').value = '';
+      document.getElementById('studentSearchInput').value = '';
+      document.getElementById('studentSearchInput').readOnly = true;
+      document.getElementById('studentSearchInput').placeholder = 'Select Class first';
+      document.getElementById('studentSearchDropdown').innerHTML = '';
+      document.getElementById('studentSearchDropdown').style.display = 'none';
+      document.getElementById('examScore50Input').value = '';
+      document.getElementById('totalInput').value = '';
+      document.getElementById('classScoreError').style.display = 'none';
+      document.getElementById('examScoreError').style.display = 'none';
+      document.getElementById('performanceModal').classList.add('active');
+    }
+
+    function closeModal() { document.getElementById('performanceModal').classList.remove('active'); }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+      const classScore = parseFloat(document.getElementById('classScoreInput').value) || 0;
+      const exam100 = parseFloat(document.getElementById('examScore100Input').value) || 0;
+      
+      // Use dynamic max values from settings
+      const maxClassScore = scorePercentages.classScorePercentage;
+      
+      if (classScore > maxClassScore) { 
+        document.getElementById('classScoreError').textContent = `Class Score cannot exceed ${maxClassScore}.`;
+        document.getElementById('classScoreError').style.display = 'block'; 
+        document.getElementById('classScoreInput').focus(); 
+        return; 
+      }
+      if (exam100 > 100) { document.getElementById('examScoreError').style.display = 'block'; document.getElementById('examScore100Input').focus(); return; }
+      // Duplicate validation: ensure same student/course/class/term/year not already taken
+      const studentId = document.getElementById('studentIdHidden').value || '';
+      const input = document.getElementById('studentSearchInput');
+      const studentName = input.value.replace(/\s*\(.*?\)\s*$/, '').trim();
+      const selectedClass = document.getElementById('classSelect').value || '';
+      const selectedTerm = document.getElementById('termSelect').value || '';
+      const selectedYear = document.getElementById('yearSelect').value || '';
+      const selectedCourse = document.getElementById('courseSelect').value || '';
+
+      // Normalize for consistent comparison
+      const normalize = (str) => String(str || '').trim().toLowerCase();
+
+      const duplicate = performanceList.find(p => {
+        const pStudentId = normalize(p.studentId);
+        const pStudentName = normalize(p.studentName);
+        const inputStudentId = normalize(studentId);
+        const inputStudentName = normalize(studentName);
+
+        const sameStudent = (inputStudentId !== '' && pStudentId !== '')
+          ? pStudentId === inputStudentId
+          : pStudentName === inputStudentName;
+        const sameClass = normalize(p.studentClass) === normalize(selectedClass);
+        const sameTerm = normalize(p.term) === normalize(selectedTerm);
+        const sameYear = normalize(p.academicYear) === normalize(selectedYear);
+        const sameCourse = normalize(p.course) === normalize(selectedCourse);
+        return sameStudent && sameClass && sameTerm && sameYear && sameCourse;
+      });
+      if (duplicate) { showToast('A performance record for this student, course, class, term and year already exists.', 'error'); return; }
+
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true; btn.innerText = 'Saving...';
+      const data = { studentId: studentId, studentName: studentName, studentClass: selectedClass, term: selectedTerm, academicYear: selectedYear, course: selectedCourse, classScore: classScore, examScore100: exam100, examScore60: parseFloat(document.getElementById('examScore50Input').value) || 0, examScore50: parseFloat(document.getElementById('examScore50Input').value) || 0, total: parseFloat(document.getElementById('totalInput').value) || 0 };
+      google.script.run.withSuccessHandler(function(res) { btn.disabled = false; btn.innerText = 'Save Record'; if (res && res.success) { closeModal(); refreshData(); showToast('Performance record added — ID: ' + (res.performanceId || ''), 'success'); } else { showToast(res && res.message ? res.message : 'Failed to add performance record', 'error'); } }).withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Save Record'; showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error'); }).addPerformance(data);
+    }
+
+    function openEditModal(id) {
+      if (!id) { showToast('Missing record id', 'error'); return; }
+      const item = performanceList.find(p => p.performanceId === id);
+      if (!item) { showToast('Record not found', 'error'); return; }
+      document.getElementById('edit_performanceId').innerText = item.performanceId || '';
+      const classSelect = document.getElementById('edit_studentClass');
+      if ([...classSelect.options].some(o => o.value === item.studentClass)) {
+        classSelect.value = item.studentClass;
+      } else { const o = document.createElement('option'); o.value = item.studentClass; o.innerText = item.studentClass; classSelect.appendChild(o); classSelect.value = item.studentClass; }
+      document.getElementById('edit_studentIdHidden').value = item.studentId || item.studentName || '';
+      document.getElementById('edit_studentSearchInput').value = item.studentName + (item.studentId ? ` (${item.studentId})` : '');
+      document.getElementById('edit_studentSearchInput').readOnly = false;
+      document.getElementById('edit_studentSearchDropdown').style.display = 'none';
+      document.getElementById('edit_term').value = item.term || '';
+      const yearSelect = document.getElementById('edit_academicYear');
+      if ([...yearSelect.options].some(o => o.value === item.academicYear)) {
+        yearSelect.value = item.academicYear;
+      } else { const o = document.createElement('option'); o.value = item.academicYear; o.innerText = item.academicYear + ' (Inactive)'; yearSelect.appendChild(o); yearSelect.value = item.academicYear; }
+      const courseSelect = document.getElementById('edit_course');
+      if ([...courseSelect.options].some(o => o.value === item.course)) {
+        courseSelect.value = item.course;
+      } else if (item.course) { const o = document.createElement('option'); o.value = item.course; o.innerText = item.course; courseSelect.appendChild(o); courseSelect.value = item.course; }
+      document.getElementById('edit_classScore').value = item.classScore || 0;
+      document.getElementById('edit_examScore100').value = item.examScore100 || 0;
+      const weighted = item.examScore50 !== undefined ? item.examScore50 : (item.examScore60 || 0);
+      document.getElementById('edit_examScore50').value = weighted;
+      document.getElementById('edit_total').value = item.total || 0;
+      document.getElementById('edit_rank').value = item.rank || '';
+      document.getElementById('edit_classScoreError').style.display = 'none';
+      document.getElementById('edit_examScoreError').style.display = 'none';
+      document.getElementById('performanceEditModal').classList.add('active');
+    }
+
+    function closeEditModal() { document.getElementById('performanceEditModal').classList.remove('active'); }
+
+    function handleEditSubmit(e) {
+      e.preventDefault();
+      const classScore = parseFloat(document.getElementById('edit_classScore').value) || 0;
+      const exam100 = parseFloat(document.getElementById('edit_examScore100').value) || 0;
+      
+      // Use dynamic max values from settings
+      const maxClassScore = scorePercentages.classScorePercentage;
+      
+      if (classScore > maxClassScore) { 
+        document.getElementById('edit_classScoreError').textContent = `Class Score cannot exceed ${maxClassScore}.`;
+        document.getElementById('edit_classScoreError').style.display = 'block'; 
+        document.getElementById('edit_classScore').focus(); 
+        return; 
+      }
+      if (exam100 > 100) { document.getElementById('edit_examScoreError').style.display = 'block'; document.getElementById('edit_examScore100').focus(); return; }
+      const perfId = document.getElementById('edit_performanceId').innerText;
+      const studentId = document.getElementById('edit_studentIdHidden').value || '';
+      const inputVal = document.getElementById('edit_studentSearchInput').value;
+      const studentName = inputVal.replace(/\s*\(.*?\)\s*$/, '').trim();
+      // Duplicate validation: ensure we don't create another record with same student/course/class/term/year
+      const selectedClass = document.getElementById('edit_studentClass').value || '';
+      const selectedTerm = document.getElementById('edit_term').value || '';
+      const selectedYear = document.getElementById('edit_academicYear').value || '';
+      const selectedCourse = document.getElementById('edit_course').value || '';
+      
+      // Normalize for consistent comparison
+      const normalize = (str) => String(str || '').trim().toLowerCase();
+      
+      const duplicate = performanceList.find(p => {
+        if (String(p.performanceId || '') === String(perfId)) return false; // ignore same record
+        const pStudentId = normalize(p.studentId);
+        const pStudentName = normalize(p.studentName);
+        const inputStudentId = normalize(studentId);
+        const inputStudentName = normalize(studentName);
+
+        const sameStudent = (inputStudentId !== '' && pStudentId !== '')
+          ? pStudentId === inputStudentId
+          : pStudentName === inputStudentName;
+        const sameClass = normalize(p.studentClass) === normalize(selectedClass);
+        const sameTerm = normalize(p.term) === normalize(selectedTerm);
+        const sameYear = normalize(p.academicYear) === normalize(selectedYear);
+        const sameCourse = normalize(p.course) === normalize(selectedCourse);
+        return sameStudent && sameClass && sameTerm && sameYear && sameCourse;
+      });
+      if (duplicate) { showToast('Another performance record already exists for this student with the same course, class, term and year.', 'error'); return; }
+
+      const data = { studentId: studentId, studentName: studentName, studentClass: selectedClass, term: selectedTerm, academicYear: selectedYear, course: selectedCourse, classScore: classScore, examScore100: exam100, examScore60: parseFloat(document.getElementById('edit_examScore50').value) || 0, examScore50: parseFloat(document.getElementById('edit_examScore50').value) || 0, total: parseFloat(document.getElementById('edit_total').value) || 0, rank: document.getElementById('edit_rank').value || '' };
+      const btn = document.getElementById('editSaveBtn');
+      btn.disabled = true; btn.innerText = 'Saving...';
+      google.script.run.withSuccessHandler(function(res) { btn.disabled = false; btn.innerText = 'Save Changes'; if (res && res.success) { closeEditModal(); refreshData(); showToast('Record updated', 'success'); } else { showToast(res && res.message ? res.message : 'Update failed', 'error'); } }).withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Save Changes'; showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error'); }).updatePerformance(perfId, data);
+    }
+
+    function confirmDelete(id) { if (!id) return showToast('Missing id', 'error'); openDeleteConfirm(id); }
+    function openDeleteConfirm(id) { const m = document.getElementById('deleteConfirmModal'); m.setAttribute('data-id', id); m.classList.add('active'); }
+    function closeDeleteConfirm() { const m = document.getElementById('deleteConfirmModal'); m.classList.remove('active'); m.removeAttribute('data-id'); }
+    function doDeleteConfirmed() { const m = document.getElementById('deleteConfirmModal'); const id = m.getAttribute('data-id'); if (!id) { closeDeleteConfirm(); return; } google.script.run.withSuccessHandler(function(res) { if (res && res.success) { refreshData(); showToast('Deleted', 'success'); } else { showToast(res && res.message ? res.message : 'Delete failed', 'error'); } closeDeleteConfirm(); }).withFailureHandler(function(err) { showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error'); closeDeleteConfirm(); }).deletePerformance(id); }
+
+    function filterTable() {
+      const searchVal = document.getElementById('searchInput').value.toLowerCase();
+      const classVal = document.getElementById('classFilter').value.toLowerCase();
+      const yearVal = document.getElementById('yearFilter').value.toLowerCase();
+      const rows = document.querySelectorAll('#tableBody tr');
+      const countBadge = document.getElementById('recordCount');
+      let visibleCount = 0;
+      let hasPlaceholder = false;
+      rows.forEach(row => {
+        if (row.cells.length === 1 && row.cells[0].getAttribute('colspan')) {
+          hasPlaceholder = true;
+          row.style.display = 'none';
+          return;
+        }
+        const studentName = row.cells[1].innerText.toLowerCase();
+        const rowClass = (row.getAttribute('data-class') || '').toLowerCase();
+        const rowYear = (row.getAttribute('data-year') || '').toLowerCase();
+        const matchSearch = studentName.includes(searchVal);
+        const matchClass = classVal === '' || rowClass === classVal;
+        const matchYear = yearVal === '' || rowYear === yearVal;
+        if (matchSearch && matchClass && matchYear) { row.style.display = ''; visibleCount++; } else { row.style.display = 'none'; }
+      });
+      if (visibleCount === 0 && performanceList.length > 0) {
+        const tbody = document.getElementById('tableBody');
+        let msgRow = document.getElementById('filterEmptyRow');
+        if (!msgRow) {
+          msgRow = document.createElement('tr');
+          msgRow.id = 'filterEmptyRow';
+          msgRow.innerHTML = '<td colspan="12" style="text-align:center; padding:30px; color:#64748b;">No records match the current filters.</td>';
+          tbody.appendChild(msgRow);
+        }
+        msgRow.style.display = '';
+      } else {
+        const msgRow = document.getElementById('filterEmptyRow');
+        if (msgRow) msgRow.style.display = 'none';
+      }
+      if (visibleCount === 0 && performanceList.length === 0 && hasPlaceholder) {
+        const placeholder = rows[0];
+        if (placeholder) placeholder.style.display = '';
+      }
+      countBadge.innerText = visibleCount;
+    }
+
+    function computeRanks(records) {
+      const items = (records || []).map(r => Object.assign({}, r));
+      const groups = {};
+      items.forEach(item => { const key = `${(item.studentClass || '').trim().toLowerCase()}|${(item.term || '').trim().toLowerCase()}|${(item.academicYear || '').trim().toLowerCase()}|${(item.course || '').trim().toLowerCase()}`; if (!groups[key]) groups[key] = []; groups[key].push(item); });
+      Object.values(groups).forEach(group => { group.sort((a, b) => { const d = (b.total || 0) - (a.total || 0); return d !== 0 ? d : String(a.studentName || '').localeCompare(String(b.studentName || '')); }); group.forEach((item, i) => { item.rank = String(i + 1); }); });
+      return items;
+    }
+
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.display = 'block';
+      if (type === 'success') t.style.background = '#10b981';
+      else if (type === 'error') t.style.background = '#ef4444';
+      else t.style.background = '#64748b';
+      clearTimeout(window._toastTimeout);
+      window._toastTimeout = setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    function openTerminalReportModal() {
+      const reportClassSelect = document.getElementById('reportClass');
+      const reportYearSelect = document.getElementById('reportYear');
+      reportClassSelect.innerHTML = '<option value="" disabled selected>Select Class</option>';
+      reportYearSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
+      google.script.run.withSuccessHandler(function(classes) {
+        classes.forEach(cls => {
+          const opt = document.createElement('option'); opt.value = cls; opt.innerText = cls; reportClassSelect.appendChild(opt);
+        });
+      }).withFailureHandler(function(err) { console.error('Error loading classes:', err); }).getClassNames();
+      google.script.run.withSuccessHandler(function(years) {
+        const activeYears = years.filter(y => y.status === 'Active');
+        years.forEach(year => {
+          const opt = document.createElement('option'); opt.value = year.academicYear; opt.innerText = year.academicYear + (year.status === 'Active' ? ' (Active)' : ''); reportYearSelect.appendChild(opt);
+        });
+        if (activeYears.length === 1) {
+          reportYearSelect.value = activeYears[0].academicYear;
+          validateReportFilters();
+        }
+      }).withFailureHandler(function(err) { console.error('Error loading years:', err); }).getAcademicYearsData();
+      document.getElementById('terminalReportForm').reset();
+      document.getElementById('studentListContainer').innerHTML = '<p style="color: #64748b; text-align: center; padding: 20px;">Please select Class, Term and Academic Year first</p>';
+      const selectAllControl = document.getElementById('selectAllStudents');
+      selectAllControl.checked = false;
+      selectAllControl.disabled = true;
+      document.getElementById('studentCountBadge').style.display = 'none';
+      document.getElementById('downloadZipBtn').disabled = true;
+      document.getElementById('downloadZipFooterBtn').disabled = true;
+      document.getElementById('generateReportBtn').disabled = true;
+      document.getElementById('terminalReportModal').classList.add('active');
+    }
+
+    function closeTerminalReportModal() { document.getElementById('terminalReportModal').classList.remove('active'); }
+
+    function loadStudentsForReport() {
+      const selectedClass = document.getElementById('reportClass').value;
+      const container = document.getElementById('studentListContainer');
+      const selectAll = document.getElementById('selectAllStudents');
+      const downloadZipBtn = document.getElementById('downloadZipBtn');
+      const downloadZipFooterBtn = document.getElementById('downloadZipFooterBtn');
+      if (!selectedClass) {
+        container.innerHTML = '<p style="color: #64748b; text-align: center; padding: 20px;">Please select a class first</p>';
+        selectAll.checked = false; selectAll.disabled = true;
+        downloadZipBtn.disabled = true; downloadZipFooterBtn.disabled = true;
+        document.getElementById('studentCountBadge').style.display = 'none';
+        return;
+      }
+      const studentsInClass = allStudents.filter(s => s.studentClass === selectedClass);
+      if (studentsInClass.length === 0) {
+        container.innerHTML = '<p style="color: #64748b; text-align: center; padding: 20px;">No students found in this class</p>';
+        selectAll.checked = false; selectAll.disabled = true;
+        downloadZipBtn.disabled = true; downloadZipFooterBtn.disabled = true;
+        document.getElementById('studentCountBadge').style.display = 'none';
+        return;
+      }
+      selectAll.disabled = false;
+      container.innerHTML = '';
+      studentsInClass.forEach(student => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 10px 0; border-bottom: 1px solid #e2e8f0;';
+        const left = document.createElement('div');
+        left.style.cssText = 'display:flex; align-items:center; gap:10px; flex:1; min-width:0;';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox'; checkbox.className = 'student-checkbox'; checkbox.value = student.studentId;
+        checkbox.dataset.studentName = student.fullName;
+        checkbox.style.cssText = 'width: 16px; height: 16px; cursor: pointer;';
+        checkbox.onchange = updateStudentCount;
+        const label = document.createElement('div');
+        label.style.cssText = 'display:flex; align-items:center; gap:6px; color:#0f172a; font-size:14px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+        label.innerHTML = `<span style="font-size:14px;">📄</span> ${student.fullName} (${student.studentId})`;
+        left.appendChild(checkbox);
+        left.appendChild(label);
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap;';
+        const previewBtn = document.createElement('button');
+        previewBtn.type = 'button'; previewBtn.className = 'btn btn-secondary'; previewBtn.style.cssText = 'padding: 8px 12px; font-size: 13px;'; previewBtn.innerText = 'Preview'; previewBtn.onclick = function() { previewStudentReport({ studentId: student.studentId, studentName: student.fullName }); };
+        const downloadBtn = document.createElement('button');
+        downloadBtn.type = 'button'; downloadBtn.className = 'btn btn-primary'; downloadBtn.style.cssText = 'padding: 8px 12px; font-size: 13px; background:#2563eb; border:none;'; downloadBtn.innerText = 'Download'; downloadBtn.onclick = function() { downloadStudentReport({ studentId: student.studentId, studentName: student.fullName }); };
+        actions.appendChild(previewBtn);
+        actions.appendChild(downloadBtn);
+        row.appendChild(left);
+        row.appendChild(actions);
+        container.appendChild(row);
+      });
+      document.getElementById('studentCountBadge').style.display = 'block';
+      updateStudentCount();
+    }
+
+    function toggleAllStudents() {
+      const selectAll = document.getElementById('selectAllStudents');
+      const checkboxes = document.querySelectorAll('.student-checkbox');
+      checkboxes.forEach(cb => { cb.checked = selectAll.checked; });
+      updateStudentCount();
+    }
+
+    function validateReportFilters() {
+      const classVal = document.getElementById('reportClass').value;
+      const termVal = document.getElementById('reportTerm').value;
+      const yearVal = document.getElementById('reportYear').value;
+      const container = document.getElementById('studentListContainer');
+      const selectAll = document.getElementById('selectAllStudents');
+      const downloadZipBtn = document.getElementById('downloadZipBtn');
+      const downloadZipFooterBtn = document.getElementById('downloadZipFooterBtn');
+      selectAll.disabled = true;
+      downloadZipBtn.disabled = true;
+      downloadZipFooterBtn.disabled = true;
+      document.getElementById('generateReportBtn').disabled = true;
+      if (!classVal || !termVal || !yearVal) {
+        container.innerHTML = '<p style="color: #64748b; text-align: center; padding: 20px;">Please select Class, Term and Academic Year first</p>';
+        document.getElementById('studentCountBadge').style.display = 'none';
+        return;
+      }
+      loadStudentsForReport();
+    }
+
+    function updateStudentCount() {
+      const checkboxes = document.querySelectorAll('.student-checkbox:checked');
+      const allCheckboxes = document.querySelectorAll('.student-checkbox');
+      document.getElementById('selectedCount').innerText = checkboxes.length;
+      const selectAll = document.getElementById('selectAllStudents');
+      if (allCheckboxes.length > 0) { selectAll.checked = checkboxes.length === allCheckboxes.length; }
+      const generateReportBtn = document.getElementById('generateReportBtn');
+      const downloadZipBtn = document.getElementById('downloadZipBtn');
+      const downloadZipFooterBtn = document.getElementById('downloadZipFooterBtn');
+      const multiSelected = checkboxes.length > 1;
+      const anySelected = checkboxes.length > 0;
+      if (generateReportBtn) generateReportBtn.disabled = !anySelected;
+      if (downloadZipBtn) downloadZipBtn.disabled = !multiSelected;
+      if (downloadZipFooterBtn) downloadZipFooterBtn.disabled = !multiSelected;
+    }
+
+    function handleGenerateReports() {
+      const classVal = document.getElementById('reportClass').value;
+      const yearVal = document.getElementById('reportYear').value;
+      const termVal = document.getElementById('reportTerm').value;
+      const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+      const selectedStudents = Array.from(selectedCheckboxes).map(cb => ({ studentId: cb.value, studentName: cb.dataset.studentName }));
+      if (!classVal || !yearVal || !termVal) { showToast('Please select Class, Term and Academic Year first', 'error'); return; }
+      if (selectedStudents.length === 0) { showToast('Please select at least one student', 'error'); return; }
+      if (selectedStudents.length === 1) { previewStudentReport(selectedStudents[0]); return; }
+      showToast('Multiple students selected. Use Download ZIP to download all reports.', 'success');
+    }
+
+    function downloadSelectedReportsZip() {
+      const classVal = document.getElementById('reportClass').value;
+      const yearVal = document.getElementById('reportYear').value;
+      const termVal = document.getElementById('reportTerm').value;
+      const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+      if (!classVal || !yearVal || !termVal) { showToast('Please select Class, Term and Academic Year first', 'error'); return; }
+      if (selectedCheckboxes.length === 0) { showToast('Please select at least one student to download', 'error'); return; }
+      if (selectedCheckboxes.length < 2) { showToast('Select two or more students to download as ZIP', 'error'); return; }
+      const students = Array.from(selectedCheckboxes).map(cb => ({ studentId: cb.value, studentName: cb.dataset.studentName }));
+      const zipButtons = [document.getElementById('downloadZipBtn'), document.getElementById('downloadZipFooterBtn')];
+      zipButtons.forEach(btn => { if (btn) { btn.disabled = true; btn.innerText = 'Preparing ZIP...'; } });
+      google.script.run.withSuccessHandler(function(res) {
+        zipButtons.forEach(btn => { if (btn) btn.innerText = '📦 Bulk ZIP Download'; if (btn) btn.disabled = false; });
+        if (res && res.success && res.base64 && res.fileName) { downloadBase64File(res.base64, res.fileName, 'application/zip'); showToast('ZIP file ready for download', 'success'); } else { showToast(res && res.message ? res.message : 'Failed to create ZIP file', 'error'); }
+      }).withFailureHandler(function(err) {
+        zipButtons.forEach(btn => { if (btn) btn.disabled = false; if (btn) btn.innerText = '📦 Bulk ZIP Download'; });
+        showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error');
+      }).generateTerminalReports({ studentClass: classVal, academicYear: yearVal, term: termVal, students: students });
+    }
+
+    function downloadStudentReport(student) {
+      const classVal = document.getElementById('reportClass').value;
+      const yearVal = document.getElementById('reportYear').value;
+      const termVal = document.getElementById('reportTerm').value;
+      if (!classVal || !yearVal || !termVal) { showToast('Please select Class, Term and Academic Year first', 'error'); return; }
+      const payload = { studentClass: classVal, academicYear: yearVal, term: termVal, students: [student] };
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success && res.base64 && res.fileName) { downloadBase64File(res.base64, res.fileName, 'application/pdf'); showToast(`${student.studentName} report downloaded`, 'success'); } else { showToast(res && res.message ? res.message : 'Failed to download student report', 'error'); }
+      }).withFailureHandler(function(err) { showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error'); }).generateTerminalReports(payload);
+    }
+
+    function previewStudentReport(student) {
+      const classVal = document.getElementById('reportClass').value;
+      const yearVal = document.getElementById('reportYear').value;
+      const termVal = document.getElementById('reportTerm').value;
+      if (!classVal || !yearVal || !termVal) { showToast('Please select Class, Term and Academic Year first', 'error'); return; }
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success && res.base64 && res.fileName) { const blob = base64ToBlob(res.base64, 'application/pdf'); const url = URL.createObjectURL(blob); window.open(url, '_blank'); showToast(`Preview opened for ${student.studentName}`, 'success'); } else { showToast(res && res.message ? res.message : 'Failed to preview report', 'error'); }
+      }).withFailureHandler(function(err) { showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error'); }).generateTerminalReports({ studentClass: classVal, academicYear: yearVal, term: termVal, students: [student] });
+    }
+
+    function base64ToBlob(base64, mimeType) {
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
+      const byteArray = new Uint8Array(byteNumbers);
+      return new Blob([byteArray], { type: mimeType });
+    }
+
+    function downloadBase64File(base64, fileName, mimeType) {
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+  <!-- GLOBAL TOAST NOTIFICATION CONTAINER -->
+  <div id="toast" style="position:fixed; right:24px; bottom:24px; z-index:99999; display:none; padding:14px 22px; border-radius:10px; color:white; font-weight:600; font-size:14px; box-shadow:0 10px 25px -5px rgba(0, 0, 0, 0.3); transition:all 0.3s ease;"></div>
+</body>
+</html>

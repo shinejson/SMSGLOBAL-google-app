@@ -1,0 +1,221 @@
+// --- SETTINGS FUNCTIONS ---
+
+/**
+ * Convert a Google Drive share/view URL to a direct image URL for <img> tags
+ * Handles formats like:
+ * - https://drive.google.com/file/d/FILE_ID/view?usp=drive_link
+ * - https://drive.google.com/open?id=FILE_ID
+ * - https://drive.google.com/uc?id=FILE_ID
+ */
+function convertDriveUrlToDirectImage(url) {
+  if (!url) return '';
+  const strUrl = String(url).trim();
+  
+  // Extract File ID from various Google Drive URL patterns
+  let fileId = '';
+  const fileDMatch = strUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  const idParamMatch = strUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  
+  if (fileDMatch && fileDMatch[1]) {
+    fileId = fileDMatch[1];
+  } else if (idParamMatch && idParamMatch[1]) {
+    fileId = idParamMatch[1];
+  }
+  
+  if (fileId) {
+    // Return high-reliability direct thumbnail / Google CDN image link
+    return 'https://lh3.googleusercontent.com/d/' + fileId;
+  }
+  
+  return strUrl;
+}
+
+// 1. Fetch Main System Parameters (Left side of Settings Sheet)
+function getSystemParameters() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Settings");
+  if (!sheet) return [];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  // Read from Row 2 downward (Header is Row 1), Column B (Parameter) and C (Value)
+  const dataRange = sheet.getRange(2, 2, lastRow - 1, 2);
+  const data = dataRange.getValues();
+
+  return data
+    .map((row) => {
+      const paramName = String(row[0]).trim();
+      const rawValue  = String(row[1]).trim();
+      let displayValue = rawValue;
+
+      if (/password/i.test(paramName)) {
+        displayValue = '••••••';
+      }
+
+      return {
+        param: paramName,
+        value: displayValue,
+        rawValue: rawValue
+      };
+    })
+    .filter(item => item.param !== '');
+}
+
+// Returns a flat { paramName: value } map for quick key-based lookups.
+// Passwords are masked in the returned map, and direct Google Drive image links are formatted.
+function getParameters() {
+  const params = getSystemParameters();
+  const map = {};
+  
+  params.forEach(function(item) {
+    map[item.param] = item.value;
+    
+    // Normalize keys for easy access (e.g. "School Name" -> "schoolName", "School Logo URL" -> "schoolLogoUrl")
+    const camelKey = item.param.toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, function(m, chr) {
+      return chr.toUpperCase();
+    }).replace(/[^a-zA-Z0-9]/g, '');
+    
+    map[camelKey] = item.value;
+
+    // Direct image link conversion for logo URL
+    if (/logo/i.test(item.param)) {
+      map['schoolLogoDirectUrl'] = convertDriveUrlToDirectImage(item.rawValue || item.value);
+    }
+  });
+
+  // Ensure default fallback school name if missing
+  if (!map['schoolName'] && !map['School Name']) {
+    map['School Name'] = 'GLOBAL EVANGELICAL BASIC SCHOOL, TETTEKOPE';
+    map['schoolName']  = 'GLOBAL EVANGELICAL BASIC SCHOOL, TETTEKOPE';
+  }
+  
+  return map;
+}
+
+// 2. Update a specific System Parameter
+function normalizeParamName(name) {
+  return String(name || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+}
+
+function hashString(value) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value), Utilities.Charset.UTF_8);
+  return bytes.map(function(byte) {
+    return (byte + 256).toString(16).slice(-2);
+  }).join('');
+}
+
+function isStrongPassword(value) {
+  return /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/.test(String(value || ''));
+}
+
+function updateSystemParameter(paramName, newValue) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Settings");
+  if (!sheet) throw new Error("Settings worksheet not found.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error("No system parameters found.");
+
+  const normalizedTarget = normalizeParamName(paramName);
+  const paramsRange = sheet.getRange(2, 2, lastRow - 1, 1);
+  const params = paramsRange.getValues();
+
+  let foundRow = -1;
+  for (let i = 0; i < params.length; i++) {
+    if (normalizeParamName(params[i][0]) === normalizedTarget) {
+      foundRow = 2 + i;
+      break;
+    }
+  }
+
+  let storedValue = String(newValue || '').trim();
+  if (normalizedTarget === 'masterpassword' || normalizedTarget === 'masterpass') {
+    if (!isStrongPassword(storedValue)) {
+      throw new Error('Master password must be at least 12 characters and include letters, numbers, and special characters.');
+    }
+    if (!storedValue.startsWith('sha256:')) {
+      storedValue = 'sha256:' + hashString(storedValue);
+    }
+  }
+
+  if (foundRow === -1) {
+    sheet.getRange(lastRow + 1, 2, 1, 2).setValues([[paramName, storedValue]]);
+    return { success: true };
+  }
+
+  sheet.getRange(foundRow, 3).setValue(storedValue);
+  return { success: true };
+}
+
+// 3. Fetch Lists (Fee Categories, Payment Methods, Statuses)
+function getSystemLists() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Settings");
+  if (!sheet) return { categories: [], methods: [], statuses: [] };
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { categories: [], methods: [], statuses: [] };
+
+  // Read Column E (5), F (6), G (7)
+  const dataRange = sheet.getRange(2, 5, lastRow - 1, 3); 
+  const data = dataRange.getValues();
+
+  const categories = [];
+  const methods = [];
+  const statuses = [];
+
+  data.forEach(row => {
+    if (String(row[0]).trim()) categories.push(String(row[0]).trim());
+    if (String(row[1]).trim()) methods.push(String(row[1]).trim());
+    if (String(row[2]).trim()) statuses.push(String(row[2]).trim());
+  });
+
+  return { categories, methods, statuses };
+}
+
+// 4. Update a List Item (Used for Categories and Methods)
+function updateSystemListItem(columnLetter, oldValue, newValue) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Settings");
+  if (!sheet) throw new Error("Settings worksheet not found.");
+
+  const colIndex = columnLetter.charCodeAt(0) - 64; 
+  if (colIndex < 5 || colIndex > 7) throw new Error("Invalid column.");
+
+  const lastRow = sheet.getLastRow();
+  for (let r = 2; r <= lastRow; r++) {
+    const cell = sheet.getRange(r, colIndex);
+    if (String(cell.getValue()).trim() === oldValue) {
+      cell.setValue(newValue);
+      return { success: true };
+    }
+  }
+  throw new Error("List item not found.");
+}
+
+// 5. Get Score Percentages for Performance Calculations
+function getScorePercentages() {
+  const params = getSystemParameters();
+  let classScorePercentage = 50;
+  let examScorePercentage = 50;
+  
+  params.forEach(function(item) {
+    const paramName = String(item.param || '').trim();
+    const paramValue = String(item.value || '').trim();
+    
+    if (paramName === 'Class Score' && paramValue && !isNaN(paramValue)) {
+      classScorePercentage = parseFloat(paramValue);
+    }
+    if (paramName === 'Exams Score' && paramValue && !isNaN(paramValue)) {
+      examScorePercentage = parseFloat(paramValue);
+    }
+  });
+  
+  return {
+    classScorePercentage: classScorePercentage,
+    examScorePercentage: examScorePercentage,
+    classScoreDecimal: classScorePercentage / 100,
+    examScoreDecimal: examScorePercentage / 100
+  };
+}

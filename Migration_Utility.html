@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Security Migration</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #d32f2f;
+      border-bottom: 3px solid #d32f2f;
+      padding-bottom: 10px;
+    }
+    .warning {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .success {
+      background: #d4edda;
+      border-left: 4px solid #28a745;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .error {
+      background: #f8d7da;
+      border-left: 4px solid #dc3545;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .info {
+      background: #d1ecf1;
+      border-left: 4px solid #17a2b8;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    button {
+      background: #1a73e8;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #1557b0;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .danger-btn {
+      background: #d32f2f;
+    }
+    .danger-btn:hover {
+      background: #b71c1c;
+    }
+    .secondary-btn {
+      background: #6c757d;
+    }
+    .secondary-btn:hover {
+      background: #5a6268;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 4px;
+      display: none;
+    }
+    .loader {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1a73e8;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .status-card {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .status-card h3 {
+      margin: 0 0 10px 0;
+      color: #495057;
+      font-size: 14px;
+    }
+    .status-card .value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #1a73e8;
+    }
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔒 Password Security Migration</h1>
+    
+    <div class="warning">
+      <strong>⚠️ CRITICAL SECURITY UPDATE</strong><br>
+      Your system currently stores passwords in <strong>plain text</strong>. This is a major security vulnerability.
+      This tool will migrate all passwords to secure SHA-256 hashes.
+    </div>
+
+    <div class="info">
+      <strong>ℹ️ What This Does:</strong>
+      <ul>
+        <li>Converts all plain text passwords to secure hashes</li>
+        <li>Users can still log in with their existing passwords</li>
+        <li>Passwords become impossible to reverse-engineer</li>
+        <li>Already-hashed passwords are automatically skipped</li>
+      </ul>
+    </div>
+
+    <h2>Step 1: Check Current Status</h2>
+    <button onclick="checkStatus()" class="secondary-btn">
+      🔍 Check Security Status
+    </button>
+
+    <div id="statusDisplay"></div>
+
+    <h2>Step 2: Run Migration</h2>
+    <div class="warning">
+      <strong>Before You Continue:</strong>
+      <ul>
+        <li>✅ Backup your Users sheet (just in case)</li>
+        <li>✅ This operation is safe and can be run multiple times</li>
+        <li>✅ User logins will continue to work normally</li>
+        <li>⚠️ Original passwords CANNOT be recovered after migration</li>
+      </ul>
+    </div>
+
+    <button onclick="runMigration()" class="danger-btn" id="migrateBtn">
+      🚀 Migrate Passwords to Secure Hashes
+    </button>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    function showLoader(buttonId) {
+      const btn = document.getElementById(buttonId);
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<div class="loader"></div> Processing...';
+      }
+    }
+
+    function hideLoader(buttonId, originalText) {
+      const btn = document.getElementById(buttonId);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    function showStatus(message, type) {
+      const statusDiv = document.getElementById('status');
+      statusDiv.className = type;
+      statusDiv.innerHTML = message;
+      statusDiv.style.display = 'block';
+    }
+
+    function checkStatus() {
+      showLoader('migrateBtn');
+      const statusDisplay = document.getElementById('statusDisplay');
+      statusDisplay.innerHTML = '<div class="loader"></div> Checking...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoader('migrateBtn', '🚀 Migrate Passwords to Secure Hashes');
+          
+          let html = '<div class="status-grid">';
+          html += `
+            <div class="status-card">
+              <h3>Total Users</h3>
+              <div class="value">${result.totalUsers}</div>
+            </div>
+            <div class="status-card">
+              <h3>Secure (Hashed)</h3>
+              <div class="value" style="color: #28a745;">${result.hashedPasswords}</div>
+            </div>
+            <div class="status-card">
+              <h3>Insecure (Plain Text)</h3>
+              <div class="value" style="color: #dc3545;">${result.plainTextPasswords}</div>
+            </div>
+          `;
+          html += '</div>';
+
+          if (result.secure) {
+            html += `<div class="success"><strong>✅ ${result.message}</strong><br>Your system is secure. No migration needed.</div>`;
+          } else {
+            html += `<div class="error"><strong>❌ ${result.message}</strong><br>Please run the migration to secure your passwords.</div>`;
+          }
+
+          statusDisplay.innerHTML = html;
+        })
+        .withFailureHandler(function(error) {
+          hideLoader('migrateBtn', '🚀 Migrate Passwords to Secure Hashes');
+          statusDisplay.innerHTML = `<div class="error"><strong>Error:</strong> ${error.message}</div>`;
+        })
+        .checkPasswordSecurityStatus();
+    }
+
+    function runMigration() {
+      if (!confirm('Are you ready to migrate passwords to secure hashes?\n\nThis is safe and reversible by running multiple times.\nUsers will be able to log in normally after migration.')) {
+        return;
+      }
+
+      showLoader('migrateBtn');
+      showStatus('<div class="loader"></div> Migrating passwords...', 'info');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoader('migrateBtn', '🚀 Migrate Passwords to Secure Hashes');
+          
+          if (result.success) {
+            let message = `<strong>✅ Migration Successful!</strong><br><br>`;
+            message += `<strong>Results:</strong><br>`;
+            message += `• ${result.migrated} password(s) migrated to secure hashes<br>`;
+            message += `• Users can log in normally with their existing passwords<br>`;
+            message += `• Passwords are now stored as irreversible SHA-256 hashes<br><br>`;
+            message += `<strong>What to do next:</strong><br>`;
+            message += `1. Click "Check Security Status" to verify<br>`;
+            message += `2. Test logging in with an existing account<br>`;
+            message += `3. You're done! Your system is now secure. 🎉`;
+            
+            showStatus(message, 'success');
+            
+            // Auto-check status after migration
+            setTimeout(checkStatus, 1000);
+          } else {
+            showStatus(`<strong>❌ Migration Failed</strong><br>${result.message}`, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoader('migrateBtn', '🚀 Migrate Passwords to Secure Hashes');
+          showStatus(`<strong>❌ Error:</strong> ${error.message}`, 'error');
+        })
+        .migratePasswordsToHash();
+    }
+
+    // Auto-check status on load
+    window.onload = function() {
+      checkStatus();
+    };
+  </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Password Security Migration</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #d32f2f;
+      border-bottom: 3px solid #d32f2f;
+      padding-bottom: 10px;
+    }
+    .warning {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .success {
+      background: #d4edda;
+      border-left: 4px solid #28a745;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .error {
+      background: #f8d7da;
+      border-left: 4px solid #dc3545;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .info {
+      background: #d1ecf1;
+      border-left: 4px solid #17a2b8;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    button {
+      background: #1a73e8;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 10px 5px;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #1557b0;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .danger-btn {
+      background: #d32f2f;
+    }
+    .danger-btn:hover {
+      background: #b71c1c;
+    }
+    .secondary-btn {
+      background: #6c757d;
+    }
+    .secondary-btn:hover {
+      background: #5a6268;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 4px;
+      display: none;
+    }
+    .loader {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1a73e8;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin: 20px 0;
+    }
+    .status-card {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .status-card h3 {
+      margin: 0 0 10px 0;
+      color: #495057;
+      font-size: 14px;
+    }
+    .status-card .value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #1a73e8;
+    }
+    code {
+      background: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔒 Password Security Migration</h1>
+    
+    <div class="warning">
+      <strong>⚠️ CRITICAL SECURITY UPDATE</strong><br>
+      Your system currently stores passwords in <strong>plain text</strong>. This is a major security vulnerability.
+      This tool will migrate all passwords to secure SHA-256 hashes.
+    </div>
+
+    <div class="info">
+      <strong>ℹ️ What This Does:</strong>
+      <ul>
+        <li>Converts all plain text passwords to secure hashes</li>
+        <li>Users can still log in with their existing passwords</li>
+        <li>Passwords become impossible to reverse-engineer</li>
+        <li>Already-hashed passwords are automatically skipped</li>
+      </ul>
+    </div>
+
+    <h2>Step 1: Check Current Status</h2>
+    <button onclick="checkStatus()" class="secondary-btn">
+      🔍 Check Security Status
+    </button>
+
+    <div id="statusDisplay"></div>
+
+    <h2>Step 2: Run Migration</h2>
+    <div class="warning">
+      <strong>Before You Continue:</strong>
+      <ul>
+        <li>✅ Backup your Users sheet (just in case)</li>
+        <li>✅ This operation is safe and can be run multiple times</li>
+        <li>✅ User logins will continue to work normally</li>
+        <li>⚠️ Original passwords CANNOT be recovered after migration</li>
+      </ul>
+    </div>
+
+    <button onclick="runMigration()" class="danger-btn" id="migrateBtn">
+      🚀 Migrate Passwords to Secure Hashes
+    </button>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    function showLoader(buttonId) {
+      const btn = document.getElementById(buttonId);
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<div class="loader"></div> Processing...';
+      }
+    }
+
+    function hideLoader(buttonId, originalText) {
+      const btn = document.getElementById(buttonId);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    function showStatus(message, type) {
+      const statusDiv = document.getElementById('status');
+      statusDiv.className = type;
+      statusDiv.innerHTML = message;
+      statusDiv.style.display = 'block';
+    }
+
+    function checkStatus() {
+      showLoader('migrateBtn');
+      const statusDisplay = document.getElementById('statusDisplay');
+      statusDisplay.innerHTML = '<div class="loader"></div> Checking...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoader('migrateBtn', '🚀 Migrate Passwords to Secure Hashes');
+          
+          let html = '<div class="status-grid">';
+          html += `
+            <div class="status-card">
+              <h3>Total Users</h3>
+              <div class="value">${result.totalUsers}</div>
+            </div>
+            <div class="status-card">
+              <h3>Secure (Hashed)</h3>
+              <div class="value" style="color: #28a745;">${result.hashedPasswords}</div>
+            </div>
+            <div class="status-card">
+              <h3>Insecure (Plain Text)</h3>
+              <div class="value" style="color: #dc3545;">${result.plainTextPasswords}</div>
+            </div>
+          `;
+          html += '</div>';
+
+          if (result.secure) {
+            html += `<div class="success"><strong>✅ ${result.message}</strong><br>Your system is secure. No migration needed.</div>`;
+          } else {
+            html += `<div class="error"><strong>❌ ${result.message}</strong><br>Please run the migration to secure your passwords.</div>`;
+          }
+
+          statusDisplay.innerHTML = html;
+        })
+        .withFailureHandler(function(error) {
+          hideLoader('migrateBtn', '🚀 Migrate Passwords to Secure Hashes');
+          statusDisplay.innerHTML = `<div class="error"><strong>Error:</strong> ${error.message}</div>`;
+        })
+        .checkPasswordSecurityStatus();
+    }
+
+    function runMigration() {
+      if (!confirm('Are you ready to migrate passwords to secure hashes?\n\nThis is safe and reversible by running multiple times.\nUsers will be able to log in normally after migration.')) {
+        return;
+      }
+
+      showLoader('migrateBtn');
+      showStatus('<div class="loader"></div> Migrating passwords...', 'info');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoader('migrateBtn', '🚀 Migrate Passwords to Secure Hashes');
+          
+          if (result.success) {
+            let message = `<strong>✅ Migration Successful!</strong><br><br>`;
+            message += `<strong>Results:</strong><br>`;
+            message += `• ${result.migrated} password(s) migrated to secure hashes<br>`;
+            message += `• Users can log in normally with their existing passwords<br>`;
+            message += `• Passwords are now stored as irreversible SHA-256 hashes<br><br>`;
+            message += `<strong>What to do next:</strong><br>`;
+            message += `1. Click "Check Security Status" to verify<br>`;
+            message += `2. Test logging in with an existing account<br>`;
+            message += `3. You're done! Your system is now secure. 🎉`;
+            
+            showStatus(message, 'success');
+            
+            // Auto-check status after migration
+            setTimeout(checkStatus, 1000);
+          } else {
+            showStatus(`<strong>❌ Migration Failed</strong><br>${result.message}`, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoader('migrateBtn', '🚀 Migrate Passwords to Secure Hashes');
+          showStatus(`<strong>❌ Error:</strong> ${error.message}`, 'error');
+        })
+        .migratePasswordsToHash();
+    }
+
+    // Auto-check status on load
+    window.onload = function() {
+      checkStatus();
+    };
+  </script>
+</body>
+</html>

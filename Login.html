@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | Global Evangelical Basic School, Tettekope</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.78) 100%), 
+                  url('https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=1920&auto=format&fit=crop') center/cover no-repeat fixed;
+      padding: 20px;
+      position: relative;
+    }
+
+    /* Ambient Background Glow */
+    body::before {
+      content: '';
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.22) 0%, rgba(0, 0, 0, 0) 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 440px;
+      z-index: 10;
+    }
+
+    /* GLASSMORPHIC CARD */
+    .login-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      padding: 40px 34px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    /* SCHOOL LOGO & BRANDING */
+    .school-logo-wrapper {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 16px;
+    }
+
+    .school-logo-badge {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 3px solid #3b82f6;
+      box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      margin: 0 auto;
+      overflow: hidden;
+      transition: transform 0.3s ease;
+    }
+
+    .school-logo-badge img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .school-logo-badge:hover {
+      transform: scale(1.05) rotate(3deg);
+    }
+
+    .school-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+      margin-top: 4px;
+      line-height: 1.3;
+    }
+
+    .portal-subtitle {
+      color: #64748b;
+      font-size: 13.5px;
+      font-weight: 500;
+      margin-top: 6px;
+      margin-bottom: 26px;
+    }
+
+    /* FORM GROUPS & INPUTS */
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #475569;
+      margin-bottom: 8px;
+      letter-spacing: 0.04em;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      font-size: 16px;
+      color: #94a3b8;
+      pointer-events: none;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 14px 12px 42px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 14.5px;
+      color: #0f172a;
+      background: #ffffff;
+      transition: all 0.2s ease;
+    }
+
+    .form-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .form-input:focus {
+      border-color: #3b82f6;
+      outline: none;
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+      background: #ffffff;
+    }
+
+    /* TOGGLE PASSWORD ICON */
+    .toggle-pw-btn {
+      position: absolute;
+      right: 12px;
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 4px;
+    }
+    .toggle-pw-btn:hover { color: #334155; }
+
+    /* LOGIN BUTTON */
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 10px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: 0 8px 16px -4px rgba(37, 99, 235, 0.4);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .login-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, #1d4ed8, #1e40af);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 20px -4px rgba(37, 99, 235, 0.5);
+    }
+
+    .login-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .login-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    /* ERROR & LOADING ALERTS */
+    #errorMsg {
+      color: #991b1b;
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13.5px;
+      margin-top: 18px;
+      display: none;
+      text-align: left;
+      line-height: 1.4;
+    }
+
+    #loginLoading {
+      display: none;
+      color: #2563eb;
+      font-size: 13.5px;
+      font-weight: 600;
+      margin-top: 16px;
+    }
+
+    /* FOOTER METADATA */
+    .login-footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
+      text-align: center;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 480px) {
+      .login-card {
+        padding: 30px 22px;
+        border-radius: 16px;
+      }
+      .school-name {
+        font-size: 16px;
+      }
+    }
+
+    /* DARK MODE SUPPORT */
+    body.dark-mode .login-card {
+      background: rgba(15, 23, 42, 0.92);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    body.dark-mode .school-name { color: #f1f5f9; }
+    body.dark-mode .portal-subtitle { color: #94a3b8; }
+    body.dark-mode .form-label { color: #94a3b8; }
+    body.dark-mode .form-input {
+      background: #0f172a;
+      border-color: #334155;
+      color: #f1f5f9;
+    }
+    body.dark-mode .form-input:focus {
+      border-color: #3b82f6;
+      background: #0f172a;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <div class="login-card">
+      
+      <!-- SCHOOL LOGO & BRANDING -->
+      <div class="school-logo-wrapper">
+        <div class="school-logo-badge" id="schoolLogo">🏫</div>
+      </div>
+      <h1 class="school-name" id="schoolTitle">GLOBAL EVANGELICAL BASIC SCHOOL, TETTEKOPE</h1>
+      <p class="portal-subtitle">Student Management System Portal</p>
+
+      <!-- LOGIN FORM -->
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <div class="input-wrapper">
+            <span class="input-icon">👤</span>
+            <input type="text" id="username" class="form-input" placeholder="Enter your username" required autocomplete="username">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="password" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
+            <button type="button" class="toggle-pw-btn" onclick="togglePasswordVisibility()" title="Toggle password visibility">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" class="login-btn" id="loginBtn">
+          <span>Sign In to Portal</span> &rarr;
+        </button>
+
+        <div id="errorMsg">Invalid username or password. Please try again.</div>
+        <div id="loginLoading">⏳ Authenticating credentials... please wait</div>
+      </form>
+    </div>
+
+    <!-- FOOTER COPYRIGHT -->
+    <div class="login-footer">
+      &copy; <span id="yearSpan"></span> <span id="footerSchoolName">Global Evangelical Basic School, Tettekope</span> • All Rights Reserved
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('yearSpan').textContent = new Date().getFullYear();
+    const BASE_SCRIPT_URL = '<?= scriptUrl ?>' || window.location.href.split('?')[0];
+
+    // Helper to format Google Drive link to direct image URL
+    function formatDriveImageUrl(url) {
+      if (!url) return '';
+      const strUrl = String(url).trim();
+      const fileDMatch = strUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      const idParamMatch = strUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      const fileId = (fileDMatch && fileDMatch[1]) || (idParamMatch && idParamMatch[1]);
+      if (fileId) {
+        return 'https://lh3.googleusercontent.com/d/' + fileId;
+      }
+      return strUrl;
+    }
+
+    // Set school logo image if URL provided
+    function applySchoolLogo(logoUrl) {
+      if (!logoUrl) return;
+      const directUrl = formatDriveImageUrl(logoUrl);
+      const badge = document.getElementById('schoolLogo');
+      if (badge && directUrl) {
+        badge.innerHTML = `<img src="${directUrl}" alt="School Logo" onerror="this.parentElement.innerHTML='🏫'">`;
+      }
+    }
+
+    // Load School Parameters from Google Apps Script Backend (Settings Sheet)
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(function(params) {
+            if (params) {
+              const name = params['School Name'] || params['schoolName'];
+              if (name) {
+                document.getElementById('schoolTitle').textContent = name;
+                document.getElementById('footerSchoolName').textContent = name;
+              }
+              const logo = params['schoolLogoDirectUrl'] || params['School Logo URL'] || params['schoolLogoUrl'];
+              if (logo) {
+                applySchoolLogo(logo);
+              }
+            }
+          })
+          .getParameters();
+      } else {
+        // Fallback for hardcoded Google Drive logo link
+        const driveLogoUrl = 'https://drive.google.com/file/d/1MVnH55BHBynLBOD4pLIZE-5Y9gMaJbOe/view?usp=drive_link';
+        applySchoolLogo(driveLogoUrl);
+      }
+    });
+
+    function togglePasswordVisibility() {
+      const pwInput = document.getElementById('password');
+      if (pwInput.type === 'password') {
+        pwInput.type = 'text';
+      } else {
+        pwInput.type = 'password';
+      }
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('loginBtn');
+      const errorMsg = document.getElementById('errorMsg');
+      const loadingText = document.getElementById('loginLoading');
+
+      btn.disabled = true;
+      btn.innerText = 'Authenticating...';
+      errorMsg.style.display = 'none';
+      loadingText.style.display = 'block';
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res.success) {
+            btn.innerText = 'Redirecting...';
+            const target = BASE_SCRIPT_URL + '?page=Index&login=1&_=' + Date.now();
+            try {
+              top.location.href = target;
+            } catch (e) {
+              try {
+                window.location.href = target;
+              } catch (e2) {
+                setTimeout(function() { redirectToIndex(); }, 100);
+              }
+            }
+          } else {
+            btn.disabled = false;
+            btn.innerHTML = '<span>Sign In to Portal</span> &rarr;';
+            loadingText.style.display = 'none';
+            errorMsg.innerText = res.message || 'Invalid username or password.';
+            errorMsg.style.display = 'block';
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Sign In to Portal</span> &rarr;';
+          loadingText.style.display = 'none';
+          errorMsg.style.display = 'block';
+          errorMsg.innerText = 'System error: ' + (err ? err.message : 'Login failed');
+        })
+        .loginUser(username, password);
+    }
+
+    function redirectToIndex(attempt) {
+      attempt = attempt || 0;
+      google.script.run
+        .withSuccessHandler(function(isLoggedIn) {
+          if (isLoggedIn) {
+            const target = BASE_SCRIPT_URL + '?page=Index&login=1&_=' + Date.now();
+            try {
+              if (window.top && window.top !== window) {
+                window.top.location.href = target;
+              } else {
+                window.location.href = target;
+              }
+            } catch (e) {
+              if (window.parent && window.parent !== window) {
+                window.parent.location.href = target;
+              }
+            }
+            return;
+          }
+          if (attempt < 5) {
+            setTimeout(function() { redirectToIndex(attempt + 1); }, 300);
+            return;
+          }
+          const target = BASE_SCRIPT_URL + '?page=Index&login=1&_=' + Date.now();
+          try {
+            if (window.top && window.top !== window) {
+              window.top.location.href = target;
+            } else {
+              window.location.href = target;
+            }
+          } catch (e) {
+            if (window.parent && window.parent !== window) {
+              window.parent.location.href = target;
+            }
+          }
+        })
+        .checkSession();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,3363 @@
+function doGet(e) {
+  var page = (e && e.parameter && e.parameter.page) || "Index";
+  var embedded = e && e.parameter && e.parameter.embedded === "true";
+
+  // Special page for password migration utility (Admin only)
+  if (page === "Migration_Utility") {
+    if (!checkSession()) {
+      return HtmlService.createTemplateFromFile("Login").evaluate();
+    }
+    var user = getLoggedInUser();
+    if (!user || user.role !== "Admin") {
+      return ContentService.createTextOutput("Access Denied: Admin only");
+    }
+    return HtmlService.createTemplateFromFile("Migration_Utility")
+      .evaluate()
+      .setTitle("Password Security Migration")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
+  // Whitelist of pages allowed to be loaded inside the iframe
+  var EMBEDDED_ALLOWED = [
+    "Student",
+    "Courses",
+    "Attendance",
+    "Enrollments",
+    "Classes",
+    "Teachers",
+    "Academic Years",
+    "Performance",
+    "Invoices",
+    "Payments",
+    "Settings",
+    "Users",
+    "Parents",
+    "Permissions",
+    "Reports",
+    "Billings",
+    "Billing Categories",
+  ];
+
+  // Special download endpoint: stream a Drive PDF to the browser
+  if (page === "download") {
+    var fileId = (e && e.parameter && e.parameter.fileId) || null;
+    if (!fileId) return ContentService.createTextOutput("Missing fileId");
+    // Ensure user is authenticated for downloads
+    if (!checkSession()) {
+      return HtmlService.createTemplateFromFile("Login").evaluate();
+    }
+    try {
+      var file = DriveApp.getFileById(fileId);
+      // Ensure the file is at least viewable by link
+      try {
+        file.setSharing(
+          DriveApp.Access.ANYONE_WITH_LINK,
+          DriveApp.Permission.VIEW,
+        );
+      } catch (e) {
+        /* ignore */
+      }
+      var downloadUrl =
+        "https://docs.google.com/uc?export=download&id=" +
+        encodeURIComponent(fileId);
+      var html =
+        '<!doctype html><html><head><meta charset="utf-8"><title>Download</title></head><body>' +
+        '<p>If your download does not start automatically, <a id="lnk" href="' +
+        downloadUrl +
+        '">click here</a>.</p>' +
+        '<script>window.location.replace("' +
+        downloadUrl +
+        '");<\/script></body></html>';
+      return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(
+        HtmlService.XFrameOptionsMode.ALLOWALL,
+      );
+    } catch (err) {
+      return ContentService.createTextOutput(
+        "File not found or access denied.",
+      );
+    }
+  }
+
+  // Allow whitelisted pages loaded in an iframe to bypass session re-check
+  var skipSessionCheck = embedded && EMBEDDED_ALLOWED.indexOf(page) !== -1;
+
+  // Protect whitelisted pages / protect all pages except Login/skipSessionCheck whitelisted
+  if (page !== "Login" && !skipSessionCheck && !checkSession()) {
+    page = "Login";
+  }
+
+  if (page === "Login") {
+    var template = HtmlService.createTemplateFromFile("Login");
+    template.scriptUrl = ScriptApp.getService().getUrl();
+    return template
+      .evaluate()
+      .setTitle("Login - SMS")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
+  var template = HtmlService.createTemplateFromFile(page);
+  if (page === "Index") {
+    template.scriptUrl = ScriptApp.getService().getUrl();
+  }
+
+  return template
+    .evaluate()
+    .setTitle(
+      page === "Student"
+        ? "Student Directory"
+        : page === "Reports"
+          ? "System Reports"
+          : "Student Management System",
+    )
+    .addMetaTag("viewport", "width=device-width, initial-scale=1")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function getScriptUrl() {
+  return ScriptApp.getService().getUrl();
+}
+
+// Session helpers live in User.gs (checkSession, loginUser, logoutUser).
+
+// --- ROLE-BASED ACCESS CONTROL HELPERS ---
+
+function getAccessLevelForRole(role) {
+  if (!role) return "General Access";
+  // Access getPermissionsData() defined globally in Permission.gs
+  try {
+    const permissions = getPermissionsData();
+    const found = permissions.find(
+      (p) => p.role.trim().toLowerCase() === role.trim().toLowerCase(),
+    );
+    return found ? found.accessLevel : role;
+  } catch (e) {
+    console.error("Error fetching permissions from sheet:", e);
+    return role; // Fallback to raw role name if sheets are not readable
+  }
+}
+
+function getAllowedPagesForRole(role) {
+  const allPages = [
+    "Student",
+    "Courses",
+    "Attendance",
+    "Enrollments",
+    "Classes",
+    "Teachers",
+    "Academic Years",
+    "Performance",
+    "Invoices",
+    "Payments",
+    "Settings",
+    "Users",
+    "Parents",
+    "Permissions",
+    "Reports",
+    "Billings",
+    "Billing Categories",
+  ];
+
+  const rawAccessLevel = getAccessLevelForRole(role);
+  const access = rawAccessLevel.toLowerCase().trim();
+
+  // Map Access Level keywords to permitted pages
+  if (access.includes("full access") || access === "admin") {
+    return allPages;
+  }
+  if (access.includes("financial") || access === "bursar") {
+    return [
+      "Student",
+      "Parents",
+      "Invoices",
+      "Payments",
+      "Billings",
+      "Billing Categories",
+      "Reports",
+      "Classes",
+      "Courses",
+    ];
+  }
+  if (access.includes("read only") || access === "viewer") {
+    return [
+      "Student",
+      "Courses",
+      "Classes",
+      "Teachers",
+      "Attendance",
+      "Academic Years",
+      "Parents",
+      "Reports",
+    ];
+  }
+  if (access.includes("restricted") || access === "parent") {
+    return ["Invoices", "Payments"];
+  }
+  if (access.includes("class management") || access.includes("teacher")) {
+    return [
+      "Student",
+      "Courses",
+      "Classes",
+      "Attendance",
+      "Performance",
+      "Reports",
+    ];
+  }
+  if (access.includes("general") || access === "staff") {
+    return [
+      "Student",
+      "Courses",
+      "Classes",
+      "Teachers",
+      "Attendance",
+      "Academic Years",
+    ];
+  }
+
+  // Safe fallback list (public/common views)
+  return ["Student", "Courses", "Classes", "Attendance"];
+}
+
+function getPageNameFromSheetName(sheetName) {
+  const nameLower = sheetName.trim().toLowerCase();
+  if (nameLower.includes("billing categories")) return "Billing Categories";
+  if (nameLower.includes("billings")) return "Billings";
+  if (nameLower.includes("student")) return "Student";
+  if (nameLower.includes("course")) return "Courses";
+  if (nameLower.includes("attend")) return "Attendance";
+  if (nameLower.includes("enroll")) return "Enrollments";
+  if (nameLower.includes("classes")) return "Classes";
+  if (nameLower.includes("teacher")) return "Teachers";
+  if (nameLower.includes("academic")) return "Academic Years";
+  if (nameLower.includes("performance")) return "Performance";
+  if (nameLower.includes("invoice")) return "Invoices";
+  if (nameLower.includes("payment")) return "Payments";
+  if (nameLower.includes("settings")) return "Settings";
+  if (nameLower.includes("user")) return "Users";
+  if (nameLower.includes("parent")) return "Parents";
+  if (nameLower.includes("permission")) return "Permissions";
+  if (nameLower.includes("report")) return "Reports";
+  return sheetName;
+}
+
+/**
+ * Returns the evaluated HTML string for a given page name.
+ * Called via google.script.run so session is already validated by the
+ * parent Index page — no second session check needed here.
+ */
+function getPageHtml(pageName) {
+  requireLogin();
+  const user = getLoggedInUser();
+  const role = user ? user.role : "";
+  const allowedPages = getAllowedPagesForRole(role);
+
+  if (allowedPages.indexOf(pageName) === -1) {
+    throw new Error(
+      "Access Denied: You do not have permission to access the '" +
+        pageName +
+        "' module.",
+    );
+  }
+
+  try {
+    return HtmlService.createTemplateFromFile(pageName).evaluate().getContent();
+  } catch (e) {
+    throw new Error('Could not load page "' + pageName + '": ' + e.message);
+  }
+}
+
+/**
+ * Search across common entities (pages, students, invoices) and return lightweight matches.
+ * Called from client-side search to provide jump-to behaviour.
+ */
+function searchIndex(query) {
+  query = String(query || '').trim().toLowerCase();
+  if (query === '') return [];
+
+  const results = [];
+  try {
+    // Pages (sheet-backed)
+    const sheets = getSheetNames();
+    sheets.forEach(function(name) {
+      if (String(name || '').toLowerCase().indexOf(query) !== -1) {
+        results.push({ type: 'page', page: getPageNameFromSheetName(name), title: name });
+      }
+    });
+
+    // Students
+    const students = typeof getStudentsData === 'function' ? getStudentsData() : [];
+    students.forEach(function(s) {
+      const full = ((s.firstName || '') + ' ' + (s.lastName || '')).trim().toLowerCase();
+      const id = String(s.studentId || '').toLowerCase();
+      if (full.indexOf(query) !== -1 || id.indexOf(query) !== -1) {
+        results.push({ type: 'student', studentId: s.studentId, name: (s.firstName || '') + ' ' + (s.lastName || '') });
+      }
+    });
+
+    // Invoices (search by id, student name or description)
+    if (typeof getInvoicesData === 'function') {
+      const invoices = getInvoicesData();
+      invoices.forEach(function(inv) {
+        const invId = String(inv.invoiceId || '').toLowerCase();
+        const studentName = String(inv.studentName || '').toLowerCase();
+        const desc = String(inv.items || inv.description || '').toLowerCase();
+        if (invId.indexOf(query) !== -1 || studentName.indexOf(query) !== -1 || desc.indexOf(query) !== -1) {
+          results.push({ type: 'invoice', invoiceId: inv.invoiceId, label: inv.invoiceId || inv.studentName || inv.items });
+        }
+      });
+    }
+
+    // Payments (search by transactionId, invoiceId or student name)
+    if (typeof getPaymentsData === 'function') {
+      const payments = getPaymentsData();
+      payments.forEach(function(p) {
+        const tx = String(p.transactionId || '').toLowerCase();
+        const invRef = String(p.invoiceId || '').toLowerCase();
+        const studentName = String(p.studentName || '').toLowerCase();
+        if (tx.indexOf(query) !== -1 || invRef.indexOf(query) !== -1 || studentName.indexOf(query) !== -1) {
+          results.push({ type: 'payment', transactionId: p.transactionId, label: p.transactionId || p.invoiceId || p.studentName });
+        }
+      });
+    }
+
+    // Billings (search billing items)
+    if (typeof getBillingsData === 'function') {
+      const billings = getBillingsData();
+      billings.forEach(function(b) {
+        const id = String(b.billingId || '').toLowerCase();
+        const item = String(b.item || '').toLowerCase();
+        const desc = String(b.description || '').toLowerCase();
+        if (id.indexOf(query) !== -1 || item.indexOf(query) !== -1 || desc.indexOf(query) !== -1) {
+          results.push({ type: 'billing', billingId: b.billingId, label: b.item || b.billingId });
+        }
+      });
+    }
+
+    // Users
+    if (typeof getUsersData === 'function') {
+      const users = getUsersData();
+      users.forEach(function(u) {
+        const id = String(u.userId || '').toLowerCase();
+        const name = String(u.fullName || '').toLowerCase();
+        if (id.indexOf(query) !== -1 || name.indexOf(query) !== -1) {
+          results.push({ type: 'user', userId: u.userId, label: u.fullName || u.userId });
+        }
+      });
+    }
+
+    // Parents
+    if (typeof getParentsData === 'function') {
+      const parents = getParentsData();
+      parents.forEach(function(p) {
+        const id = String(p.parentId || p.id || '').toLowerCase();
+        const name = String(p.parentName || p.fullName || '').toLowerCase();
+        if (id.indexOf(query) !== -1 || name.indexOf(query) !== -1) {
+          results.push({ type: 'parent', parentId: p.parentId || p.id, label: p.parentName || p.fullName });
+        }
+      });
+    }
+  } catch (e) {
+    // swallow errors and return whatever matches we gathered
+    console.error('searchIndex error', e);
+  }
+
+  return results.slice(0, 50);
+}
+
+// Function to return the names of the sheets in the sidebar
+function getSheetNames() {
+  requireLogin();
+  const user = getLoggedInUser();
+  const role = user ? user.role : "";
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheets = ss.getSheets();
+
+  // Filter out sheets that don't have corresponding HTML files
+  const sheetsToSkip = [];
+
+  const names = sheets
+    .map((sheet) => sheet.getName())
+    .filter((name) => !sheetsToSkip.includes(name));
+
+  // Reports is a virtual dashboard page not backed by a physical sheet, so we manually append it.
+  if (names.indexOf("Reports") === -1) {
+    names.push("Reports");
+  }
+
+  // Filter sheets list according to user's permissions
+  const allowedPages = getAllowedPagesForRole(role);
+  return names.filter((name) => {
+    const pageName = getPageNameFromSheetName(name);
+    return allowedPages.indexOf(pageName) !== -1;
+  });
+}
+
+// Function to get the dashboard data (Mocking data since your screenshot is empty)
+// You can replace these numbers with real formulas later.
+function getDashboardStats(selectedYear, selectedTerm) {
+  requireLogin();
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const normYear = selectedYear ? String(selectedYear).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+  const normTerm = selectedTerm ? String(selectedTerm).trim().toLowerCase() : '';
+
+  function matchYT(itemYear, itemTerm) {
+    if (normYear) {
+      const y = String(itemYear || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (y && !normYear.includes(y) && !y.includes(normYear)) return false;
+    }
+    if (normTerm) {
+      const t = String(itemTerm || '').trim().toLowerCase();
+      if (t && t !== normTerm && !t.includes(normTerm) && !normTerm.includes(t)) return false;
+    }
+    return true;
+  }
+
+  // Count total students and class breakdown
+  let totalStudents = 0;
+  const studentClassCounts = {};
+  try {
+    const students = typeof getStudentsData === 'function' ? getStudentsData() : [];
+    
+    // If year or term filter is provided, check if students are active in that year/term via attendance or payments
+    let filteredStudents = students;
+    if (normYear || normTerm) {
+      const activeStudentIds = new Set();
+      
+      try {
+        const att = typeof getAttendanceData === 'function' ? getAttendanceData() : [];
+        att.forEach(r => {
+          if (matchYT(r.academicYear, r.term) && r.studentId) {
+            activeStudentIds.add(String(r.studentId).trim());
+          }
+        });
+      } catch(e) {}
+
+      try {
+        const pay = typeof getPaymentsData === 'function' ? getPaymentsData() : [];
+        pay.forEach(p => {
+          if (matchYT(p.academicYear, p.term) && p.studentId) {
+            activeStudentIds.add(String(p.studentId).trim());
+          }
+        });
+      } catch(e) {}
+
+      if (activeStudentIds.size > 0) {
+        filteredStudents = students.filter(s => activeStudentIds.has(String(s.studentId).trim()));
+      }
+    }
+
+    totalStudents = filteredStudents.length;
+    filteredStudents.forEach(function(student) {
+      const className = String(student.class || student.Class || student['Class Name'] || '').trim() || 'Unassigned';
+      studentClassCounts[className] = (studentClassCounts[className] || 0) + 1;
+    });
+  } catch(e) {
+    totalStudents = 0;
+  }
+
+  // Count active courses
+  let activeCourses = 0;
+  const coursesSheet = ss.getSheetByName("Courses");
+  if (coursesSheet) {
+    const lastRow = coursesSheet.getLastRow();
+    if (lastRow >= 3) {
+      const data = coursesSheet.getRange(3, 2, lastRow - 2, 7).getValues();
+      activeCourses = data.filter(
+        (row) => {
+          const id = String(row[0]).trim();
+          const status = String(row[5] || row[4] || '').trim().toLowerCase();
+          const cYear = row[2] || '';
+          const cTerm = row[3] || '';
+          if (id === '') return false;
+          if (status !== 'active') return false;
+          return matchYT(cYear, cTerm);
+        }
+      ).length;
+    }
+  }
+
+  // Calculate average attendance and attendance trend
+  let avgAttendance = "0%";
+  const attendanceTrend = [];
+  const attendanceSheet = ss.getSheetByName("Attendance");
+  if (attendanceSheet) {
+    const lastRow = attendanceSheet.getLastRow();
+    if (lastRow >= 3) {
+      const attendanceData = typeof getAttendanceData === 'function' ? getAttendanceData() : [];
+      const validRecords = attendanceData.filter((row) => matchYT(row.academicYear, row.term));
+
+      if (validRecords.length > 0) {
+        // Use the first status from settings as the "present" equivalent
+        const statuses = getAttendanceStatuses();
+        const presentStatus = statuses.length > 0 ? statuses[0].value.toLowerCase() : 'present';
+        
+        const presentCount = validRecords.filter(
+          (row) => String(row.status || '').trim().toLowerCase() === presentStatus,
+        ).length;
+        const percentage = Math.round(
+          (presentCount / validRecords.length) * 100,
+        );
+        avgAttendance = percentage + "%";
+      }
+
+      const trendMap = {};
+      const statuses = getAttendanceStatuses();
+      const presentStatus = statuses.length > 0 ? statuses[0].value.toLowerCase() : 'present';
+      
+      validRecords.forEach((row) => {
+        const dateValue = row.date ? new Date(row.date) : null;
+        if (!dateValue || isNaN(dateValue.getTime())) return;
+        const monthLabel = Utilities.formatDate(dateValue, Session.getScriptTimeZone(), "MMM yyyy");
+        const status = String(row.status || '').trim().toLowerCase();
+        if (!trendMap[monthLabel]) {
+          trendMap[monthLabel] = { present: 0, total: 0, sortKey: dateValue.getFullYear() * 100 + (dateValue.getMonth() + 1) };
+        }
+        trendMap[monthLabel].total += 1;
+        if (status === presentStatus) {
+          trendMap[monthLabel].present += 1;
+        }
+      });
+
+      const sortedTrendKeys = Object.keys(trendMap).sort((a, b) => trendMap[a].sortKey - trendMap[b].sortKey);
+      sortedTrendKeys.slice(-6).forEach((key) => {
+        const item = trendMap[key];
+        attendanceTrend.push({
+          label: key,
+          presentPct: item.total > 0 ? Math.round((item.present / item.total) * 100) : 0,
+          presentCount: item.present,
+          totalCount: item.total,
+        });
+      });
+    }
+  }
+
+  // Invoices and Payments filtered by year/term
+  let invoiceCount = 0;
+  let totalInvoiced = 0;
+  let totalPaid = 0;
+  let totalUnpaid = 0;
+  try {
+    const invoices = typeof getInvoicesData === 'function' ? getInvoicesData() : [];
+    const payments = typeof getPaymentsData === 'function' ? getPaymentsData() : [];
+
+    const filteredInvoices = invoices.filter(inv => matchYT(inv.academicYear, inv.term));
+    const filteredPayments = payments.filter(p => matchYT(p.academicYear, p.term));
+
+    invoiceCount = filteredInvoices.length;
+    totalInvoiced = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.amountDue) || 0), 0);
+
+    totalPaid = filteredPayments.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
+    totalUnpaid = Math.max(0, totalInvoiced - totalPaid);
+  } catch (e) {
+    totalInvoiced = 0;
+    totalPaid = 0;
+    totalUnpaid = 0;
+    invoiceCount = 0;
+  }
+
+  return {
+    totalStudents: totalStudents,
+    activeCourses: activeCourses,
+    avgAttendance: avgAttendance,
+    invoiceCount: invoiceCount,
+    totalInvoiced: totalInvoiced,
+    totalPaid: totalPaid,
+    totalUnpaid: totalUnpaid,
+    attendanceTrend: attendanceTrend,
+    studentClassCounts: studentClassCounts,
+  };
+}
+
+function requireLogin() {
+  if (!checkSession()) {
+    throw new Error("Authentication required. Please sign in.");
+  }
+}
+
+// --- LICENSE & DEMO LIMIT HELPERS ---
+function getLicenseDetails() {
+  const status = String(getSystemParameter('License Status') || 'Demo').trim();
+  const limitValue = parseInt(getSystemParameter('Student Limit'), 10);
+  const limit = isNaN(limitValue) ? 10 : limitValue;
+  const devEmail = String(getSystemParameter('Developer Email') || '').trim();
+  return { status: status, limit: limit, developerEmail: devEmail };
+}
+
+function activateFullLicense(providedPassword) {
+  requireLogin();
+  const masterPass = getSystemParameter('Master Password');
+  if (!verifyPassword(providedPassword, masterPass || '')) {
+    return { success: false, message: 'Invalid developer master password.' };
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settingsSheet = ss.getSheetByName('Settings');
+  if (!settingsSheet) return { success: false, message: 'Settings sheet not found.' };
+
+  const data = settingsSheet.getDataRange().getValues();
+  const norm = s => String(s || '').trim().toLowerCase().replace(/[\s_\-]+/g, '');
+
+  let statusRow = -1;
+  let statusCol = 3; // Default value column: C (3)
+
+  for (let i = 0; i < data.length; i++) {
+    const colAKey = norm(data[i][0]);
+    const colBKey = norm(data[i][1]);
+    if (colAKey === 'licensestatus') {
+      statusRow = i + 1;
+      statusCol = 2;
+      break;
+    } else if (colBKey === 'licensestatus') {
+      statusRow = i + 1;
+      statusCol = 3;
+      break;
+    }
+  }
+
+  if (statusRow === -1) {
+    statusRow = 9;
+    statusCol = 3;
+    if (!settingsSheet.getRange(9, 2).getValue()) {
+      settingsSheet.getRange(9, 2).setValue('License Status');
+    }
+  }
+
+  settingsSheet.getRange(statusRow, statusCol).setValue('Full Access');
+  return { success: true, message: 'Full lifetime access activated successfully!' };
+}
+
+function verifyMasterPassword(providedPassword) {
+  requireLogin();
+  const masterPass = getSystemParameter('Master Password');
+  if (!verifyPassword(providedPassword, masterPass || '')) {
+    return { success: false, message: 'Invalid master password.' };
+  }
+  const license = getLicenseDetails();
+  return { success: true, license: license };
+}
+
+function updateLicenseSettings(status, limit, providedPassword) {
+  requireLogin();
+  
+  // If password is empty, it means verification was done via email code
+  if (providedPassword && providedPassword.trim() !== '') {
+    const masterPass = getSystemParameter('Master Password');
+    if (!verifyPassword(providedPassword, masterPass || '')) {
+      return { success: false, message: 'Invalid master password.' };
+    }
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settingsSheet = ss.getSheetByName('Settings');
+  if (!settingsSheet) return { success: false, message: 'Settings sheet not found.' };
+
+  const data = settingsSheet.getDataRange().getValues();
+  const norm = s => String(s || '').trim().toLowerCase().replace(/[\s_\-]+/g, '');
+
+  let statusRow = -1;
+  let statusValCol = 3; // Default: Cell C9 (Column 3)
+
+  let limitRow = -1;
+  let limitValCol = 3; // Default: Cell C10 (Column 3)
+
+  for (let i = 0; i < data.length; i++) {
+    const colAKey = norm(data[i][0]);
+    const colBKey = norm(data[i][1]);
+
+    if (colAKey === 'licensestatus') {
+      statusRow = i + 1;
+      statusValCol = 2;
+    } else if (colBKey === 'licensestatus') {
+      statusRow = i + 1;
+      statusValCol = 3;
+    }
+
+    if (colAKey === 'studentlimit') {
+      limitRow = i + 1;
+      limitValCol = 2;
+    } else if (colBKey === 'studentlimit') {
+      limitRow = i + 1;
+      limitValCol = 3;
+    }
+  }
+
+  // Explicitly target Row 9 for License Status and Row 10 for Student Limit if not found elsewhere
+  if (statusRow === -1) {
+    statusRow = 9;
+    statusValCol = 3;
+  }
+  if (limitRow === -1) {
+    limitRow = 10;
+    limitValCol = 3;
+  }
+
+  // Ensure parameter names are present in Column B if missing
+  if (!settingsSheet.getRange(statusRow, 2).getValue() && !settingsSheet.getRange(statusRow, 1).getValue()) {
+    settingsSheet.getRange(statusRow, 2).setValue('License Status');
+  }
+  if (!settingsSheet.getRange(limitRow, 2).getValue() && !settingsSheet.getRange(limitRow, 1).getValue()) {
+    settingsSheet.getRange(limitRow, 2).setValue('Student Limit');
+  }
+
+  // Write values into cells C9 (Row 9, Column C) and C10 (Row 10, Column C)
+  settingsSheet.getRange(statusRow, statusValCol).setValue(status);
+  settingsSheet.getRange(limitRow, limitValCol).setValue(limit);
+
+  return { success: true, message: 'License settings updated successfully.' };
+}
+
+// --- EMAIL VERIFICATION FOR LICENSE EDITS ---
+function generateAndEmailVerificationCode() {
+  requireLogin();
+  const devEmail = (getSystemParameter('Developer Email') || '').trim();
+  if (!devEmail) {
+    return { success: false, message: 'Developer Email is not configured in settings. Please set it first.' };
+  }
+
+  // Generate a 6-digit random code
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const timestamp = Date.now();
+  
+  // Store verification code in PropertiesService (expires in 10 minutes)
+  const props = PropertiesService.getUserProperties();
+  props.setProperty('license_verify_code', code);
+  props.setProperty('license_verify_timestamp', String(timestamp));
+
+  try {
+    const subject = '🔐 SMS License Settings Verification Code';
+    const plainBody =
+      'Your verification code is: ' + code + '\n\n' +
+      'This code expires in 10 minutes.\n' +
+      'Use this code in the SMS application to update License Status and Student Limit.\n\n' +
+      'If you did not request this, please ignore this email.';
+
+    // Use GmailApp to send only to the developer email (no automatic CC to script owner)
+    GmailApp.sendEmail(devEmail, subject, plainBody, {
+      name: 'SMS School App',
+      noReply: true
+    });
+
+    return { success: true, message: 'Verification code sent to ' + devEmail };
+  } catch (e1) {
+    // Fallback to MailApp if GmailApp fails (different account types)
+    try {
+      MailApp.sendEmail({
+        to: devEmail,
+        subject: '🔐 SMS License Settings Verification Code',
+        body:
+          'Your verification code is: ' + code + '\n\n' +
+          'This code expires in 10 minutes.\n' +
+          'Use this code in the SMS application to update License Status and Student Limit.\n\n' +
+          'If you did not request this, please ignore this email.',
+        name: 'SMS School App'
+      });
+      return { success: true, message: 'Verification code sent to ' + devEmail };
+    } catch (e2) {
+      return { success: false, message: 'Failed to send email: ' + e2.message };
+    }
+  }
+}
+
+function verifyEmailCode(providedCode) {
+  requireLogin();
+  const props = PropertiesService.getUserProperties();
+  const storedCode = props.getProperty('license_verify_code');
+  const timestamp = props.getProperty('license_verify_timestamp');
+  
+  if (!storedCode || !timestamp) {
+    return { success: false, message: 'No verification code found. Please request a new one.' };
+  }
+
+  // Check if code expired (10 minutes = 600000 ms)
+  const now = Date.now();
+  if (now - parseInt(timestamp) > 600000) {
+    props.deleteProperty('license_verify_code');
+    props.deleteProperty('license_verify_timestamp');
+    return { success: false, message: 'Verification code has expired. Please request a new one.' };
+  }
+
+  // Verify code
+  if (String(providedCode).trim() !== String(storedCode)) {
+    return { success: false, message: 'Incorrect verification code.' };
+  }
+
+  // Code is valid - return license details
+  const license = getLicenseDetails();
+  
+  // Clear the code after successful verification (one-time use)
+  props.deleteProperty('license_verify_code');
+  props.deleteProperty('license_verify_timestamp');
+  
+  return { success: true, license: license };
+}
+
+// 1. Serve the Student Page
+function showStudentPage() {
+  return HtmlService.createTemplateFromFile("Student")
+    .evaluate()
+    .setTitle("Student Directory")
+    .addMetaTag("viewport", "width=device-width, initial-scale=1")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// 2. Fetch Data from the 'Students' sheet
+// 2. Fetch Data from the 'Students' sheet - UPDATED FOR FIX
+// ...existing code...
+/**
+ * Return an array of student objects based on the "Students" sheet.
+ * Make sure the sheet name and header names match what's in the sheet.
+ */
+function getStudentsData() {
+  var ss = SpreadsheetApp.getActive();
+  var sheet = ss.getSheetByName("Students");
+  if (!sheet) return [];
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+
+  // Find the first non-empty row to use as the header
+  // (handles sheets where row 1 is blank and headers are on row 2)
+  var headerRowIndex = -1;
+  for (var i = 0; i < values.length; i++) {
+    if (
+      values[i].some(function (c) {
+        return c !== "" && c !== null;
+      })
+    ) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+  if (headerRowIndex === -1) return [];
+
+  var headers = values[headerRowIndex].map(function (h) {
+    return String(h).trim();
+  });
+  var idx = {};
+  headers.forEach(function (h, i) {
+    idx[h] = i;
+  });
+
+  // Data rows come after the header row; skip any fully blank rows
+  var rows = values.slice(headerRowIndex + 1).filter(function (r) {
+    return r.some(function (c) {
+      return c !== "" && c !== null;
+    });
+  });
+
+  var out = rows.map(function (r) {
+    function val(name) {
+      if (idx[name] === undefined) return "";
+      var v = r[idx[name]];
+      if (v instanceof Date) return v.toISOString();
+      return v === "" || v === null ? "" : String(v);
+    }
+    return {
+      studentId: val("Student ID") || val("studentId") || "",
+      firstName: val("First Name") || "",
+      lastName: val("Last Name") || "",
+      email: val("Email") || "",
+      dob: val("Date of Birth") || val("dob") || "",
+      gender: val("Gender") || "",
+      enrollmentDate: val("Enrollment Date") || val("enrollmentDate") || "",
+      status: val("Status") || "",
+      class: val("Class") || val("Class Name") || "",
+    };
+  });
+
+  Logger.log("getStudentsData -> rows: " + out.length);
+  return out;
+}
+
+function findDuplicateStudent(studentData, ignoreStudentId) {
+  const students = getStudentsData();
+  const firstName = String(studentData.firstName || "")
+    .trim()
+    .toLowerCase();
+  const lastName = String(studentData.lastName || "")
+    .trim()
+    .toLowerCase();
+
+  for (let i = 0; i < students.length; i++) {
+    const student = students[i];
+    if (ignoreStudentId && student.studentId === ignoreStudentId) continue;
+
+    const existingFirst = String(student.firstName || "")
+      .trim()
+      .toLowerCase();
+    const existingLast = String(student.lastName || "")
+      .trim()
+      .toLowerCase();
+
+    if (
+      firstName &&
+      lastName &&
+      existingFirst === firstName &&
+      existingLast === lastName
+    ) {
+      return { type: "name", studentId: student.studentId };
+    }
+  }
+  return null;
+}
+
+/**
+ * Return an array of class names from the "Classes" sheet (first column).
+ * NOTE: getClassesData() is defined later in the file (keeping one definition)
+ */
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+// 3. Helper to locate student row by ID - OPTIMIZED WITH INDEX
+function findRowById(sheet, studentId) {
+  // Use indexed lookup for O(1) performance instead of O(n) linear search
+  const rowNumber = findRowByIdIndexed('Students', studentId);
+  
+  if (rowNumber !== -1) {
+    return rowNumber;
+  }
+  
+  // Fallback to linear search if index fails (shouldn't happen)
+  Logger.log('WARNING: Index lookup failed, falling back to linear search');
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return -1;
+  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0]).trim() === String(studentId).trim()) {
+      return i + 3;
+    }
+  }
+  return -1;
+}
+
+// 4. Helper to auto-generate the next incrementing Student ID (e.g. STU-1001)
+function generateNextStudentId(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return "STU-1001";
+
+  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues(); // Column B
+  let maxIdNum = 1000;
+  values.forEach((row) => {
+    const idStr = String(row[0]).trim();
+    if (idStr.startsWith("STU-")) {
+      const num = parseInt(idStr.substring(4), 10);
+      if (!isNaN(num) && num > maxIdNum) {
+        maxIdNum = num;
+      }
+    }
+  });
+  return "STU-" + (maxIdNum + 1);
+}
+
+// 5. Create operation logic
+function addStudent(studentData) {
+  requireLogin();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Students");
+  if (!sheet) throw new Error("Students worksheet not found.");
+
+  const license = getLicenseDetails();
+  const currentStudents = getStudentsData();
+  if (currentStudents.length >= license.limit) {
+    return {
+      success: false,
+      licenseLimitReached: true,
+      limit: license.limit,
+      currentCount: currentStudents.length,
+      developerEmail: license.developerEmail,
+      message:
+        'Student Limit Reached! You have reached the maximum allowance of ' +
+        license.limit +
+        ' students.',
+    };
+  }
+
+  const duplicate = findDuplicateStudent(studentData);
+  if (duplicate) {
+    return {
+      success: false,
+      message:
+        "A student with the same first name and last name already exists.",
+    };
+  }
+
+  const nextId = generateNextStudentId(sheet);
+  const lastRow = sheet.getLastRow();
+  const targetRow = lastRow + 1;
+
+  // Set values starting from Column 2 (B) leaving Column A empty
+  // Include Class as the 9th column (Column J)
+  sheet.getRange(targetRow, 2, 1, 9).setValues([
+    [
+      nextId,
+      studentData.firstName,
+      studentData.lastName,
+      studentData.email,
+      studentData.dob ? new Date(studentData.dob) : "",
+      studentData.gender,
+      studentData.enrollmentDate
+        ? new Date(studentData.enrollmentDate)
+        : new Date(),
+      studentData.status || "Active",
+      studentData.class || "",
+    ],
+  ]);
+
+  // Invalidate cache and index after modification
+  invalidateStudentsCache();
+  invalidateIndex('Students');
+
+  return { success: true, studentId: nextId };
+}
+
+// 6. Update operation logic
+function updateStudent(studentId, studentData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Students");
+  if (!sheet) throw new Error("Students worksheet not found.");
+
+  const duplicate = findDuplicateStudent(studentData, studentId);
+  if (duplicate) {
+    return {
+      success: false,
+      message:
+        "Another student with the same first name and last name already exists.",
+    };
+  }
+
+  const row = findRowById(sheet, studentId);
+  if (row === -1) throw new Error("Student record not found.");
+
+  // Check if student is Completed JHS 3 (locked record)
+  const currentRow = sheet.getRange(row, 1, 1, 10).getValues()[0];
+  const currentStatus = String(currentRow[7] || "").trim();
+  const currentClass = String(currentRow[9] || "").trim();
+  if (currentStatus === "Completed" && currentClass.toUpperCase().includes("JHS 3")) {
+    return {
+      success: false,
+      message: "Cannot update this student: Completed JHS 3 record is locked.",
+    };
+  }
+
+  // Update details in sheet spanning Column 3 (C) to Column 10 (J) -> 8 columns total (includes Class)
+  sheet
+    .getRange(row, 3, 1, 8)
+    .setValues([
+      [
+        studentData.firstName,
+        studentData.lastName,
+        studentData.email,
+        studentData.dob ? new Date(studentData.dob) : "",
+        studentData.gender,
+        studentData.enrollmentDate ? new Date(studentData.enrollmentDate) : "",
+        studentData.status || "Active",
+        studentData.class || "",
+      ],
+    ]);
+
+  // Invalidate cache and index after modification
+  invalidateStudentsCache();
+  invalidateIndex('Students');
+
+  return { success: true };
+}
+
+// 7. Delete operation logic
+function deleteStudent(studentId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Students");
+  if (!sheet) throw new Error("Students worksheet not found.");
+
+  const row = findRowById(sheet, studentId);
+  if (row === -1) throw new Error("Student record not found.");
+
+  sheet.deleteRow(row);
+  
+  // Invalidate cache and index after modification
+  invalidateStudentsCache();
+  invalidateIndex('Students');
+  
+  return { success: true };
+}
+
+// 8. Import Multiple Students from CSV Data
+function importStudents(studentsArray) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Students");
+    
+    if (!sheet) {
+      return { 
+        success: false, 
+        message: "Students worksheet not found." 
+      };
+    }
+
+    const license = getLicenseDetails();
+    const currentStudents = getStudentsData();
+    let currentCount = currentStudents.length;
+
+    if (currentCount >= license.limit) {
+      return {
+        success: false,
+        licenseLimitReached: true,
+        limit: license.limit,
+        currentCount: currentCount,
+        developerEmail: license.developerEmail,
+        message: 'Student Limit Reached! Cannot import students because you have reached the maximum allowance of ' + license.limit + ' students.'
+      };
+    }
+
+    let imported = 0;
+    let failed = 0;
+    let duplicates = 0;
+    let limitHitDuringImport = false;
+    const errors = [];
+
+    for (let index = 0; index < studentsArray.length; index++) {
+      const studentData = studentsArray[index];
+      try {
+        if (currentCount + imported >= license.limit) {
+          limitHitDuringImport = true;
+          errors.push(`Row ${studentData.rowNumber}: Student limit of ${license.limit} reached. Remaining students were skipped.`);
+          break;
+        }
+
+        // Validate required fields
+        if (!studentData.firstName || !studentData.lastName || !studentData.email) {
+          errors.push(`Row ${studentData.rowNumber}: Missing required fields (First Name, Last Name, or Email)`);
+          failed++;
+          continue;
+        }
+
+        // Check for duplicates (same first name and last name)
+        const duplicate = findDuplicateStudent(studentData, null);
+        if (duplicate) {
+          errors.push(`Row ${studentData.rowNumber}: Duplicate student - ${studentData.firstName} ${studentData.lastName} already exists`);
+          duplicates++;
+          continue;
+        }
+
+        // Validate email format (basic check)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(studentData.email)) {
+          errors.push(`Row ${studentData.rowNumber}: Invalid email format - ${studentData.email}`);
+          failed++;
+          continue;
+        }
+
+        // Validate date formats (YYYY-MM-DD)
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (studentData.dob && !dateRegex.test(studentData.dob)) {
+          errors.push(`Row ${studentData.rowNumber}: Invalid date of birth format - ${studentData.dob} (expected YYYY-MM-DD)`);
+          failed++;
+          continue;
+        }
+        if (studentData.enrollmentDate && !dateRegex.test(studentData.enrollmentDate)) {
+          errors.push(`Row ${studentData.rowNumber}: Invalid enrollment date format - ${studentData.enrollmentDate} (expected YYYY-MM-DD)`);
+          failed++;
+          continue;
+        }
+
+        // Validate gender
+        const validGenders = ['Male', 'Female', 'Other', 'male', 'female', 'other'];
+        if (studentData.gender && !validGenders.includes(studentData.gender)) {
+          errors.push(`Row ${studentData.rowNumber}: Invalid gender - ${studentData.gender} (expected Male, Female, or Other)`);
+          failed++;
+          continue;
+        }
+
+        // Validate status
+        const validStatuses = ['Active', 'Inactive', 'active', 'inactive'];
+        if (studentData.status && !validStatuses.includes(studentData.status)) {
+          errors.push(`Row ${studentData.rowNumber}: Invalid status - ${studentData.status} (expected Active or Inactive)`);
+          failed++;
+          continue;
+        }
+
+        // Generate new student ID
+        const studentId = generateNextStudentId(sheet);
+
+        // Convert date strings to Date objects
+        const dobDate = studentData.dob ? new Date(studentData.dob) : '';
+        const enrollDate = studentData.enrollmentDate ? new Date(studentData.enrollmentDate) : new Date();
+
+        // Prepare row data (matching your Students sheet structure)
+        const newRow = [
+          '', // Column A (blank)
+          studentId,
+          studentData.firstName.trim(),
+          studentData.lastName.trim(),
+          studentData.email.trim().toLowerCase(),
+          dobDate,
+          studentData.gender || '',
+          enrollDate,
+          studentData.status || 'Active',
+          studentData.class || ''
+        ];
+
+        // Append to sheet
+        sheet.appendRow(newRow);
+        imported++;
+
+      } catch (err) {
+        errors.push(`Row ${studentData.rowNumber}: ${err.message}`);
+        failed++;
+      }
+    }
+
+    if (imported > 0) {
+      invalidateStudentsCache();
+      invalidateIndex('Students');
+    }
+
+    return {
+      success: true,
+      imported: imported,
+      failed: failed,
+      duplicates: duplicates,
+      errors: errors,
+      licenseLimitReached: limitHitDuringImport,
+      limit: license.limit,
+      developerEmail: license.developerEmail
+    };
+
+  } catch (err) {
+    Logger.log('Import error: ' + err.message);
+    return {
+      success: false,
+      message: err.message,
+      imported: 0,
+      failed: 0,
+      duplicates: 0,
+      errors: []
+    };
+  }
+}
+
+// Helper to inspect Row 2 headers in the Attendance sheet and return column index maps (0-based offset relative to Column B)
+function getAttendanceHeaderMap(sheet) {
+  const lastCol = Math.max(sheet.getLastColumn(), 10);
+  const numCols = lastCol - 1; // from Col B (col 2)
+  if (numCols < 1) return null;
+
+  const headers = sheet
+    .getRange(2, 2, 1, numCols)
+    .getValues()[0]
+    .map((h) => String(h || "").trim().toLowerCase());
+
+  function findIndex(aliases, fallbackIdx) {
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      for (let a = 0; a < aliases.length; a++) {
+        if (h === aliases[a]) return i;
+      }
+    }
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      for (let a = 0; a < aliases.length; a++) {
+        if (h.indexOf(aliases[a]) !== -1) return i;
+      }
+    }
+    return fallbackIdx;
+  }
+
+  return {
+    numCols: numCols,
+    idxId: findIndex(["attendance id", "attendanceid", "id"], 0),
+    idxDate: findIndex(["date", "attendance date"], 1),
+    idxYear: findIndex(["academic year", "year", "academicyear"], 2),
+    idxClass: findIndex(["class", "class name", "classname", "student class"], 3),
+    idxStudentId: findIndex(["student id", "studentid", "student_id", "sid"], 4),
+    idxStudentName: findIndex(["student name", "name", "student"], 5),
+    idxCourse: findIndex(["course id", "courseid", "course"], 6),
+    idxStatus: findIndex(["status", "attendance status"], 7),
+    idxTerm: findIndex(["term"], 8),
+  };
+}
+
+// 9. Fetch Attendance Data
+function getAttendanceData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Attendance");
+  if (!sheet) return [];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return [];
+
+  const hMap = getAttendanceHeaderMap(sheet);
+  if (!hMap) return [];
+
+  const dataRange = sheet.getRange(3, 2, lastRow - 2, hMap.numCols);
+  const data = dataRange.getValues();
+
+  return data
+    .filter((row) => {
+      const idVal = row[hMap.idxId] !== undefined ? String(row[hMap.idxId] || "").trim() : "";
+      const nameVal = row[hMap.idxStudentName] !== undefined ? String(row[hMap.idxStudentName] || "").trim() : "";
+      return idVal !== "" || nameVal !== "";
+    })
+    .map((row) => {
+      const getVal = (idx) => {
+        return idx >= 0 && idx < row.length ? String(row[idx] || "").trim() : "";
+      };
+
+      let dateVal = "";
+      if (hMap.idxDate >= 0 && hMap.idxDate < row.length && row[hMap.idxDate]) {
+        const rawD = row[hMap.idxDate];
+        if (rawD instanceof Date && !isNaN(rawD.getTime())) {
+          dateVal = rawD.toISOString().split("T")[0];
+        } else {
+          dateVal = String(rawD).trim();
+        }
+      }
+
+      let statusVal = getVal(hMap.idxStatus);
+      if (!statusVal || statusVal.toLowerCase() === "undefined" || statusVal.toLowerCase() === "null") {
+        // Use first status from settings as default
+        const statuses = getAttendanceStatuses();
+        statusVal = statuses.length > 0 ? statuses[0].value : "Present";
+      }
+
+      return {
+        attendanceId: getVal(hMap.idxId),
+        date: dateVal,
+        academicYear: getVal(hMap.idxYear),
+        className: getVal(hMap.idxClass),
+        studentId: getVal(hMap.idxStudentId),
+        studentName: getVal(hMap.idxStudentName),
+        courseId: getVal(hMap.idxCourse),
+        status: statusVal,
+        term: getVal(hMap.idxTerm),
+      };
+    });
+}
+
+// 10. Helper to auto-generate the next Attendance ID (e.g. ATT-1001)
+function generateNextAttendanceId(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return "ATT-1001";
+
+  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues();
+  let maxIdNum = 1000;
+  values.forEach((row) => {
+    const idStr = String(row[0]).trim();
+    if (idStr.startsWith("ATT-")) {
+      const num = parseInt(idStr.substring(4), 10);
+      if (!isNaN(num) && num > maxIdNum) {
+        maxIdNum = num;
+      }
+    }
+  });
+  return "ATT-" + (maxIdNum + 1);
+}
+
+// 11. Add Attendance Logic
+function addAttendance(attendanceData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Attendance");
+  if (!sheet) throw new Error("Attendance worksheet not found.");
+
+  const studentId = String(attendanceData.studentId || "").trim();
+  const dateValue = attendanceData.date ? new Date(attendanceData.date) : null;
+  const dateString =
+    dateValue instanceof Date && !isNaN(dateValue.getTime())
+      ? dateValue.toISOString().split("T")[0]
+      : "";
+
+  if (!studentId) {
+    return { success: false, message: "Student ID is required." };
+  }
+  if (!dateString) {
+    return { success: false, message: "A valid attendance date is required." };
+  }
+
+  const hMap = getAttendanceHeaderMap(sheet);
+  const lastRow = sheet.getLastRow();
+  const incomingCourseId = String(attendanceData.courseId || "").trim();
+
+  if (lastRow >= 3 && hMap) {
+    const existingRows = sheet.getRange(3, 2, lastRow - 2, hMap.numCols).getValues();
+    for (let i = 0; i < existingRows.length; i++) {
+      const row = existingRows[i];
+      const existingDate = row[hMap.idxDate];
+      const existingStudentId = String(row[hMap.idxStudentId] || "").trim();
+      const existingCourseId = String(row[hMap.idxCourse] || "").trim();
+      const existingDateString = existingDate
+        ? (existingDate instanceof Date && !isNaN(existingDate.getTime())
+            ? existingDate.toISOString().split("T")[0]
+            : String(existingDate).trim())
+        : "";
+
+      const sameCourse = !incomingCourseId || !existingCourseId || existingCourseId === incomingCourseId;
+      if (
+        existingStudentId === studentId &&
+        existingDateString === dateString &&
+        sameCourse
+      ) {
+        return {
+          success: false,
+          duplicate: true,
+          message: `Attendance for student ${studentId} in course ${incomingCourseId || 'this course'} on ${dateString} has already been recorded.`,
+        };
+      }
+    }
+  }
+
+  const nextId = generateNextAttendanceId(sheet);
+  const targetRow = lastRow + 1;
+
+  let rawStatus = String(attendanceData.status || "").trim();
+  if (!rawStatus || rawStatus.toLowerCase() === "undefined" || rawStatus.toLowerCase() === "null") {
+    // Use first status from settings as default
+    const statuses = getAttendanceStatuses();
+    rawStatus = statuses.length > 0 ? statuses[0].value : "Present";
+  }
+
+  function setCellVal(idx, val) {
+    if (idx >= 0) {
+      sheet.getRange(targetRow, idx + 2).setValue(val);
+    }
+  }
+
+  if (hMap) {
+    setCellVal(hMap.idxId, nextId);
+    setCellVal(hMap.idxDate, dateValue);
+    setCellVal(hMap.idxYear, attendanceData.academicYear || "");
+    setCellVal(hMap.idxClass, attendanceData.className || "");
+    setCellVal(hMap.idxStudentId, studentId);
+    setCellVal(hMap.idxStudentName, attendanceData.studentName || "");
+    setCellVal(hMap.idxCourse, attendanceData.courseId || "");
+    setCellVal(hMap.idxStatus, rawStatus);
+    setCellVal(hMap.idxTerm, attendanceData.term || "");
+  } else {
+    sheet.getRange(targetRow, 2, 1, 9).setValues([[
+      nextId, dateValue, attendanceData.academicYear || "", attendanceData.className || "",
+      studentId, attendanceData.studentName || "", attendanceData.courseId || "", rawStatus, attendanceData.term || ""
+    ]]);
+  }
+
+  return { success: true, attendanceId: nextId };
+}
+
+// 12a. Helper to find attendance row by ID
+function findAttendanceRowById(sheet, attendanceId) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return -1;
+  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0]).trim() === String(attendanceId).trim()) {
+      return i + 3;
+    }
+  }
+  return -1;
+}
+
+// 12b. Update Attendance (Edit)
+function updateAttendance(attendanceId, attendanceData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Attendance");
+  if (!sheet) throw new Error("Attendance worksheet not found.");
+
+  const row = findAttendanceRowById(sheet, attendanceId);
+  if (row === -1)
+    return { success: false, message: "Attendance record not found." };
+
+  const hMap = getAttendanceHeaderMap(sheet);
+  if (!hMap) return { success: false, message: "Could not read sheet headers." };
+
+  let rawStatus = String(attendanceData.status || "").trim();
+  if (!rawStatus || rawStatus.toLowerCase() === "undefined" || rawStatus.toLowerCase() === "null") {
+    // Use first status from settings as default
+    const statuses = getAttendanceStatuses();
+    rawStatus = statuses.length > 0 ? statuses[0].value : "Present";
+  }
+
+  function setCellVal(idx, val) {
+    if (idx >= 0) {
+      sheet.getRange(row, idx + 2).setValue(val);
+    }
+  }
+
+  setCellVal(hMap.idxDate, attendanceData.date ? new Date(attendanceData.date) : "");
+  setCellVal(hMap.idxYear, attendanceData.academicYear || "");
+  setCellVal(hMap.idxClass, attendanceData.className || "");
+  setCellVal(hMap.idxStudentId, attendanceData.studentId || "");
+  setCellVal(hMap.idxStudentName, attendanceData.studentName || "");
+  setCellVal(hMap.idxCourse, attendanceData.courseId || "");
+  setCellVal(hMap.idxStatus, rawStatus);
+  setCellVal(hMap.idxTerm, attendanceData.term || "");
+
+  return { success: true, message: "Attendance record updated." };
+}
+
+// 12c. Delete Attendance (Delete)
+function deleteAttendance(attendanceId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Attendance");
+  if (!sheet) throw new Error("Attendance worksheet not found.");
+
+  const row = findAttendanceRowById(sheet, attendanceId);
+  if (row === -1)
+    return { success: false, message: "Attendance record not found." };
+
+  sheet.deleteRow(row);
+  return { success: true, message: "Attendance record deleted." };
+}
+
+// 12d. Helper: Get just Student IDs and Names for dropdowns (includes Class field for dynamic filtering)
+function getStudentIdNamePairs() {
+  const students = getStudentsData();
+  return students
+    .map((s) => ({
+      studentId: s.studentId,
+      fullName: `${s.firstName} ${s.lastName}`.trim(),
+      studentClass: s.class,
+    }))
+    .filter((s) => s.studentId !== "");
+}
+
+// 13. Helper: Get just Course IDs for dropdowns
+function getCourseIds() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Courses");
+  if (!sheet) return [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return [];
+
+  const data = sheet.getRange(3, 2, lastRow - 2, 1).getValues();
+  return data.map((row) => String(row[0]).trim()).filter(Boolean);
+}
+// 16. Export filtered attendance to PDF and return base64 string
+function exportAttendancePdf(filters) {
+  requireLogin();
+  const records = getAttendanceData();
+
+  // Apply simple filter matching on provided keys (date, status, academicYear, className, term)
+  const filtered = records.filter((r) => {
+    if (filters.date && filters.date !== r.date) return false;
+    if (filters.status && filters.status !== r.status) return false;
+    if (filters.academicYear && filters.academicYear !== r.academicYear)
+      return false;
+    if (filters.className && filters.className !== r.className) return false;
+    if (filters.term && filters.term !== r.term) return false;
+    if (filters.search) {
+      const s = String(filters.search).toLowerCase();
+      const hay = [
+        r.attendanceId,
+        r.studentId,
+        r.studentName,
+        r.courseId,
+        r.status,
+        r.className,
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(s)) return false;
+    }
+    return true;
+  });
+
+  // Build a small HTML table for PDF
+  let html =
+    '<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,Helvetica,sans-serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px;font-size:12px}th{background:#f4f6f8;font-weight:700}</style></head><body>';
+  html += "<h2>Attendance Report</h2>";
+  html +=
+    "<table><thead><tr><th>Attendance ID</th><th>Date</th><th>Academic Year</th><th>Class</th><th>Student</th><th>Course</th><th>Status</th><th>Term</th></tr></thead><tbody>";
+
+  filtered.forEach((r) => {
+    html += `<tr><td>${r.attendanceId}</td><td>${r.date}</td><td>${r.academicYear}</td><td>${r.className}</td><td>${r.studentId} ${r.studentName}</td><td>${r.courseId}</td><td>${r.status}</td><td>${r.term}</td></tr>`;
+  });
+
+  html += "</tbody></table></body></html>";
+
+  const blob = HtmlService.createHtmlOutput(html)
+    .getBlob()
+    .getAs("application/pdf");
+  const encoded = Utilities.base64Encode(blob.getBytes());
+  return encoded;
+}
+
+// Save filtered attendance PDF to Drive and return file URL and id
+function exportAttendancePdfToDrive(filters) {
+  requireLogin();
+  // Optional: filters.folderId may be provided to save into a specific Drive folder
+  const folderId =
+    filters && filters.folderId ? String(filters.folderId).trim() : null;
+
+  // Reuse existing exporter to get base64 PDF
+  const base64 = exportAttendancePdf(filters);
+  if (!base64) return { success: false, message: "No PDF generated" };
+
+  const bytes = Utilities.base64Decode(base64);
+  const fileName =
+    "Attendance_Report_" + new Date().toISOString().slice(0, 10) + ".pdf";
+  const blob = Utilities.newBlob(bytes, "application/pdf", fileName);
+
+  var file;
+  if (folderId) {
+    try {
+      const folder = DriveApp.getFolderById(folderId);
+      file = folder.createFile(blob);
+    } catch (e) {
+      // fallback to root if folder invalid
+      Logger.log("Invalid folderId or access denied: " + e.message);
+      file = DriveApp.createFile(blob);
+    }
+  } else {
+    file = DriveApp.createFile(blob);
+  }
+
+  // Attempt to set sharing so the download redirect works for anyone with link
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (e) {
+    Logger.log("Could not set sharing: " + e.message);
+  }
+
+  const downloadUrl =
+    "https://docs.google.com/uc?export=download&id=" +
+    encodeURIComponent(file.getId());
+  return {
+    success: true,
+    url: file.getUrl(),
+    id: file.getId(),
+    name: file.getName(),
+    downloadUrl: downloadUrl,
+  };
+}
+// 14. Fetch Courses Data
+function getCoursesData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Courses");
+  if (!sheet) return [];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return [];
+
+  const dataRange = sheet.getRange(3, 2, lastRow - 2, 6);
+  const data = dataRange.getValues();
+
+  return data
+    .map((row) => ({
+      courseId: String(row[0]).trim(),
+      courseName: String(row[1]).trim(),
+      instructor: String(row[2]).trim(),
+      credits: String(row[3]).trim(),
+      semester: String(row[4]).trim(),
+      status: String(row[5]).trim(),
+    }))
+    .filter((c) => c.courseId !== "");
+}
+
+// 15. Helper to auto-generate the next Course ID (e.g. CRS-1001)
+function generateNextCourseId(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return "CRS-1001";
+
+  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues();
+  let maxIdNum = 1000;
+  values.forEach((row) => {
+    const idStr = String(row[0]).trim();
+    if (idStr.startsWith("CRS-")) {
+      const num = parseInt(idStr.substring(4), 10);
+      if (!isNaN(num) && num > maxIdNum) {
+        maxIdNum = num;
+      }
+    }
+  });
+  return "CRS-" + (maxIdNum + 1);
+}
+
+// 16. Add Course Logic
+function addCourse(courseData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Courses");
+  if (!sheet) throw new Error("Courses worksheet not found.");
+
+  const nextId = generateNextCourseId(sheet);
+  const lastRow = sheet.getLastRow();
+  const targetRow = lastRow + 1;
+
+  // Set values starting from Column 2 (B) leaving Column A empty
+  sheet
+    .getRange(targetRow, 2, 1, 6)
+    .setValues([
+      [
+        nextId,
+        courseData.courseName,
+        courseData.instructor,
+        courseData.credits,
+        courseData.semester,
+        courseData.status || "Active",
+      ],
+    ]);
+
+  return { success: true, courseId: nextId };
+}
+
+// 17. Fetch Enrollments Data
+function getEnrollmentsData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Enrollments");
+  if (!sheet) return [];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return [];
+
+  // Row 3 to Last, Col B(2) to G(7) => 6 columns
+  const dataRange = sheet.getRange(3, 2, lastRow - 2, 6);
+  const data = dataRange.getValues();
+
+  return data.map((row) => ({
+    enrollmentId: String(row[0]).trim(),
+    studentId: String(row[1]).trim(),
+    courseId: String(row[2]).trim(),
+    enrollmentDate: row[3] ? new Date(row[3]).toISOString().split("T")[0] : "",
+    grade: String(row[4]).trim(),
+    status: String(row[5]).trim(),
+  }));
+}
+
+// 18. Helper: Get Course IDs AND Names for enrollment dropdowns
+function getCourseIdNamePairs() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Courses");
+  if (!sheet) return [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return [];
+
+  // Get ID (Col B), Name (Col C)
+  const data = sheet.getRange(3, 2, lastRow - 2, 2).getValues();
+  return data.map((row) => ({
+    courseId: String(row[0]).trim(),
+    courseName: String(row[1]).trim(),
+  }));
+}
+
+// 19. Helper: Generate Enrollment ID (e.g. ENR-1001)
+function generateNextEnrollmentId(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return "ENR-1001";
+
+  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues();
+  let maxIdNum = 1000;
+  values.forEach((row) => {
+    const idStr = String(row[0]).trim();
+    if (idStr.startsWith("ENR-")) {
+      const num = parseInt(idStr.substring(4), 10);
+      if (!isNaN(num) && num > maxIdNum) {
+        maxIdNum = num;
+      }
+    }
+  });
+  return "ENR-" + (maxIdNum + 1);
+}
+
+// 20. Add Enrollment Logic
+function addEnrollment(enrollmentData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Enrollments");
+  if (!sheet) throw new Error("Enrollments worksheet not found.");
+
+  const nextId = generateNextEnrollmentId(sheet);
+  const lastRow = sheet.getLastRow();
+  const targetRow = lastRow + 1;
+
+  sheet
+    .getRange(targetRow, 2, 1, 6)
+    .setValues([
+      [
+        nextId,
+        enrollmentData.studentId,
+        enrollmentData.courseId,
+        new Date(enrollmentData.enrollmentDate),
+        enrollmentData.grade,
+        enrollmentData.status,
+      ],
+    ]);
+
+  return { success: true, enrollmentId: nextId };
+}
+
+// 21. Fetch Classes Data (For the Classes page)
+function getClassesData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Classes");
+  if (!sheet) return [];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  // Get class names from Column A, starting from Row 2
+  const classRange = sheet.getRange(2, 1, lastRow - 1, 1);
+  const classData = classRange.getValues();
+  
+  // Get all students data and count them per class
+  let studentCounts = {};
+  
+  try {
+    // Use the existing getStudentsData which properly handles headers
+    const studentsData = getStudentsData();
+    
+    // Count students per class
+    studentsData.forEach(function(student) {
+      const className = String(student.class || '').trim();
+      if (className) {
+        studentCounts[className] = (studentCounts[className] || 0) + 1;
+      }
+    });
+  } catch (e) {
+    Logger.log('Error counting students per class: ' + e.message);
+  }
+  
+  return classData.map((row, idx) => {
+    const className = String(row[0]).trim();
+    return {
+      id: idx + 2, // Sheet row number for reference
+      className: className,
+      studentCount: studentCounts[className] || 0
+    };
+  }).filter((r) => r.className);
+}
+
+// 22. Add Class Logic
+function addClass(className) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Classes");
+  if (!sheet) throw new Error("Classes worksheet not found.");
+
+  const lastRow = sheet.getLastRow();
+  const targetRow = lastRow + 1;
+
+  // Set value in Column A
+  sheet.getRange(targetRow, 1, 1, 1).setValue([className]);
+
+  return { success: true };
+}
+
+// 23. Update Class Logic
+function updateClass(id, className) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Classes");
+  if (!sheet) throw new Error("Classes worksheet not found.");
+
+  // id is the row number in the sheet
+  if (id < 2) throw new Error("Invalid class ID.");
+
+  // Update Column A with the new class name
+  sheet.getRange(id, 1).setValue(className);
+
+  return { success: true };
+}
+
+// 24. Delete Class Logic
+function deleteClass(id) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Classes");
+  if (!sheet) throw new Error("Classes worksheet not found.");
+
+  // id is the row number in the sheet
+  if (id < 2) throw new Error("Invalid class ID.");
+
+  // Delete the entire row
+  sheet.deleteRow(id);
+
+  return { success: true };
+}
+
+// --- ACADEMIC YEARS FUNCTIONS ---
+
+// Fetch data from Academic Years sheet
+function getAcademicYearsData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Academic Years");
+  if (!sheet) return [];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return []; // Headers at Row 2
+
+  // Get range from Row 3, Column B to Column C
+  const dataRange = sheet.getRange(3, 2, lastRow - 2, 2);
+  const data = dataRange.getValues();
+
+  return data
+    .filter((row) => String(row[0]).trim() !== "") // Filter out empty rows
+    .map((row) => ({
+      academicYear: String(row[0]).trim(),
+      status: String(row[1]).trim() || "Active",
+    }));
+}
+
+// Add new Academic Year
+function addAcademicYear(yearData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Academic Years");
+  if (!sheet) throw new Error("Academic Years worksheet not found.");
+
+  const lastRow = sheet.getLastRow();
+  const targetRow = lastRow + 1;
+
+  // Write to Column B and C
+  sheet
+    .getRange(targetRow, 2, 1, 2)
+    .setValues([[yearData.academicYear, yearData.status || "Active"]]);
+
+  return { success: true };
+}
+
+// --- TEACHERS FUNCTIONS ---
+
+// Fetch Teachers Data
+function getTeachersData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Teachers");
+  if (!sheet) return [];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return [];
+
+  // Get range from Row 3, Col B to Col F
+  const dataRange = sheet.getRange(3, 2, lastRow - 2, 5);
+  const data = dataRange.getValues();
+
+  return data.map((row) => ({
+    teacherId: String(row[0]).trim(),
+    firstName: String(row[1]).trim(),
+    lastName: String(row[2]).trim(),
+    class: String(row[3]).trim(),
+    academicYear: String(row[4]).trim(),
+  }));
+}
+
+// Helper to auto-generate the next Teacher ID (e.g. TCH-1001)
+function generateNextTeacherId(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return "TCH-1001";
+
+  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues();
+  let maxIdNum = 1000;
+  values.forEach((row) => {
+    const idStr = String(row[0]).trim();
+    if (idStr.startsWith("TCH-")) {
+      const num = parseInt(idStr.substring(4), 10);
+      if (!isNaN(num) && num > maxIdNum) {
+        maxIdNum = num;
+      }
+    }
+  });
+  return "TCH-" + (maxIdNum + 1);
+}
+
+// Add new Teacher
+function addTeacher(teacherData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Teachers");
+  if (!sheet) throw new Error("Teachers worksheet not found.");
+
+  const nextId = generateNextTeacherId(sheet);
+  const lastRow = sheet.getLastRow();
+  const targetRow = lastRow + 1;
+
+  // Write to Column B to F
+  sheet
+    .getRange(targetRow, 2, 1, 5)
+    .setValues([
+      [
+        nextId,
+        teacherData.firstName,
+        teacherData.lastName,
+        teacherData.class,
+        teacherData.academicYear,
+      ],
+    ]);
+
+  return { success: true, teacherId: nextId };
+}
+
+// Generic helper to get just Class names (for Teacher dropdown)
+function getClassNames() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Classes");
+  if (!sheet) return [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  return data.map((row) => String(row[0]).trim()).filter(Boolean);
+}
+
+// --- PERFORMANCE FUNCTIONS ---
+
+// Fetch Performance Data with dynamic column mapping (used by DataAccessLayer cache wrapper)
+function getPerformanceDataFromSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Performance");
+  if (!sheet) return [];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return [];
+
+  // Read headers in Row 2, from Col B (2) to Col M (13) -> 12 columns
+  const headers = sheet
+    .getRange(2, 2, 1, 12)
+    .getValues()[0]
+    .map((h) => String(h).trim().toLowerCase());
+
+  // Helper: find header index by prioritized alias lists
+  function findHeaderIndex(aliasGroups) {
+    // aliasGroups: array of alias strings in priority order
+    // 1) exact match
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      for (let a = 0; a < aliasGroups.length; a++) {
+        if (h === aliasGroups[a]) return i;
+      }
+    }
+    // 2) contains any alias (less strict)
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
+      for (let a = 0; a < aliasGroups.length; a++) {
+        if (h.indexOf(aliasGroups[a]) !== -1) return i;
+      }
+    }
+    return -1;
+  }
+
+  const idxId = findHeaderIndex([
+    "performance id",
+    "performance",
+    "perf id",
+    "perf",
+  ]);
+  const idxStudentId = findHeaderIndex([
+    "student id",
+    "studentid",
+    "student_id",
+    "sid",
+  ]);
+  const idxName = findHeaderIndex(["student name", "name", "student"]);
+  const idxClass = findHeaderIndex(["student class", "class name", "class"]);
+  const idxTerm = findHeaderIndex(["term"]);
+  const idxYear = findHeaderIndex(["academic year", "year"]);
+  const idxClassScore = findHeaderIndex(["class score", "classscore"]);
+  const idxExam100 = findHeaderIndex([
+    "exam score (100%)",
+    "exam 100",
+    "exam score 100",
+    "exam100",
+  ]);
+  const idxExam60 = findHeaderIndex([
+    "exam score (50%)",
+    "exam score (50)",
+    "exam 50",
+    "exam score 50",
+    "exam score (60%)",
+    "exam 60",
+    "exam score 60",
+    "exam60",
+  ]);
+  const idxTotal = findHeaderIndex(["total"]);
+  const idxRank = findHeaderIndex(["rank"]);
+  const idxCourse = findHeaderIndex(["course"]);
+
+  const data = sheet.getRange(3, 2, lastRow - 2, 12).getValues();
+
+  return data
+    .filter((row) => {
+      // Filter out empty rows - check if student name exists
+      const studentName = idxName !== -1 ? String(row[idxName]).trim() : "";
+      return studentName !== "";
+    })
+    .map((row, index) => {
+      return {
+        performanceId: `ROW-${index + 3}`, // Use actual row number as ID
+        rowNumber: index + 3, // Store actual row number for updates
+        studentId: idxStudentId !== -1 ? String(row[idxStudentId]).trim() : "",
+        studentName: idxName !== -1 ? String(row[idxName]).trim() : "",
+        studentClass: idxClass !== -1 ? String(row[idxClass]).trim() : "",
+        term: idxTerm !== -1 ? String(row[idxTerm]).trim() : "",
+        academicYear: idxYear !== -1 ? String(row[idxYear]).trim() : "",
+        classScore: idxClassScore !== -1 ? Number(row[idxClassScore]) || 0 : 0,
+        examScore100: idxExam100 !== -1 ? Number(row[idxExam100]) || 0 : 0,
+        examScore60: idxExam60 !== -1 ? Number(row[idxExam60]) || 0 : 0,
+        total: idxTotal !== -1 ? Number(row[idxTotal]) || 0 : 0,
+        rank: idxRank !== -1 ? String(row[idxRank]).trim() : "",
+        course: idxCourse !== -1 ? String(row[idxCourse]).trim() : "",
+      };
+    });
+}
+
+/**
+ * Recalculate ranks for ALL performance records
+ * Call this once to fix existing records that don't have ranks
+ */
+function recalculateAllRanks() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Performance");
+  if (!sheet) {
+    Logger.log('Performance sheet not found');
+    return { success: false, message: 'Performance sheet not found' };
+  }
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) {
+    Logger.log('No records to process');
+    return { success: true, message: 'No records found' };
+  }
+  
+  // Get headers
+  const headers = sheet.getRange(2, 2, 1, 12).getValues()[0].map(h => String(h).trim().toLowerCase());
+  
+  function findCol(aliases) {
+    for (let i = 0; i < headers.length; i++) {
+      for (let a of aliases) {
+        if (headers[i] === a || headers[i].indexOf(a) !== -1) return i + 2;
+      }
+    }
+    return -1;
+  }
+  
+  const colClass = findCol(['student class', 'class name', 'class']);
+  const colTerm = findCol(['term']);
+  const colYear = findCol(['academic year', 'year']);
+  const colCourse = findCol(['course']);
+  const colTotal = findCol(['total']);
+  const colRank = findCol(['rank']);
+  
+  if (colClass === -1 || colTerm === -1 || colYear === -1 || colCourse === -1 || colTotal === -1 || colRank === -1) {
+    Logger.log('Cannot recalculate ranks - missing required columns');
+    return { success: false, message: 'Missing required columns in Performance sheet' };
+  }
+  
+  // Get all data
+  const allData = sheet.getRange(3, 2, lastRow - 2, headers.length).getValues();
+  
+  // Group records by class/term/year/course
+  const groups = {};
+  
+  for (let i = 0; i < allData.length; i++) {
+    const row = allData[i];
+    const rowClass = String(row[colClass - 2] || '').trim();
+    const rowTerm = String(row[colTerm - 2] || '').trim();
+    const rowYear = String(row[colYear - 2] || '').trim();
+    const rowCourse = String(row[colCourse - 2] || '').trim();
+    const rowTotal = Number(row[colTotal - 2]) || 0;
+    
+    if (!rowClass || !rowTerm || !rowYear || !rowCourse) continue;
+    
+    const groupKey = `${rowClass}|${rowTerm}|${rowYear}|${rowCourse}`;
+    
+    if (!groups[groupKey]) {
+      groups[groupKey] = [];
+    }
+    
+    groups[groupKey].push({
+      rowNumber: i + 3,
+      total: rowTotal
+    });
+  }
+  
+  // Calculate ranks for each group
+  let totalRecordsRanked = 0;
+  
+  Object.keys(groups).forEach(function(groupKey) {
+    const records = groups[groupKey];
+    
+    // Sort by total (descending)
+    records.sort((a, b) => b.total - a.total);
+    
+    // Assign ranks (handle ties)
+    let currentRank = 1;
+    for (let i = 0; i < records.length; i++) {
+      if (i > 0 && records[i].total < records[i - 1].total) {
+        currentRank = i + 1;
+      }
+      sheet.getRange(records[i].rowNumber, colRank).setValue(currentRank);
+      totalRecordsRanked++;
+    }
+    
+    Logger.log(`Ranked ${records.length} students in group: ${groupKey}`);
+  });
+  
+  Logger.log(`Total records ranked: ${totalRecordsRanked} across ${Object.keys(groups).length} groups`);
+  
+  return {
+    success: true,
+    message: `Successfully ranked ${totalRecordsRanked} records across ${Object.keys(groups).length} course groups`,
+    totalRecords: totalRecordsRanked,
+    totalGroups: Object.keys(groups).length
+  };
+}
+
+/**
+ * Clean up existing duplicate performance records in the Performance sheet.
+ * Retains the first occurrence for each (Student + Class + Term + Academic Year + Course) combination
+ * and deletes any duplicate rows below it.
+ */
+function removeDuplicatePerformanceRecords() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Performance");
+  if (!sheet) return { success: false, message: 'Performance sheet not found' };
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return { success: true, message: 'No performance records found', deletedCount: 0 };
+
+  const headers = sheet.getRange(2, 2, 1, 12).getValues()[0].map(h => String(h).trim().toLowerCase());
+  
+  function findCol(aliases) {
+    for (let i = 0; i < headers.length; i++) {
+      for (let a of aliases) {
+        if (headers[i] === a || headers[i].indexOf(a) !== -1) return i;
+      }
+    }
+    return -1;
+  }
+
+  const idxName = findCol(["student name", "name", "student"]);
+  const idxStudentId = findCol(["student id", "studentid", "student_id", "sid"]);
+  const idxClass = findCol(["student class", "class name", "class"]);
+  const idxTerm = findCol(["term"]);
+  const idxYear = findCol(["academic year", "year"]);
+  const idxCourse = findCol(["course"]);
+
+  const allVals = sheet.getRange(3, 2, lastRow - 2, headers.length).getValues();
+  const normalize = (str) => String(str || "").trim().toLowerCase();
+
+  const seenKeys = new Set();
+  const rowsToDelete = [];
+
+  for (let i = 0; i < allVals.length; i++) {
+    const rowNum = i + 3;
+    const row = allVals[i];
+
+    const studentName = idxName !== -1 ? normalize(row[idxName]) : "";
+    const studentId = idxStudentId !== -1 ? normalize(row[idxStudentId]) : "";
+    const className = idxClass !== -1 ? normalize(row[idxClass]) : "";
+    const term = idxTerm !== -1 ? normalize(row[idxTerm]) : "";
+    const year = idxYear !== -1 ? normalize(row[idxYear]) : "";
+    const course = idxCourse !== -1 ? normalize(row[idxCourse]) : "";
+
+    if (!studentName && !studentId) continue;
+
+    const studentIdentifier = studentId !== "" ? studentId : studentName;
+    const key = `${studentIdentifier}|${className}|${term}|${year}|${course}`;
+
+    if (seenKeys.has(key)) {
+      rowsToDelete.push(rowNum);
+    } else {
+      seenKeys.add(key);
+    }
+  }
+
+  // Delete duplicate rows from bottom to top to preserve row indexing
+  rowsToDelete.reverse().forEach(rowNum => {
+    sheet.deleteRow(rowNum);
+  });
+
+  if (rowsToDelete.length > 0) {
+    try { recalculateAllRanks(); } catch (e) { /* ignore */ }
+    try { invalidatePerformanceCache(); } catch (e) { /* ignore */ }
+  }
+
+  return {
+    success: true,
+    message: `Removed ${rowsToDelete.length} duplicate performance record(s).`,
+    deletedCount: rowsToDelete.length
+  };
+}
+
+/**
+ * Calculate and set ranks for students in a specific class/term/year/course
+ * Ranks students by total score (highest first)
+ */
+function calculateAndSetRanks(sheet, className, term, academicYear, courseName) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return;
+  
+  // Get headers
+  const headers = sheet.getRange(2, 2, 1, 12).getValues()[0].map(h => String(h).trim().toLowerCase());
+  
+  function findCol(aliases) {
+    for (let i = 0; i < headers.length; i++) {
+      for (let a of aliases) {
+        if (headers[i] === a || headers[i].indexOf(a) !== -1) return i + 2;
+      }
+    }
+    return -1;
+  }
+  
+  const colClass = findCol(['student class', 'class name', 'class']);
+  const colTerm = findCol(['term']);
+  const colYear = findCol(['academic year', 'year']);
+  const colCourse = findCol(['course']);
+  const colTotal = findCol(['total']);
+  const colRank = findCol(['rank']);
+  
+  if (colClass === -1 || colTerm === -1 || colYear === -1 || colCourse === -1 || colTotal === -1 || colRank === -1) {
+    Logger.log('Cannot calculate ranks - missing required columns');
+    return;
+  }
+  
+  // Get all data
+  const allData = sheet.getRange(3, 2, lastRow - 2, headers.length).getValues();
+  
+  // Filter records matching class/term/year/course
+  const matchingRecords = [];
+  for (let i = 0; i < allData.length; i++) {
+    const row = allData[i];
+    const rowClass = String(row[colClass - 2] || '').trim();
+    const rowTerm = String(row[colTerm - 2] || '').trim();
+    const rowYear = String(row[colYear - 2] || '').trim();
+    const rowCourse = String(row[colCourse - 2] || '').trim();
+    const rowTotal = Number(row[colTotal - 2]) || 0;
+    
+    if (rowClass === className && rowTerm === term && rowYear === academicYear && rowCourse === courseName) {
+      matchingRecords.push({
+        rowNumber: i + 3,
+        total: rowTotal
+      });
+    }
+  }
+  
+  // Sort by total (descending)
+  matchingRecords.sort((a, b) => b.total - a.total);
+  
+  // Assign ranks (handle ties)
+  let currentRank = 1;
+  for (let i = 0; i < matchingRecords.length; i++) {
+    if (i > 0 && matchingRecords[i].total < matchingRecords[i - 1].total) {
+      currentRank = i + 1;
+    }
+    sheet.getRange(matchingRecords[i].rowNumber, colRank).setValue(currentRank);
+  }
+  
+  Logger.log(`Ranks calculated for ${matchingRecords.length} students in ${courseName}`);
+}
+
+// Add new Performance Record dynamically looking up header columns
+function addPerformance(perfData) {
+  try {
+    Logger.log('addPerformance called with data: ' + JSON.stringify(perfData));
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Performance");
+    if (!sheet) throw new Error("Performance worksheet not found.");
+
+    const lastRow = sheet.getLastRow();
+
+    // Let's get header columns to know where to write what (from B to M)
+    const headers = sheet
+      .getRange(2, 2, 1, 12)
+      .getValues()[0]
+      .map((h) => String(h).trim().toLowerCase());
+
+    // Helper to locate header column (1-based sheet column number)
+    function findColNum(aliasGroups) {
+      // exact match first
+      for (let i = 0; i < headers.length; i++) {
+        for (let a = 0; a < aliasGroups.length; a++) {
+          if (headers[i] === aliasGroups[a]) return i + 2;
+        }
+      }
+      // contains match next
+      for (let i = 0; i < headers.length; i++) {
+        for (let a = 0; a < aliasGroups.length; a++) {
+          if (headers[i].indexOf(aliasGroups[a]) !== -1) return i + 2;
+        }
+      }
+      return -1;
+    }
+
+    const colName = findColNum(["student name", "name", "student"]);
+    const colStudentId = findColNum([
+      "student id",
+      "studentid",
+      "student_id",
+      "sid",
+    ]);
+    const colClass = findColNum(["student class", "class name", "class"]);
+    const colTerm = findColNum(["term"]);
+    const colYear = findColNum(["academic year", "year"]);
+    const colClassScore = findColNum(["class score", "classscore"]);
+    const colExam100 = findColNum([
+      "exam score (100%)",
+      "exam score (100)",
+      "exam 100",
+      "exam score 100",
+      "exam100",
+    ]);
+    const colExam60 = findColNum([
+      "exam score (50%)",
+      "exam score (50)",
+      "exam 50",
+      "exam score 50",
+      "exam score (60%)",
+      "exam 60",
+      "exam score 60",
+      "exam60",
+    ]);
+    const colTotal = findColNum(["total"]);
+    const colCourse = findColNum(["course"]);
+
+    // Server-side duplicate check: prevent same student/course/class/term/year
+    if (lastRow >= 3) {
+      const allVals = sheet.getRange(3, 2, lastRow - 2, headers.length).getValues();
+      
+      // Normalize function for consistent comparison
+      const normalize = (str) => String(str || "").trim().toLowerCase();
+      
+      const incomingStudentId = normalize(perfData.studentId);
+      const incomingStudentName = normalize(perfData.studentName);
+      const incomingClass = normalize(perfData.studentClass);
+      const incomingTerm = normalize(perfData.term);
+      const incomingYear = normalize(perfData.academicYear);
+      const incomingCourse = normalize(perfData.course);
+      
+      Logger.log('Checking for duplicates with: StudentID=' + incomingStudentId + ', Name=' + incomingStudentName + ', Class=' + incomingClass + ', Term=' + incomingTerm + ', Year=' + incomingYear + ', Course=' + incomingCourse);
+      
+      for (let i = 0; i < allVals.length; i++) {
+        const row = allVals[i];
+        const valAt = (col) => {
+          if (col === -1) return "";
+          const idx = col - 2;
+          return String(row[idx] || "").trim();
+        };
+        
+        const existingStudentId = normalize(valAt(colStudentId));
+        const existingName = normalize(valAt(colName));
+        const existingClass = normalize(valAt(colClass));
+        const existingTerm = normalize(valAt(colTerm));
+        const existingYear = normalize(valAt(colYear));
+        const existingCourse = normalize(valAt(colCourse));
+
+        // Match by student ID first (if both non-empty), otherwise fallback to student name
+        const sameStudent = (incomingStudentId !== "" && existingStudentId !== "")
+          ? existingStudentId === incomingStudentId
+          : existingName === incomingStudentName;
+
+        const sameClass = existingClass === incomingClass;
+        const sameTerm = existingTerm === incomingTerm;
+        const sameYear = existingYear === incomingYear;
+        const sameCourse = existingCourse === incomingCourse;
+
+        if (sameStudent && sameClass && sameTerm && sameYear && sameCourse) {
+          Logger.log('DUPLICATE FOUND at row ' + (i + 3) + ': ExistingID=' + existingStudentId + ', ExistingName=' + existingName + ', Course=' + existingCourse);
+          return { 
+            success: false, 
+            message: `Duplicate record: ${perfData.studentName} already has a performance record for ${perfData.course} in ${perfData.term} ${perfData.academicYear}.` 
+          };
+        }
+      }
+      Logger.log('No duplicate found - record will be added');
+    }
+
+    const targetRow = lastRow + 1;
+
+    // Write values to their respective columns
+    if (colName !== -1)
+      sheet.getRange(targetRow, colName).setValue(perfData.studentName);
+    if (colStudentId !== -1)
+      sheet
+        .getRange(targetRow, colStudentId)
+        .setValue(perfData.studentId || perfData.studentName || "");
+    if (colClass !== -1)
+      sheet.getRange(targetRow, colClass).setValue(perfData.studentClass);
+    if (colTerm !== -1)
+      sheet.getRange(targetRow, colTerm).setValue(perfData.term);
+    if (colYear !== -1)
+      sheet.getRange(targetRow, colYear).setValue(perfData.academicYear);
+    if (colClassScore !== -1)
+      sheet.getRange(targetRow, colClassScore).setValue(perfData.classScore);
+    if (colExam100 !== -1)
+      sheet.getRange(targetRow, colExam100).setValue(perfData.examScore100);
+    if (colExam60 !== -1)
+      sheet.getRange(targetRow, colExam60).setValue(perfData.examScore50 || perfData.examScore60 || 0);
+    if (colTotal !== -1)
+      sheet.getRange(targetRow, colTotal).setValue(perfData.total);
+    if (colCourse !== -1)
+      sheet.getRange(targetRow, colCourse).setValue(perfData.course);
+    
+    // Calculate and set rank after adding the record
+    try {
+      calculateAndSetRanks(sheet, perfData.studentClass, perfData.term, perfData.academicYear, perfData.course);
+    } catch (rankError) {
+      Logger.log('Error calculating ranks: ' + rankError.message);
+      // Continue anyway - rank can be calculated later
+    }
+
+    Logger.log('Performance record added successfully at row: ' + targetRow);
+    try { invalidatePerformanceCache(); } catch (e) { /* fail silently */ }
+    return { success: true, performanceId: `ROW-${targetRow}` };
+    
+  } catch (error) {
+    Logger.log('ERROR in addPerformance: ' + error.toString());
+    return { success: false, message: error.toString() };
+  }
+}
+
+// Helper: find performance row by performanceId
+function findPerformanceRowById(sheet, performanceId) {
+  if (!sheet) return -1;
+  
+  // New format: performanceId is "ROW-X" where X is the actual row number
+  if (String(performanceId).startsWith('ROW-')) {
+    const rowNum = parseInt(String(performanceId).replace('ROW-', ''), 10);
+    if (!isNaN(rowNum) && rowNum >= 3) {
+      return rowNum;
+    }
+  }
+  
+  // Fallback: old behavior (shouldn't happen with new format)
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return -1;
+  
+  // Try to find by student name as fallback
+  Logger.log('Warning: Could not parse row from performanceId: ' + performanceId);
+  return -1;
+}
+
+// Update Performance record by ID
+function updatePerformance(performanceId, perfData) {
+  try {
+    Logger.log('updatePerformance - ID: ' + performanceId + ', Data: ' + JSON.stringify(perfData));
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Performance");
+  if (!sheet)
+    return { success: false, message: "Performance sheet not found." };
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return { success: false, message: "No records." };
+
+  // read headers and build helper findColNum (same logic as addPerformance)
+  const headers = sheet
+    .getRange(2, 2, 1, 12)
+    .getValues()[0]
+    .map((h) => String(h).trim().toLowerCase());
+  function findColNumLocal(aliasGroups) {
+    for (let i = 0; i < headers.length; i++) {
+      for (let a = 0; a < aliasGroups.length; a++) {
+        if (headers[i] === aliasGroups[a]) return i + 2;
+      }
+    }
+    for (let i = 0; i < headers.length; i++) {
+      for (let a = 0; a < aliasGroups.length; a++) {
+        if (headers[i].indexOf(aliasGroups[a]) !== -1) return i + 2;
+      }
+    }
+    return -1;
+  }
+
+  const row = findPerformanceRowById(sheet, performanceId);
+  if (row === -1) return { success: false, message: "Record not found." };
+
+  const colName = findColNumLocal(["student name", "name", "student"]);
+  const colStudentId = findColNumLocal([
+    "student id",
+    "studentid",
+    "student_id",
+    "sid",
+  ]);
+  const colClass = findColNumLocal(["student class", "class name", "class"]);
+  const colTerm = findColNumLocal(["term"]);
+  const colYear = findColNumLocal(["academic year", "year"]);
+  const colClassScore = findColNumLocal(["class score", "classscore"]);
+  const colExam100 = findColNumLocal([
+    "exam score (100%)",
+    "exam score (100)",
+    "exam 100",
+    "exam score 100",
+    "exam100",
+  ]);
+  const colExam60 = findColNumLocal([
+    "exam score (50%)",
+    "exam score (50)",
+    "exam 50",
+    "exam score 50",
+    "exam50",
+    "exam score (60%)",
+    "exam 60",
+    "exam score 60",
+    "exam60",
+  ]);
+  const colTotal = findColNumLocal(["total"]);
+  const colRank = findColNumLocal(["rank"]);
+  const colCourse = findColNumLocal(["course"]);
+
+  // Check for duplicate before applying update (ignore current row)
+  const dupRow = findPerformanceDuplicateLocal(perfData, row);
+  if (dupRow !== -1) {
+    return { success: false, message: "Another performance record already exists for this student in the same course, class, term and academic year." };
+  }
+
+  // Server-side duplicate check for update: ignore the row being updated
+  function findPerformanceDuplicateLocal(data, ignoreRow) {
+    const lastRowCheck = sheet.getLastRow();
+    if (lastRowCheck < 3) return -1;
+    const allVals = sheet.getRange(3, 2, lastRowCheck - 2, headers.length).getValues();
+    const normalize = (str) => String(str || "").trim().toLowerCase();
+
+    const incomingStudentId = normalize(data.studentId);
+    const incomingStudentName = normalize(data.studentName);
+    const incomingClass = normalize(data.studentClass);
+    const incomingTerm = normalize(data.term);
+    const incomingYear = normalize(data.academicYear);
+    const incomingCourse = normalize(data.course);
+
+    for (let i = 0; i < allVals.length; i++) {
+      const rowNum = i + 3;
+      if (ignoreRow && rowNum === ignoreRow) continue;
+      const row = allVals[i];
+      const valAt = (col) => {
+        if (col === -1) return "";
+        const idx = col - 2;
+        return String(row[idx] || "").trim();
+      };
+      const existingStudentId = normalize(valAt(colStudentId));
+      const existingName = normalize(valAt(colName));
+      const existingClass = normalize(valAt(colClass));
+      const existingTerm = normalize(valAt(colTerm));
+      const existingYear = normalize(valAt(colYear));
+      const existingCourse = normalize(valAt(colCourse));
+
+      const sameStudent = (incomingStudentId !== "" && existingStudentId !== "")
+        ? existingStudentId === incomingStudentId
+        : existingName === incomingStudentName;
+
+      const sameClass = existingClass === incomingClass;
+      const sameTerm = existingTerm === incomingTerm;
+      const sameYear = existingYear === incomingYear;
+      const sameCourse = existingCourse === incomingCourse;
+
+      if (sameStudent && sameClass && sameTerm && sameYear && sameCourse) {
+        return rowNum;
+      }
+    }
+    return -1;
+  }
+
+  if (colName !== -1)
+    sheet.getRange(row, colName).setValue(perfData.studentName || "");
+  if (colStudentId !== -1)
+    sheet
+      .getRange(row, colStudentId)
+      .setValue(perfData.studentId || perfData.studentName || "");
+  if (colClass !== -1)
+    sheet.getRange(row, colClass).setValue(perfData.studentClass || "");
+  if (colTerm !== -1)
+    sheet.getRange(row, colTerm).setValue(perfData.term || "");
+  if (colYear !== -1)
+    sheet.getRange(row, colYear).setValue(perfData.academicYear || "");
+  if (colClassScore !== -1)
+    sheet.getRange(row, colClassScore).setValue(perfData.classScore || 0);
+  if (colExam100 !== -1)
+    sheet.getRange(row, colExam100).setValue(perfData.examScore100 || 0);
+  if (colExam60 !== -1)
+    sheet.getRange(row, colExam60).setValue(
+      perfData.examScore60 !== undefined
+        ? perfData.examScore60
+        : perfData.examScore50 || 0,
+    );
+  if (colTotal !== -1)
+    sheet.getRange(row, colTotal).setValue(perfData.total || 0);
+  if (colRank !== -1)
+    sheet.getRange(row, colRank).setValue(perfData.rank || "");
+  if (colCourse !== -1)
+    sheet.getRange(row, colCourse).setValue(perfData.course || "");
+
+  // Recalculate ranks after update
+  try {
+    calculateAndSetRanks(sheet, perfData.studentClass, perfData.term, perfData.academicYear, perfData.course);
+  } catch (rankError) {
+    Logger.log('Error calculating ranks: ' + rankError.message);
+  }
+
+  Logger.log('Update successful');
+  try { invalidatePerformanceCache(); } catch (e) { /* fail silently */ }
+  return { success: true };
+  } catch (error) {
+    Logger.log('ERROR in updatePerformance: ' + error.toString());
+    return { success: false, message: error.toString() };
+  }
+}
+
+// Delete Performance record by ID
+function deletePerformance(performanceId) {
+  try {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Performance");
+  if (!sheet)
+    return { success: false, message: "Performance sheet not found." };
+  const row = findPerformanceRowById(sheet, performanceId);
+  if (row === -1) return { success: false, message: "Record not found." };
+  sheet.deleteRow(row);
+  try { invalidatePerformanceCache(); } catch (e) { /* fail silently */ }
+  return { success: true };
+  } catch (error) {
+    Logger.log('ERROR in deletePerformance: ' + error.toString());
+    return { success: false, message: error.toString() };
+  }
+}
+
+
+// ============================================
+// TERMINAL REPORT GENERATION
+// ============================================
+
+function generateTerminalReports(reportData) {
+  requireLogin();
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const students = reportData.students || [];
+  
+  if (students.length === 0) {
+    return { success: false, message: 'No students selected' };
+  }
+  
+  try {
+    // If single student, generate single PDF
+    if (students.length === 1) {
+      const result = generateSingleTerminalReport(reportData, students[0]);
+      return {
+        success: true,
+        base64: result.base64,
+        fileName: result.fileName,
+      };
+    }
+
+    // If multiple students, generate ZIP
+    const result = generateMultipleTerminalReports(reportData, students);
+    return {
+      success: true,
+      base64: result.base64,
+      fileName: result.fileName,
+      isZip: true,
+    };
+  } catch (error) {
+    Logger.log('Error generating terminal reports: ' + error.toString());
+    return { success: false, message: error.toString() };
+  }
+}
+
+function generateSingleTerminalReport(reportData, student) {
+  try {
+    Logger.log('=== generateSingleTerminalReport START ===');
+    Logger.log('Report Data: ' + JSON.stringify(reportData));
+    Logger.log('Student: ' + JSON.stringify(student));
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Get student performance data
+    const performanceSheet = ss.getSheetByName('Performance');
+    if (!performanceSheet) throw new Error('Performance sheet not found');
+    
+    const performanceData = getPerformanceData();
+    Logger.log('Total performance records: ' + performanceData.length);
+    
+    // Improved matching: normalize IDs and names, require class/term/year, prefer ID, then name equality, then substring fallback
+    function normText(s) { return String(s || '').toLowerCase().trim(); }
+    function normId(s) { return String(s || '').replace(/[^a-z0-9]/gi, '').toLowerCase().trim(); }
+
+    const studentPerformance = performanceData.filter(p => {
+      const classMatch = normText(p.studentClass) === normText(reportData.studentClass);
+      const yearMatch = normText(p.academicYear) === normText(reportData.academicYear);
+      const termMatch = normText(p.term) === normText(reportData.term);
+      if (!classMatch || !yearMatch || !termMatch) return false;
+
+      // Try ID match if available
+      if (student.studentId && String(student.studentId).trim() !== '') {
+        if (p.studentId && String(p.studentId).trim() !== '') {
+          if (normId(p.studentId) === normId(student.studentId)) {
+            Logger.log('MATCH FOUND by ID: ' + JSON.stringify(p));
+            return true;
+          }
+        }
+        // fall through to name checks
+      }
+
+      const perfName = normText(p.studentName);
+      const targetName = normText(student.studentName || '');
+      if (perfName === targetName) {
+        Logger.log('MATCH FOUND by exact name: ' + JSON.stringify(p));
+        return true;
+      }
+      // substring fallback
+      if (perfName.indexOf(targetName) !== -1 || targetName.indexOf(perfName) !== -1) {
+        Logger.log('MATCH FOUND by substring: ' + JSON.stringify(p));
+        return true;
+      }
+
+      return false;
+    });
+    
+    Logger.log('Filtered student performance records: ' + studentPerformance.length);
+    if (studentPerformance.length === 0) {
+      Logger.log('WARNING: No performance records found for student!');
+      Logger.log('Search criteria - Name: ' + student.studentName + ', ID: ' + student.studentId + ', Class: ' + reportData.studentClass + ', Term: ' + reportData.term + ', Year: ' + reportData.academicYear);
+    }
+
+  // Compute overall position (POS) for this student among peers in same class/term/year
+  try {
+    const allPerf = performanceData.filter(p => p.studentClass === reportData.studentClass && p.academicYear === reportData.academicYear && p.term === reportData.term);
+    const grouped = {};
+    allPerf.forEach(p => {
+      const key = (p.studentId && String(p.studentId).trim()) || (p.studentName || '').toLowerCase().trim();
+      if (!grouped[key]) grouped[key] = { studentName: p.studentName || '', total: 0 };
+      grouped[key].total = (grouped[key].total || 0) + (Number(p.total) || 0);
+    });
+    const standings = Object.keys(grouped).map(k => ({ key: k, studentName: grouped[k].studentName, total: grouped[k].total }));
+    standings.sort((a, b) => { const d = b.total - a.total; if (d !== 0) return d; return (a.studentName || '').localeCompare(b.studentName || ''); });
+    const studentKey = (student.studentId && String(student.studentId).trim()) || (student.studentName || '').toLowerCase().trim();
+    let overallPosition = '-';
+    for (let i = 0; i < standings.length; i++) {
+      if (standings[i].key === studentKey) { overallPosition = String(i + 1); break; }
+    }
+    reportData.overallPosition = overallPosition;
+  } catch (e) {
+    Logger.log('Error computing overall position: ' + e.toString());
+    reportData.overallPosition = '-';
+  }
+  
+  // Get school information from Settings sheet
+  const schoolName = getSystemParameter('School Name') || 'GLOBAL EVANGELICAL BASIC SCHOOL, TETTEKOPE';
+  const schoolAddress = getSystemParameter('School Address') || getSystemParameter('Address') || 'P.O. BOX KW 182, KETA';
+  const schoolEmail = getSystemParameter('School Email') || getSystemParameter('Email') || '';
+  const schoolPhone = getSystemParameter('School Phone') || getSystemParameter('Phone') || '';
+  const rawSchoolLogo = getSystemParameter('School Logo') || getSystemParameter('Logo URL') || 'https://drive.google.com/uc?export=view&id=1MVnH55BHBynLBOD4pLIZE-5Y9gMaJbOe';
+  const schoolLogo = getImageAsBase64(rawSchoolLogo);
+  
+  Logger.log('School Info - Name: ' + schoolName + ', Address: ' + schoolAddress + ', Email: ' + schoolEmail);
+  
+  // Get student info
+  const studentsSheet = ss.getSheetByName('Students');
+  let studentInfo = { fullName: student.studentName, firstName: '', lastName: '' };
+  if (studentsSheet) {
+    const studentsData = getStudentsData();
+    let found = null;
+    // Prefer lookup by studentId if available
+    if (student.studentId && String(student.studentId).trim() !== '') {
+      found = studentsData.find(s => String(s.studentId || '').trim() === String(student.studentId).trim());
+    }
+    // Fallback to name match
+    if (!found) {
+      found = studentsData.find(s => {
+        const fullName = `${s.firstName} ${s.lastName}`.trim();
+        return fullName.toLowerCase() === (student.studentName || '').toLowerCase().trim();
+      });
+    }
+    if (found) {
+      studentInfo = found;
+      studentInfo.fullName = `${found.firstName} ${found.lastName}`.trim();
+    }
+  }
+  
+  // Generate HTML report
+  const html = buildTerminalReportHTML(schoolName, schoolAddress, schoolEmail, schoolPhone, schoolLogo, studentInfo, reportData, studentPerformance);
+  
+  Logger.log('HTML generated, length: ' + html.length);
+  
+  // Convert to PDF and return base64 (avoids Drive permission requirement)
+  const fileName = `${student.studentName}_${reportData.term}_${reportData.academicYear}_Report.pdf`;
+  const blob = Utilities.newBlob(html, 'text/html', 'report.html').getAs('application/pdf');
+  blob.setName(fileName);
+
+  Logger.log('=== generateSingleTerminalReport END ===');
+  
+  return {
+    base64: Utilities.base64Encode(blob.getBytes()),
+    fileName: fileName,
+    blob: blob,
+  };
+  
+  } catch (error) {
+    Logger.log('ERROR in generateSingleTerminalReport: ' + error.toString());
+    throw error;
+  }
+}
+
+function generateMultipleTerminalReports(reportData, students) {
+  const blobs = students.map(function (student) {
+    return generateSingleTerminalReport(reportData, student).blob;
+  });
+
+  const fileName = `Terminal_Reports_${reportData.studentClass}_${reportData.term}_${reportData.academicYear}.zip`;
+  const zipBlob = Utilities.zip(blobs, fileName);
+
+  return {
+    base64: Utilities.base64Encode(zipBlob.getBytes()),
+    fileName: fileName,
+  };
+}
+
+function buildTerminalReportHTML(schoolName, schoolAddress, schoolEmail, schoolPhone, schoolLogo, studentInfo, reportData, performanceData) {
+  // Calculate overall statistics
+  let totalMarks = 0;
+  let subjectCount = 0;
+  let overallPosition = (reportData && reportData.overallPosition) ? reportData.overallPosition : '-';
+  
+  performanceData.forEach(p => {
+    totalMarks += (p.total || 0);
+    subjectCount++;
+  });
+  
+  const average = subjectCount > 0 ? (totalMarks / subjectCount).toFixed(2) : 0;
+  
+  // Determine grade based on average
+  let grade = 'F FAIL';
+  if (average >= 80) grade = 'A EXCELLENT';
+  else if (average >= 70) grade = 'B VERY GOOD';
+  else if (average >= 60) grade = 'C GOOD';
+  else if (average >= 45) grade = 'D CREDIT';
+  else if (average >= 35) grade = 'E WEAK';
+  
+  // Build subject rows dynamically from actual performance data
+  let subjectRows = '';
+  
+  // Sort performance data by course name for consistent ordering
+  const sortedPerformance = performanceData.sort((a, b) => {
+    const courseA = (a.course || '').toUpperCase();
+    const courseB = (b.course || '').toUpperCase();
+    return courseA.localeCompare(courseB);
+  });
+  
+  sortedPerformance.forEach(p => {
+    const subjectName = p.course || 'N/A';
+    const classScore = (p.classScore || 0).toFixed(1);
+    const examScore100 = (p.examScore100 || 0).toFixed(1);
+    const examScore50 = (p.examScore50 !== undefined ? p.examScore50 : (p.examScore60 || 0)).toFixed(1);
+    const total = (p.total || 0).toFixed(1);
+    const position = p.rank || '-'; // This is the RANK from performance table
+    
+    // Determine grade for subject
+    let subjectGrade = 'F';
+    let remarks = 'Fail';
+    const totalNum = parseFloat(total);
+    
+    if (totalNum >= 80) {
+      subjectGrade = 'A';
+      remarks = 'Excellent';
+    } else if (totalNum >= 70) {
+      subjectGrade = 'B';
+      remarks = 'Very Good';
+    } else if (totalNum >= 60) {
+      subjectGrade = 'C';
+      remarks = 'Good';
+    } else if (totalNum >= 45) {
+      subjectGrade = 'D';
+      remarks = 'Credit';
+    } else if (totalNum >= 35) {
+      subjectGrade = 'E';
+      remarks = 'Weak';
+    } else {
+      subjectGrade = 'F';
+      remarks = 'Fail';
+    }
+    
+    subjectRows += `
+      <tr>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: left;">${subjectName}</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;">${classScore}</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;">${examScore100}</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;">${examScore50}</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;"><strong>${total}</strong></td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;">${position}</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;"><strong>${subjectGrade}</strong></td>
+        <td style="padding: 6px 4px; border: 1px solid #000; font-size: 10px;">${remarks}</td>
+      </tr>`;
+  });
+  
+  // Add a summary row at the bottom showing average
+  if (sortedPerformance.length > 0) {
+    // Determine overall remark based on average
+    let overallRemark = 'Fail';
+    const avgNum = parseFloat(average);
+    if (avgNum >= 80) overallRemark = 'Excellent';
+    else if (avgNum >= 70) overallRemark = 'Very Good';
+    else if (avgNum >= 60) overallRemark = 'Good';
+    else if (avgNum >= 45) overallRemark = 'Credit';
+    else if (avgNum >= 35) overallRemark = 'Weak';
+    
+    subjectRows += `
+      <tr style="background: #f0f0f0; font-weight: bold;">
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: left;">AVERAGE / TOTAL</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;" colspan="3">${subjectCount} Subjects</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;">${average}</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;">${overallPosition}</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; text-align: center;">${grade.split(' ')[0]}</td>
+        <td style="padding: 6px 4px; border: 1px solid #000; font-size: 10px;">${overallRemark}</td>
+      </tr>`;
+  }
+  
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Terminal Report - ${studentInfo.fullName || studentInfo.firstName + ' ' + studentInfo.lastName}</title>
+  <style>
+    @page { 
+      size: A4 portrait; 
+      margin: 10mm 15mm;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Times New Roman', Times, serif; 
+      background: #fff; 
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+    }
+    .report-container { 
+      width: 100%;
+      min-height: 297mm;
+      border: 3px solid #654321; 
+      padding: 12px; 
+      background: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+    }
+    .report-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .header { 
+      text-align: center; 
+      margin-bottom: 12px; 
+      border-bottom: 2px solid #000; 
+      padding-bottom: 10px;
+      position: relative;
+    }
+    .school-logo {
+      width: 60px;
+      height: 60px;
+      position: absolute;
+      left: 10px;
+      top: 0;
+      object-fit: contain;
+    }
+    .header h1 { font-size: 16px; margin: 6px 0; text-transform: uppercase; font-weight: bold; }
+    .header p { font-size: 11px; margin: 2px 0; }
+    .student-info { margin: 10px 0; font-size: 12px; line-height: 1.6; }
+    .student-info div { display: flex; justify-content: space-between; }
+    .student-info span { flex: 1; }
+    .grading-key { margin: 10px 0; padding: 6px; background: #fff; border: 1px solid #000; }
+    .grading-key table { width: 100%; font-size: 10px; }
+    .grading-key td { padding: 3px; border: 1px solid #000; text-align: center; font-weight: bold; }
+    
+    .table-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 300px;
+    }
+    
+    .performance-table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      background: #fff; 
+      font-size: 11px;
+    }
+    .performance-table th { 
+      background: #e0e0e0; 
+      padding: 3px 2px; 
+      border: 1px solid #000; 
+      font-size: 9px; 
+      text-align: center; 
+      font-weight: bold; 
+      line-height: 1; 
+    }
+    .performance-table td { 
+      font-size: 10px; 
+      padding: 3px 2px; 
+      border: 1px solid #000; 
+      vertical-align: middle;
+      line-height: 1.1;
+    }
+    
+    .footer-section { 
+      margin-top: auto;
+      padding-top: 12px;
+      font-size: 11px; 
+      line-height: 1.6; 
+      page-break-inside: avoid;
+    }
+    .signature-line { border-bottom: 1px solid #000; display: inline-block; min-width: 180px; margin-left: 8px; }
+    .motto { text-align: center; font-style: italic; margin-top: 8px; font-size: 10px; color: #333; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="report-container">
+    <div class="report-content">
+      <!-- Header -->
+      <div class="header">
+        ${schoolLogo ? `<img src="${schoolLogo}" class="school-logo" alt="School Logo" />` : ''}
+        <h1>${schoolName}</h1>
+        <p>${schoolAddress}</p>
+        ${schoolEmail ? `<p style="font-size: 10px;">Email: ${schoolEmail}</p>` : ''}
+        ${schoolPhone ? `<p style="font-size: 10px;">Phone: ${schoolPhone}</p>` : ''}
+        <p style="font-weight: bold; margin-top: 6px;">PUPIL'S REPORT SHEET</p>
+      </div>
+      
+      <!-- Student Info -->
+      <div class="student-info">
+        <div>
+          <span><strong>NAME:</strong> ${studentInfo.fullName || (studentInfo.firstName + ' ' + studentInfo.lastName)}</span>
+          <span><strong>No. of Roll:</strong> .................................</span>
+        </div>
+        <div>
+          <span><strong>FORM / CLASS:</strong> ${reportData.studentClass}</span>
+          <span><strong>TERM:</strong> ${reportData.term}</span>
+          <span><strong>YEAR:</strong> ${reportData.academicYear}</span>
+          <span><strong>VAC. DATE:</strong> .............................</span>
+        </div>
+        <div>
+          <span><strong>NEXT TERM BEGINS:</strong> ....................................</span>
+          <span><strong>OVERALL POS:</strong> ${overallPosition}</span>
+        </div>
+      </div>
+      
+      <!-- Grading Key -->
+      <div class="grading-key">
+        <table>
+          <tr>
+            <td><strong>A EXCELLENT (80% - 100%)</strong></td>
+            <td><strong>B VERY GOOD (70% - 79%)</strong></td>
+            <td><strong>C GOOD (60% - 69%)</strong></td>
+          </tr>
+          <tr>
+            <td><strong>D CREDIT (45% - 59%)</strong></td>
+            <td><strong>E WEAK (35% - 44%)</strong></td>
+            <td><strong>F FAIL (00% - 34%)</strong></td>
+          </tr>
+        </table>
+      </div>
+      
+      <!-- Performance Table -->
+      <div class="table-wrapper">
+        <table class="performance-table">
+          <thead>
+            <tr>
+              <th rowspan="2">SUBJECTS</th>
+              <th>CLASS<br>SCORE<br>50%</th>
+              <th>EXAMS<br>SCORE<br>100%</th>
+              <th>EXAMS<br>SCORE<br>50%</th>
+              <th>TOTAL<br>SCORE<br>100%</th>
+              <th rowspan="2">POS</th>
+              <th rowspan="2">GRADES</th>
+              <th rowspan="2">REMARKS<br><span style="font-weight: normal; font-size: 9px;">Specific Areas of<br>Strength & Weakness</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${subjectRows}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- Footer Section -->
+    <div class="footer-section">
+      <div style="margin-bottom: 6px;">
+        <strong>ATTENDANCE:</strong> ...............................
+        <span style="margin-left: 40px;"><strong>PROMOTED TO:</strong> .................................</span>
+      </div>
+      <div style="margin-bottom: 6px;">
+        <strong>CONDUCT:</strong> .................................................................................................................................
+      </div>
+      <div style="margin-bottom: 6px;">
+        <strong>ATTITUDE:</strong> ................................................................................................................................
+      </div>
+      <div style="margin-bottom: 6px;">
+        <strong>CLASS TEACHER'S REMARK:</strong> ..........................................................................................................
+        <br>
+        ....................................................................................................................................................................
+      </div>
+      <div style="margin-bottom: 8px;">
+        <strong>HEAD TEACHER'S SIGNATURE:</strong> <span class="signature-line"></span>
+      </div>
+      
+      <!-- Motto -->
+      <div class="motto">
+        <strong>NO CROSS NO CROWN</strong>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+  
+  return html;
+}
+
+function normalizeParamName(name) {
+  return String(name || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+}
+
+function hashString(value) {
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value), Utilities.Charset.UTF_8);
+  return bytes.map(function(byte) {
+    return (byte + 256).toString(16).slice(-2);
+  }).join('');
+}
+
+function verifyPassword(candidate, storedValue) {
+  if (!storedValue) return false;
+  if (String(storedValue).startsWith('sha256:')) {
+    return hashString(candidate) === String(storedValue).slice(7);
+  }
+  return String(candidate) === String(storedValue);
+}
+
+function getSystemParameter(paramName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settingsSheet = ss.getSheetByName('Settings');
+  if (!settingsSheet) return null;
+  
+  const data = settingsSheet.getDataRange().getValues();
+  const normalizedTarget = normalizeParamName(paramName);
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    for (let j = 0; j < row.length - 1; j++) {
+      const cellVal = String(row[j] || '').trim();
+      if (cellVal && normalizeParamName(cellVal) === normalizedTarget) {
+        // Find the next non-empty cell in the row
+        for (let k = j + 1; k < row.length; k++) {
+          const val = String(row[k] || '').trim();
+          if (val !== '') {
+            return val;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Get attendance status options from Settings sheet
+ * Returns array of status objects with value, label, and badge class
+ * Falls back to default statuses if not configured
+ */
+function getAttendanceStatuses() {
+  try {
+    const statusConfig = getSystemParameter('Attendance Statuses');
+    
+    if (statusConfig) {
+      // Parse comma-separated status list from Settings
+      const statuses = statusConfig.split(',').map(s => s.trim()).filter(s => s !== '');
+      return statuses.map(status => {
+        return {
+          value: status,
+          label: status,
+          badgeClass: 'status-' + status.toLowerCase().replace(/\s+/g, '-')
+        };
+      });
+    }
+  } catch (e) {
+    Logger.log('Error reading attendance statuses from settings: ' + e.message);
+  }
+  
+  // Default statuses if not configured
+  return [
+    { value: 'Present', label: 'Present', badgeClass: 'status-present' },
+    { value: 'Absent', label: 'Absent', badgeClass: 'status-absent' },
+    { value: 'Late', label: 'Late', badgeClass: 'status-late' },
+    { value: 'Excused', label: 'Excused', badgeClass: 'status-excused' }
+  ];
+}
+
+
+/**
+ * Convert a logo URL or Drive ID to a base64 Data URI for reliable PDF rendering
+ */
+function getImageAsBase64(logoUrl) {
+  if (!logoUrl) return '';
+  const str = String(logoUrl).trim();
+  if (str.startsWith('data:image/')) return str; // Already base64
+
+  try {
+    let blob = null;
+
+    // Check if string contains a Google Drive file ID
+    let fileId = null;
+    const matchId = str.match(/id=([a-zA-Z0-9_-]+)/);
+    const matchD = str.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (matchId) {
+      fileId = matchId[1];
+    } else if (matchD) {
+      fileId = matchD[1];
+    } else if (/^[a-zA-Z0-9_-]{25,}$/.test(str)) {
+      fileId = str;
+    }
+
+    if (fileId) {
+      try {
+        const file = DriveApp.getFileById(fileId);
+        blob = file.getBlob();
+      } catch (e) {
+        Logger.log('DriveApp failed to get file by ID (' + fileId + '): ' + e.message);
+      }
+    }
+
+    // Fallback: fetch via UrlFetchApp if DriveApp didn't get a blob
+    if (!blob && (str.startsWith('http://') || str.startsWith('https://'))) {
+      try {
+        const response = UrlFetchApp.fetch(str, { muteHttpExceptions: true });
+        if (response.getResponseCode() === 200) {
+          blob = response.getBlob();
+        }
+      } catch (e) {
+        Logger.log('UrlFetchApp failed for logo URL: ' + e.message);
+      }
+    }
+
+    if (blob) {
+      const mimeType = blob.getContentType() || 'image/png';
+      const base64 = Utilities.base64Encode(blob.getBytes());
+      return `data:${mimeType};base64,${base64}`;
+    }
+  } catch (err) {
+    Logger.log('Error converting logo to Base64: ' + err.toString());
+  }
+
+  return logoUrl; // Fallback to original string if conversion fails
+}
+
+function createDailyBackup() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const backupName = `SMS_Backup_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd')}`;
+  
+  const folder = DriveApp.getFolderById('YOUR_BACKUP_FOLDER_ID');
+  ss.copy(backupName).moveTo(folder);
+}
+
+// Set up trigger: Edit > Current project's triggers
+// Add: createDailyBackup, Time-driven, Day timer, 2am-3am
+
+
+function lockSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Change "Students" to the name of the sheet you want to lock
+  const sheet = ss.getSheetByName("Students"); 
+
+  // Create a protection object for the sheet
+  const protection = sheet.protect().setDescription('Locked for script entry only');
+
+  // Get your own email (the person running this script)
+  const me = Session.getEffectiveUser().getEmail();
+  
+  // Add yourself as an editor
+  protection.addEditor(me);
+  
+  // Remove all other editors
+  protection.removeEditors(protection.getEditors());
+  
+  // If your domain allows domain-wide editing, disable that too
+  if (protection.canDomainEdit()) {
+    protection.setDomainEdit(false);
+  }
+}

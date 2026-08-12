@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body { background-color: #f4f7fc; padding: 40px; height: 100vh; overflow-x: hidden; }
+
+    /* --- HEADER --- */
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+    .page-title { font-size: 22px; color: #0f172a; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .page-title span { color: #64748b; font-weight: 400; font-size: 16px; background: #e2e8f0; padding: 2px 10px; border-radius: 20px; }
+    .action-btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+    .action-btn:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3); }
+
+    /* --- TOOLBAR --- */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px 10px 0 0; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px; margin: 0 -40px; padding-left: 60px; padding-right: 60px; }
+    .toolbar-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .search-box { display: flex; align-items: center; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 8px; width: 250px; background: #f8fafc; }
+    .search-box input { border: none; outline: none; background: transparent; width: 100%; margin-left: 8px; font-size: 14px; color: #333; }
+
+    .dashboard-section { background: white; border-radius: 10px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08); margin: 20px -40px 25px; padding: 24px 40px; }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
+    .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+    .summary-card h4 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: #475569; margin: 0; }
+    .summary-card p { font-size: 26px; font-weight: 800; color: #0f172a; margin: 0; }
+    .summary-card span { font-size: 13px; color: #64748b; }
+    .class-chart { display: grid; gap: 18px; }
+    .class-chart-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .class-chart-header h4 { margin: 0; font-size: 16px; color: #0f172a; }
+    .class-chart-header span { font-size: 13px; color: #64748b; }
+    .dashboard-action-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+    .dashboard-action-buttons .btn { width: auto; }
+    .class-chart-list { display: grid; gap: 12px; }
+    .class-chart-row { display: grid; grid-template-columns: minmax(120px, 180px) 1fr minmax(85px, 120px); align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #e2e8f0; }
+    .chart-label { font-size: 13px; font-weight: 700; color: #0f172a; }
+    .chart-bar { position: relative; width: 100%; height: 12px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+    .chart-bar-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px; }
+    .chart-bar-fill.paid { background: #22c55e; }
+    .chart-bar-fill.balance { background: #f97316; opacity: 0.82; }
+    .chart-value { font-size: 12px; color: #334155; text-align: right; white-space: nowrap; }
+    .class-breakdown-table { margin-top: 18px; overflow-x: auto; }
+    .class-breakdown-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .class-breakdown-table th, .class-breakdown-table td { padding: 12px 14px; border: 1px solid #e2e8f0; text-align: left; }
+    .class-breakdown-table th { background: #f8fafc; color: #475569; font-weight: 700; }
+    .class-breakdown-table td { color: #0f172a; }
+
+    /* --- TABLE --- */
+    .table-container { background: white; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow-x: auto; margin: 0 -40px; padding: 0 40px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+    th { text-align: left; padding: 16px 20px; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; white-space: nowrap; }
+    td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
+    tr:hover { background-color: #f8fafc; }
+
+    /* --- AMOUNT STYLE --- */
+    .amount-text { font-weight: 600; color: #0f172a; }
+
+    /* --- BALANCE STATUS BADGES --- */
+    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-block; }
+    .status-paid { background: #dcfce7; color: #166534; }
+    .status-part-payment { background: #fef9c3; color: #854d0e; }
+    .status-no-payment { background: #fee2e2; color: #991b1b; }
+
+    /* --- ACTIONS --- */
+    .actions-cell { display: flex; gap: 10px; justify-content: center; }
+    .action-icon-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 6px; color: #64748b; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .action-icon-btn:hover { transform: scale(1.1); }
+    .action-icon-btn.edit-btn:hover { background: #eff6ff; color: #2563eb; }
+    .action-icon-btn.delete-btn:hover { background: #fef2f2; color: #dc2626; }
+
+    /* --- LOADING --- */
+    #loading { text-align: center; padding: 40px; color: #64748b; }
+
+    /* --- MODALS --- */
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+    .modal-backdrop.active { opacity: 1; pointer-events: auto; }
+    .modal-content { background: white; width: 90%; max-width: 700px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); transform: scale(0.95); transition: transform 0.25s ease; overflow: hidden; display: flex; flex-direction: column; }
+    .modal-backdrop.active .modal-content { transform: scale(1); }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 18px; color: #0f172a; font-weight: 600; }
+    .modal-close { color: #94a3b8; font-size: 24px; background: none; border: none; cursor: pointer; }
+    .modal-close:hover { color: #334155; }
+    .modal-body { padding: 24px; max-height: 70vh; overflow-y: auto; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid #f1f5f9; background: #f8fafc; display: flex; justify-content: flex-end; gap: 12px; }
+    
+    .form-group { margin-bottom: 15px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; margin-bottom: 6px; }
+    .form-input, .form-select { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; transition: border-color 0.15s; }
+    .form-input:focus, .form-select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .form-grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; }
+    
+    .readonly-field { background: #f8fafc !important; color: #64748b !important; cursor: not-allowed; }
+
+    .btn { padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn-secondary { background: #e2e8f0; color: #475569; }
+    .btn-secondary:hover { background: #cbd5e1; color: #1e293b; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+
+    @media (max-width: 768px) {
+      body { padding: 20px; }
+      .table-container { margin: 0 -20px; }
+      .page-header { flex-direction: column; align-items: flex-start; }
+      .toolbar { flex-direction: column; align-items: flex-start; }
+      .search-box { width: 100%; }
+      .form-grid-3, .form-grid-2, .form-grid-4 { grid-template-columns: 1fr; }
+    }
+
+    /* --- DARK MODE STYLES --- */
+    body.dark-mode { background-color: #0f172a; color: #f1f5f9; }
+    body.dark-mode .page-title { color: #f1f5f9; }
+    body.dark-mode .page-title span { background: #1e293b; color: #94a3b8; }
+    body.dark-mode .toolbar { background: #1e293b; border-bottom-color: #334155; }
+    body.dark-mode .search-box { background: #0f172a; border-color: #334155; }
+    body.dark-mode .search-box input { color: #f1f5f9; }
+    body.dark-mode .form-input, body.dark-mode .form-select { background: #1e293b; border-color: #334155; color: #f1f5f9; }
+    body.dark-mode .form-input:focus, body.dark-mode .form-select:focus { border-color: #3b82f6; }
+    body.dark-mode .table-container { background: #1e293b; }
+    body.dark-mode thead { background: #0f172a; border-bottom-color: #334155; }
+    body.dark-mode th { color: #94a3b8; }
+    body.dark-mode td { color: #f1f5f9; border-bottom-color: #334155; }
+    body.dark-mode tr:hover { background-color: #334155; }
+    body.dark-mode #loading { color: #94a3b8; }
+    body.dark-mode .modal-content { background: #1e293b; }
+    body.dark-mode .modal-header { border-bottom-color: #334155; }
+    body.dark-mode .modal-header h3 { color: #f1f5f9; }
+    body.dark-mode .modal-close { color: #94a3b8; }
+    body.dark-mode .modal-close:hover { color: #f1f5f9; }
+    body.dark-mode .modal-footer { background: #0f172a; border-top-color: #334155; }
+    body.dark-mode .form-label { color: #94a3b8; }
+    body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
+    body.dark-mode .btn-secondary:hover { background: #475569; }
+    body.dark-mode .readonly-field { background: #0f172a !important; color: #94a3b8 !important; }
+    body.dark-mode .amount-text { color: #f1f5f9; }
+    body.dark-mode .searchable-select-list { background: #1e293b; border-color: #334155; }
+    body.dark-mode .searchable-select-item { color: #f1f5f9; }
+    body.dark-mode .searchable-select-item:hover { background-color: #334155; }
+    body.dark-mode .searchable-select-no-results { color: #94a3b8; }
+    body.dark-mode .dashboard-section { background: #111827; border-color: #334155; }
+    body.dark-mode .dashboard-grid, body.dark-mode .class-chart, body.dark-mode .class-breakdown-table { background: transparent; }
+    body.dark-mode .summary-card { background: #111827; border-color: #334155; }
+    body.dark-mode .summary-card h4, body.dark-mode .summary-card p, body.dark-mode .summary-card span { color: #f1f5f9; }
+    body.dark-mode .class-chart-header h4, body.dark-mode .class-chart-header span { color: #f1f5f9; }
+    body.dark-mode .class-chart-row { border-color: #334155; }
+    body.dark-mode .chart-label, body.dark-mode .chart-value { color: #f1f5f9; }
+    body.dark-mode .chart-bar { background: #334155; }
+    body.dark-mode .class-breakdown-table table { background: transparent; }
+    body.dark-mode .class-breakdown-table th { background: #1e293b; color: #94a3b8; border-color: #334155; }
+    body.dark-mode .class-breakdown-table td { color: #f1f5f9; border-color: #334155; }
+    body.dark-mode .dashboard-action-buttons .btn { border-color: #334155; }
+
+    /* --- SEARCHABLE DROPDOWN --- */
+    .searchable-select-container { position: relative; }
+    .searchable-select-list { position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #cbd5e1; border-radius: 8px; margin-top: 4px; max-height: 180px; overflow-y: auto; z-index: 1050; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); display: none; }
+    .searchable-select-item { padding: 10px 14px; font-size: 14px; color: #0f172a; cursor: pointer; transition: background-color 0.15s; }
+    .searchable-select-item:hover { background-color: #f1f5f9; }
+    .searchable-select-no-results { padding: 10px 14px; font-size: 14px; color: #64748b; text-align: center; }
+
+    /* ===== RECEIPT PREVIEW MODAL ===== */
+    .receipt-preview-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(15, 23, 42, 0.75);
+      flex-direction: column;
+      align-items: center;
+    }
+    .receipt-preview-modal.active { display: flex; }
+    .receipt-preview-toolbar {
+      width: 100%;
+      background: #1e293b;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+      flex-shrink: 0;
+    }
+    .receipt-preview-toolbar h4 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .receipt-preview-toolbar .tb-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .receipt-preview-toolbar .btn-print {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+    .receipt-preview-toolbar .btn-print:hover { background: #2563eb; }
+    .receipt-preview-toolbar .btn-close-preview {
+      background: transparent;
+      border: 1.5px solid #475569;
+      color: #cbd5e1;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .receipt-preview-toolbar .btn-close-preview:hover { border-color: #ef4444; color: #ef4444; }
+    .receipt-preview-scroll {
+      flex: 1;
+      overflow-y: auto;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 30px 20px;
+      background: #475569;
+    }
+    /* The actual A4 receipt sits inside the scroll area */
+    .receipt-preview-scroll .receipt-print-visible {
+      position: relative !important;
+      width: 210mm;
+      height: 297mm;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+      flex-shrink: 0;
+    }
+
+    /* ===== RECEIPT STYLES ===== */
+    .receipt-print-visible {
+      position: absolute; top: 0; left: 0;
+      width: 210mm; height: 297mm;
+      padding: 8mm 10mm;
+      background: white;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      color: #000 !important;
+    }
+    .receipt-cut-wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    /* Each receipt half fills exactly 50% of the A4 */
+    .receipt-copy {
+      flex: 0 0 calc(50% - 6mm);
+      box-sizing: border-box;
+      padding: 6mm 8mm;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: white;
+      color: #000 !important;
+      overflow: hidden;
+    }
+    /* Scissors cut line between copies */
+    .receipt-cut-line {
+      flex: 0 0 12mm;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+    .receipt-cut-line::before,
+    .receipt-cut-line::after {
+      content: '';
+      flex: 1;
+      border-top: 1.5px dashed #555;
+    }
+    /* Header row: logo + school info LEFT, meta RIGHT */
+    .rc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 5px;
+    }
+    .rc-branding {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .rc-logo {
+      width: 50px;
+      height: 50px;
+      object-fit: contain;
+      display: block;
+    }
+    .rc-school-name {
+      font-size: 14px;
+      font-weight: 800;
+      color: #000;
+      margin: 0 0 2px;
+    }
+    .rc-school-sub {
+      font-size: 10px;
+      color: #000;
+      margin: 0;
+    }
+    .rc-meta {
+      text-align: right;
+      font-size: 10px;
+      color: #000;
+      line-height: 1.6;
+    }
+    .rc-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #000;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+    }
+    .rc-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #000;
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .rc-copy-badge {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border: 1.5px solid #000;
+      padding: 2px 7px;
+      border-radius: 3px;
+      color: #000;
+    }
+    /* Label / value rows */
+    .rc-fields {
+      display: grid;
+      grid-template-columns: 38% 62%;
+      row-gap: 2px;
+      font-size: 11px;
+      color: #000;
+    }
+    .rc-label {
+      font-weight: 700;
+      color: #000;
+      padding: 2px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .rc-value {
+      color: #000;
+      padding: 2px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    /* Summary totals row */
+    .rc-totals {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .rc-total-box {
+      flex: 1;
+      border: 1.5px solid #000;
+      border-radius: 4px;
+      padding: 5px 8px;
+      text-align: center;
+    }
+    .rc-total-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #000;
+      margin-bottom: 2px;
+    }
+    .rc-total-value {
+      font-size: 13px;
+      font-weight: 800;
+      color: #000;
+    }
+    /* Signature line */
+    .rc-sig {
+      margin-top: auto;
+      padding-top: 6px;
+      border-top: 1px solid #000;
+      font-size: 10px;
+      color: #000;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    @media print {
+      html, body { width: 210mm; height: 297mm; margin: 0; padding: 0; }
+      body * { visibility: hidden; }
+      .receipt-print-visible, .receipt-print-visible * { visibility: visible !important; color: #000 !important; }
+      .receipt-print-visible {
+        position: fixed; top: 0; left: 0;
+        width: 210mm; height: 297mm;
+        padding: 8mm 10mm;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        background: white;
+      }
+      .rc-logo { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      /* Hide the preview modal chrome when printing — only show the receipt content */
+      .receipt-preview-modal,
+      .receipt-preview-toolbar { display: none !important; }
+      .receipt-print-visible, .receipt-print-visible * { visibility: visible !important; color: #000 !important; }
+      body > *:not(#receiptPreviewModal):not(#dashboardPrintContainer) { display: none !important; }
+      #receiptPreviewModal { display: block !important; background: none !important; padding: 0 !important; }
+      #receiptPreviewModal .receipt-preview-toolbar { display: none !important; }
+      #receiptPreviewModal .receipt-preview-scroll { overflow: visible !important; padding: 0 !important; background: none !important; }
+    }
+
+    @media print {
+      body.print-dashboard * { visibility: hidden; }
+      body.print-dashboard #dashboardPrintContainer, body.print-dashboard #dashboardPrintContainer * { visibility: visible !important; }
+      body.print-dashboard #dashboardPrintContainer { display: block !important; position: fixed; inset: 0; padding: 20px; background: white; color: #000; }
+      body.print-dashboard #dashboardPrintContainer .dashboard-print-sheet { max-width: 100%; width: auto; }
+      body.print-dashboard #dashboardPrintContainer .dashboard-grid,
+      body.print-dashboard #dashboardPrintContainer .class-chart-list,
+      body.print-dashboard #dashboardPrintContainer .class-breakdown-table table { width: 100%; }
+      body.print-dashboard #dashboardPrintContainer .dashboard-action-buttons { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="page-title">
+      💰 Payments
+      <span id="payCount">0</span>
+    </div>
+    <button class="action-btn" onclick="openAddModal()">+ Record Payment</button>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div class="search-box">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="Search ID, Billing Category, or Name..." onkeyup="filterTable()">
+      </div>
+      <!-- Filters: Year, Term, Class, Method, Status, Date Range, Billing Category -->
+      <select id="yearFilter" class="form-select" style="width:160px;" onchange="filterTable()">
+        <option value="">All Years</option>
+      </select>
+      <select id="termFilter" class="form-select" style="width:130px;" onchange="filterTable()">
+        <option value="">All Terms</option>
+        <option value="Term 1">Term 1</option>
+        <option value="Term 2">Term 2</option>
+        <option value="Term 3">Term 3</option>
+      </select>
+      <select id="classFilter" class="form-select" style="width:150px;" onchange="filterTable()">
+        <option value="">All Classes</option>
+      </select>
+      <select id="methodFilter" class="form-select" style="width:150px;" onchange="filterTable()">
+        <option value="">All Methods</option>
+        <option value="Cash">Cash</option>
+        <option value="Mobile Money">Mobile Money</option>
+        <option value="Bank Transfer">Bank Transfer</option>
+        <option value="Cheque">Cheque</option>
+      </select>
+      <select id="statusFilter" class="form-select" style="width:140px;" onchange="filterTable()">
+        <option value="">All Statuses</option>
+        <option value="Paid">Paid</option>
+        <option value="Part Payment">Part Payment</option>
+        <option value="No Payment">No Payment</option>
+      </select>
+      <select id="billingFilter" class="form-select" style="width:220px;" onchange="filterTable()">
+        <option value="">All Billing Categories</option>
+      </select>
+      <input type="date" id="dateFromFilter" class="form-input" style="width:150px;" onchange="filterTable()" title="From">
+      <input type="date" id="dateToFilter" class="form-input" style="width:150px;" onchange="filterTable()" title="To">
+      <button class="btn btn-secondary" style="padding:8px 12px;" onclick="clearFilters()">Clear</button>
+    </div>
+  </div>
+
+  <div class="dashboard-section" id="paymentDashboard">
+    <div class="dashboard-grid">
+      <div class="summary-card">
+        <h4>Total Expected</h4>
+        <p id="expectedAmount">GHS 0.00</p>
+        <span>Estimated amount due for selected year/term.</span>
+      </div>
+      <div class="summary-card">
+        <h4>Total Collected</h4>
+        <p id="collectedAmount">GHS 0.00</p>
+        <span>Payments received for selected year/term.</span>
+      </div>
+      <div class="summary-card">
+        <h4>Total Balance</h4>
+        <p id="balanceAmount">GHS 0.00</p>
+        <span>Outstanding class balance for selected year/term.</span>
+      </div>
+    </div>
+    <div class="class-chart">
+      <div class="class-chart-header">
+        <div>
+          <h4>Class Payment Breakdown</h4>
+          <span id="dashboardSubtitle">Year / Term</span>
+        </div>
+        <div class="dashboard-action-buttons">
+          <button class="btn btn-secondary" type="button" onclick="printFinancialDashboard()">Print Dashboard</button>
+          <button class="btn btn-primary" type="button" onclick="exportFinancialDashboardCSV()">Export CSV</button>
+        </div>
+      </div>
+      <div class="class-chart-list" id="classChartList"></div>
+    </div>
+    <div class="class-breakdown-table" id="classBreakdownTable"></div>
+  </div>
+
+  <!-- hidden dashboard print container -->
+  <div id="dashboardPrintContainer" style="display:none;"></div>
+
+  <!-- TABLE -->
+  <div class="table-container">
+    <div id="loading">Loading payment data...</div>
+    <table id="payTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>Transaction ID</th>
+          <th>Billing Category</th>
+          <th>Student ID</th>
+          <th>Student Name</th>
+          <th>Payment Date</th>
+          <th>Amount Paid</th>
+          <th>Method</th>
+          <th>Reference No</th>
+          <th>Acad. Year</th>
+          <th>Term</th>
+          <th>Class</th>
+          <th>Balance</th>
+          <th>Balance Status</th>
+          <th class="text-center" style="text-align: center;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- RECEIPT PREVIEW MODAL -->
+  <div class="receipt-preview-modal" id="receiptPreviewModal">
+    <div class="receipt-preview-toolbar">
+      <h4>🧾 Payment Receipt Preview</h4>
+      <div class="tb-actions">
+        <button class="btn-close-preview" onclick="closeReceiptPreview()">✕ Close</button>
+        <button class="btn-print" onclick="window.print()">🖨️ Print</button>
+      </div>
+    </div>
+    <div class="receipt-preview-scroll" id="receiptScrollArea"></div>
+  </div>
+
+  <!-- hidden container used by @media print -->
+  <div id="receiptPrintContainer" style="display:none;"></div>
+
+
+  <!-- ADD/EDIT MODAL -->
+  <div class="modal-backdrop" id="payModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Record New Payment</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <form id="payForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="formTransactionId">
+        <div class="modal-body">
+          
+          <!-- Billing Category Selector -->
+          <div class="form-group">
+            <label class="form-label" for="billingCategoryId">Select Billing Category <span style="color: #3b82f6;">(Auto-fills academic year and term)</span></label>
+            <select id="billingCategoryId" class="form-select" required onchange="populateCategoryDetails()">
+              <option value="" disabled selected>Select a Billing Category</option>
+            </select>
+          </div>
+
+          <!-- Class Selector (brings it up as filter) -->
+          <div class="form-group">
+            <label class="form-label" for="studentClass">Select Class</label>
+            <select id="studentClass" class="form-select" required onchange="filterStudentsByClass(this.value)">
+              <option value="" disabled selected>Select Class</option>
+            </select>
+          </div>
+
+          <!-- Student Selector (searchable + filtered based on selected class) -->
+          <div class="form-group">
+            <label class="form-label" for="studentSelect">Select Student</label>
+            <div class="searchable-select-container">
+              <input type="text" id="studentSearchInput" class="form-input" placeholder="Select Class first" readonly onclick="openStudentSearchDropdown()">
+              <input type="hidden" id="studentSelect" name="studentSelect" required>
+              <div id="studentSearchDropdown" class="searchable-select-list"></div>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="studentId">Student ID</label>
+              <input type="text" id="studentId" class="form-input readonly-field" readonly>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="studentName">Student Name</label>
+              <input type="text" id="studentName" class="form-input readonly-field" readonly>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="academicYear">Academic Year</label>
+              <select id="academicYear" class="form-select" required>
+                <option value="" disabled selected>Select Academic Year</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="term">Term</label>
+              <select id="term" class="form-select" required>
+                <option value="" disabled selected>Select Term</option>
+                <option value="Term 1">Term 1</option>
+                <option value="Term 2">Term 2</option>
+                <option value="Term 3">Term 3</option>
+              </select>
+            </div>
+          </div>
+
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
+
+          <div class="form-grid-4">
+            <div class="form-group">
+              <label class="form-label" for="paymentDate">Payment Date</label>
+              <input type="date" id="paymentDate" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="amountPaid">Amount Paid (GHS)</label>
+              <input type="number" id="amountPaid" class="form-input" placeholder="0.00" min="0" step="0.01" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="paymentMethod">Payment Method</label>
+              <select id="paymentMethod" class="form-select" required>
+                <option value="" disabled selected>Select Method</option>
+                <option value="Cash">Cash</option>
+                <option value="Mobile Money">Mobile Money</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cheque">Cheque</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="referenceNo">Reference No</label>
+              <input type="text" id="referenceNo" class="form-input" placeholder="e.g. MOMO-123456">
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveBtn">Save Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRM MODAL -->
+  <div class="modal-backdrop" id="deleteModal">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>Delete Payment</h3>
+        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: #64748b; font-size: 15px; line-height: 1.5;">
+          Are you sure you want to delete transaction <strong id="deletePayId" style="color: #0f172a;"></strong>? This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let payList = [];
+    let allStudents = [];
+    let billingCategoryMap = {}; // Stores billing category details for quick lookup
+    let systemParameters = [];
+    let currentDeleteId = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        console.log('Payments page: DOMContentLoaded fired');
+        
+        // Ensure google.script is available
+        if (typeof google === 'undefined' || !google.script || !google.script.run) {
+          console.error('google.script.run is not available!');
+          document.getElementById('loading').innerHTML = '<div style="color: #ef4444; padding: 20px;">Error: Unable to connect to backend. Please refresh the page.</div>';
+          return;
+        }
+        
+        document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
+      
+      // 1. Load Classes for the dropdown selector in modal
+      google.script.run.withSuccessHandler(function(classes) {
+        const select = document.getElementById('studentClass');
+        select.innerHTML = '<option value="" disabled selected>Select Class</option>';
+        classes.forEach(c => {
+          let opt = document.createElement('option');
+          opt.value = c;
+          opt.innerText = c;
+          select.appendChild(opt);
+        });
+        // Populate class filter as well
+        const classFilter = document.getElementById('classFilter');
+        if (classFilter) {
+          classFilter.innerHTML = '<option value="">All Classes</option>';
+          classes.forEach(c => {
+            let o = document.createElement('option'); o.value = c; o.innerText = c; classFilter.appendChild(o);
+          });
+        }
+      }).getClassNames();
+
+      // 2. Load Academic Years (active only)
+      google.script.run.withSuccessHandler(function(years) {
+        const select = document.getElementById('academicYear');
+        select.innerHTML = '<option value="" disabled selected>Select Academic Year</option>';
+        
+        // Filter for active years only
+        const activeYears = years.filter(y => y.status === 'Active');
+        activeYears.forEach(y => {
+          let opt = document.createElement('option');
+          opt.value = y.academicYear;
+          opt.innerText = y.academicYear;
+          select.appendChild(opt);
+        });
+        
+        // Auto-select if there is exactly one active academic year
+        if (activeYears.length === 1) {
+          select.value = activeYears[0].academicYear;
+        }
+        // Also populate Year filter with all years (active + inactive)
+        const yearFilter = document.getElementById('yearFilter');
+        if (yearFilter) {
+          yearFilter.innerHTML = '<option value="">All Years</option>';
+          let activeYear = null;
+          years.forEach(y => {
+            let o = document.createElement('option'); 
+            o.value = y.academicYear; 
+            o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : ''); 
+            yearFilter.appendChild(o);
+            if (y.status === 'Active') activeYear = y.academicYear;
+          });
+          // Auto-select active year (apply after data loads)
+          if (activeYear) {
+            yearFilter.value = activeYear;
+          }
+        }
+      }).getAcademicYearsData();
+
+      // 3. Load Billing Categories for dropdown first
+      google.script.run.withSuccessHandler(function(categories) {
+        const select = document.getElementById('billingCategoryId');
+        select.innerHTML = '<option value="" disabled selected>Select a Billing Category</option>';
+        
+        // Create a map for easy lookup later
+        billingCategoryMap = {};
+        categories.forEach(cat => {
+          billingCategoryMap[cat.id] = cat;
+          let opt = document.createElement('option');
+          opt.value = cat.id;
+          opt.innerText = `${cat.id} — ${cat.category} (${cat.academicYear} ${cat.terms})`;
+          select.appendChild(opt);
+        });
+        // populate billing filter dropdown too
+        const billingFilter = document.getElementById('billingFilter');
+        if (billingFilter) {
+          billingFilter.innerHTML = '<option value="">All Billing Categories</option>';
+          categories.forEach(cat => {
+            let o = document.createElement('option'); o.value = cat.id; o.innerText = `${cat.id} — ${cat.category}`; billingFilter.appendChild(o);
+          });
+        }
+        if (payList.length) {
+          renderTable(payList);
+        }
+      }).getBillingCategoriesData();
+
+      // 3a. Load system parameters for receipts
+      google.script.run.withSuccessHandler(function(params) {
+        systemParameters = params || [];
+      }).getSystemParameters();
+
+      // 4. Load Students globally for dynamic client-side class filtering
+      google.script.run.withSuccessHandler(function(students) {
+        allStudents = students || [];
+      }).getStudentIdNamePairs();
+
+      // Close student searchable dropdown when clicking outside
+      document.addEventListener('click', function(e) {
+        const container = document.querySelector('.searchable-select-container');
+        const dropdown = document.getElementById('studentSearchDropdown');
+        if (container && !container.contains(e.target)) {
+          dropdown.style.display = 'none';
+        }
+      });
+
+      // Search student input query listener
+      const searchInput = document.getElementById('studentSearchInput');
+      searchInput.addEventListener('input', function() {
+        renderStudentSearchList(this.value);
+      });
+      searchInput.addEventListener('focus', function() {
+        const selectedClass = document.getElementById('studentClass').value;
+        if (selectedClass) {
+          document.getElementById('studentSearchDropdown').style.display = 'block';
+          renderStudentSearchList(this.value);
+        }
+      });
+
+      // 5. Load Payments Data
+      refreshData();
+      } catch (err) {
+        console.error('Error in DOMContentLoaded:', err);
+        document.getElementById('loading').innerHTML = '<div style="color: #ef4444; padding: 20px;">Error initializing page: ' + err.message + '</div>';
+      }
+    });
+
+    // Helper to ensure an academic year is in the dropdown container (even if inactive/old logs)
+    function ensureAcademicYearInDropdown(year) {
+      if (!year) return;
+      const select = document.getElementById('academicYear');
+      for (let i = 0; i < select.options.length; i++) {
+        if (select.options[i].value === year) return;
+      }
+      let opt = document.createElement('option');
+      opt.value = year;
+      opt.innerText = year + ' (Inactive)';
+      select.appendChild(opt);
+    }
+
+    // --- SMART DROPDOWN & FILTER LOGIC ---
+    function openStudentSearchDropdown() {
+      const selectedClass = document.getElementById('studentClass').value;
+      if (!selectedClass) {
+        alert('Please select a Class first.');
+        return;
+      }
+      const dropdown = document.getElementById('studentSearchDropdown');
+      dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+      document.getElementById('studentSearchInput').select();
+    }
+
+    function filterStudentsByClass(selectedClass) {
+      document.getElementById('studentSelect').value = '';
+      const input = document.getElementById('studentSearchInput');
+      input.value = '';
+      input.readOnly = false;
+      input.placeholder = 'Type to search student name or ID...';
+      
+      document.getElementById('studentId').value = '';
+      document.getElementById('studentName').value = '';
+
+      renderStudentSearchList('');
+    }
+
+    function renderStudentSearchList(filterText) {
+      const selectedClass = document.getElementById('studentClass').value;
+      const dropdown = document.getElementById('studentSearchDropdown');
+      dropdown.innerHTML = '';
+
+      if (!selectedClass) return;
+
+      const filtered = allStudents.filter(student => 
+        student.studentClass === selectedClass &&
+        (student.studentId.toLowerCase().includes(filterText.toLowerCase()) || 
+         student.fullName.toLowerCase().includes(filterText.toLowerCase()))
+      );
+
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div class="searchable-select-no-results">No students found</div>';
+        return;
+      }
+
+      filtered.forEach(student => {
+        const item = document.createElement('div');
+        item.className = 'searchable-select-item';
+        item.innerText = `${student.studentId} — ${student.fullName}`;
+        item.onclick = function() {
+          selectStudent(student.studentId, student.fullName);
+        };
+        dropdown.appendChild(item);
+      });
+    }
+
+    function selectStudent(studentId, fullName) {
+      document.getElementById('studentSelect').value = studentId;
+      document.getElementById('studentSearchInput').value = `${studentId} — ${fullName}`;
+      document.getElementById('studentId').value = studentId;
+      document.getElementById('studentName').value = fullName;
+      document.getElementById('studentSearchDropdown').style.display = 'none';
+    }
+
+    function populateCategoryDetails() {
+      const categoryId = document.getElementById('billingCategoryId').value;
+      if(!categoryId || !billingCategoryMap[categoryId]) {
+        document.getElementById('academicYear').value = '';
+        document.getElementById('term').value = '';
+        return;
+      }
+
+      const cat = billingCategoryMap[categoryId];
+      ensureAcademicYearInDropdown(cat.academicYear);
+      document.getElementById('academicYear').value = cat.academicYear;
+      document.getElementById('term').value = cat.terms;
+    }
+
+    // --- DATA HANDLING ---
+    function refreshData() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('payTable').style.display = 'none';
+      google.script.run
+        .withSuccessHandler(renderTable)
+        .withFailureHandler(function(err) {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('payTable').style.display = 'table';
+          document.getElementById('tableBody').innerHTML = '<tr><td colspan="14" style="text-align:center; padding:30px; color:#ef4444;">Error loading payment data: ' + (err && err.message ? err.message : 'Unknown error') + '</td></tr>';
+          document.getElementById('payCount').innerText = '0';
+        })
+        .getPaymentsData();
+    }
+
+    function renderTable(data) {
+      payList = data || [];
+      const tbody = document.getElementById('tableBody');
+      const loading = document.getElementById('loading');
+      const table = document.getElementById('payTable');
+      const countBadge = document.getElementById('payCount');
+
+      loading.style.display = 'none';
+      table.style.display = 'table';
+      countBadge.innerText = payList.length;
+
+      tbody.innerHTML = '';
+      if(payList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="14" style="text-align:center; padding:30px; color:#64748b;">No payment records found.</td></tr>`;
+        return;
+      }
+
+      payList.forEach(row => {
+        // Use balance and balanceStatus directly from sheet data
+        const balance = row.balance === '' || row.balance == null ? 0 : Number(row.balance);
+        const status = row.balanceStatus || 'No Payment';
+
+        const category = billingCategoryMap[row.invoiceId];
+
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-transaction-id', row.transactionId);
+        tr.setAttribute('data-year', row.academicYear || '');
+        tr.setAttribute('data-term', row.term || '');
+        tr.setAttribute('data-class', row.studentClass || '');
+        tr.setAttribute('data-method', row.paymentMethod || '');
+        tr.setAttribute('data-status', row.balanceStatus || '');
+        tr.setAttribute('data-billing', row.invoiceId || '');
+        tr.setAttribute('data-date', row.paymentDate || '');
+        tr.innerHTML = `
+          <td><strong>${row.transactionId}</strong></td>
+          <td>${category ? row.invoiceId + ' — ' + category.category : row.invoiceId}</td>
+          <td>${row.studentId}</td>
+          <td>${row.studentName}</td>
+          <td>${row.paymentDate}</td>
+          <td><span class="amount-text">GHS ${Number(row.amountPaid).toFixed(2)}</span></td>
+          <td>${row.paymentMethod}</td>
+          <td>${row.referenceNo}</td>
+          <td>${row.academicYear}</td>
+          <td>${row.term}</td>
+          <td>${row.studentClass}</td>
+          <td><strong>GHS ${balance.toFixed(2)}</strong></td>
+          <td><span class="status-badge status-${status.toLowerCase().replace(' ', '-')}">${status}</span></td>
+          <td style="text-align: center;">
+            <div class="actions-cell">
+              <button class="action-icon-btn" onclick="printPaymentReport('${row.transactionId}')" title="Print Receipt">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7" /><path d="M6 18H4a2 2 0 0 1-2-2v-5h20v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" rx="2" ry="2" /></svg>
+              </button>
+              <button class="action-icon-btn edit-btn" onclick="openEditModal('${row.transactionId}')" title="Edit Payment">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              </button>
+              <button class="action-icon-btn delete-btn" onclick="openDeleteModal('${row.transactionId}')" title="Delete Payment">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      filterTable();
+      // Handle pending open request from parent shell
+      try { if (window._pendingOpen && window._pendingOpen.type === 'payment') { openPaymentRecord(window._pendingOpen.transactionId); window._pendingOpen = null; } } catch (e) { console.warn('openPaymentRecord failed', e); }
+    }
+
+    function filterTable() {
+      const searchVal = document.getElementById('searchInput').value.toLowerCase();
+      const year = document.getElementById('yearFilter') ? document.getElementById('yearFilter').value : '';
+      const term = document.getElementById('termFilter') ? document.getElementById('termFilter').value : '';
+      const classF = document.getElementById('classFilter') ? document.getElementById('classFilter').value : '';
+      const method = document.getElementById('methodFilter') ? document.getElementById('methodFilter').value : '';
+      const status = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value : '';
+      const billing = document.getElementById('billingFilter') ? document.getElementById('billingFilter').value : '';
+      const dateFrom = document.getElementById('dateFromFilter') && document.getElementById('dateFromFilter').value ? document.getElementById('dateFromFilter').value : '';
+      const dateTo = document.getElementById('dateToFilter') && document.getElementById('dateToFilter').value ? document.getElementById('dateToFilter').value : '';
+
+      const rows = document.querySelectorAll('#tableBody tr');
+      const countBadge = document.getElementById('payCount');
+      let visibleCount = 0;
+      let hasPlaceholder = false;
+
+      rows.forEach(row => {
+        if (row.id === 'filterEmptyRow') {
+          row.style.display = 'none';
+          return;
+        }
+        if (row.cells.length === 1 && row.cells[0].getAttribute('colspan')) {
+          hasPlaceholder = true;
+          row.style.display = 'none';
+          return;
+        }
+
+        let passes = true;
+        const rowYear = row.getAttribute('data-year') || '';
+        const rowTerm = row.getAttribute('data-term') || '';
+        const rowClass = row.getAttribute('data-class') || '';
+        const rowMethod = row.getAttribute('data-method') || '';
+        const rowStatus = row.getAttribute('data-status') || '';
+        const rowBilling = row.getAttribute('data-billing') || '';
+        const rowDate = row.getAttribute('data-date') || '';
+        const transactionId = row.getAttribute('data-transaction-id') || '';
+        const rec = payList.find(p => p.transactionId === transactionId) || {};
+
+        if (searchVal) {
+          const hay = [rec.transactionId, rec.invoiceId, rec.studentId, rec.studentName, rec.paymentMethod, rec.referenceNo, rec.academicYear, rec.term, rec.studentClass].join(' ').toLowerCase();
+          if (!hay.includes(searchVal)) passes = false;
+        }
+        if (year && rowYear !== year) passes = false;
+        if (term && rowTerm !== term) passes = false;
+        if (classF && rowClass !== classF) passes = false;
+        if (method && rowMethod !== method) passes = false;
+        if (status && rowStatus.toLowerCase() !== status.toLowerCase()) passes = false;
+        if (billing && rowBilling !== billing) passes = false;
+        if (dateFrom && (!rowDate || rowDate < dateFrom)) passes = false;
+        if (dateTo && (!rowDate || rowDate > dateTo)) passes = false;
+
+        row.style.display = passes ? '' : 'none';
+        if (passes) visibleCount++;
+      });
+
+      let msgRow = document.getElementById('filterEmptyRow');
+      if (visibleCount === 0 && payList.length > 0) {
+        if (!msgRow) {
+          msgRow = document.createElement('tr');
+          msgRow.id = 'filterEmptyRow';
+          msgRow.innerHTML = '<td colspan="14" style="text-align:center; padding:30px; color:#64748b;">No records match the current filters.</td>';
+          document.getElementById('tableBody').appendChild(msgRow);
+        }
+        msgRow.style.display = '';
+      } else if (msgRow) {
+        msgRow.style.display = 'none';
+      }
+
+      if (visibleCount === 0 && payList.length === 0 && hasPlaceholder) {
+        rows.forEach(row => {
+          if (row.cells.length === 1 && row.cells[0].getAttribute('colspan')) row.style.display = '';
+        });
+      }
+
+      countBadge.innerText = visibleCount;
+      updateDashboard();
+    }
+
+    function getDashboardContext() {
+      const year = document.getElementById('yearFilter') ? document.getElementById('yearFilter').value : '';
+      const term = document.getElementById('termFilter') ? document.getElementById('termFilter').value : '';
+      return { year, term };
+    }
+
+    function isJHSClass(className) {
+      return /\bjhs\b|junior\s*high/i.test(className);
+    }
+
+    function isPrimaryClass(className) {
+      return !isJHSClass(className);
+    }
+
+    function normalizeClassSortKey(name) {
+      const normalized = String(name || '').trim();
+      const match = normalized.match(/(\d+)/);
+      const num = match ? Number(match[1]) : 999;
+      if (/\bjhs\b/i.test(normalized)) {
+        return 100 + num;
+      }
+      return num;
+    }
+
+    function sortClassNames(classNames) {
+      return Array.from(new Set(classNames)).sort((a, b) => {
+        const keyA = normalizeClassSortKey(a);
+        const keyB = normalizeClassSortKey(b);
+        if (keyA !== keyB) return keyA - keyB;
+        return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+      });
+    }
+
+    function normalizeYearString(str) {
+      if (!str) return '';
+      return String(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function getClassBillingRate(className, year, term) {
+      const allCats = Object.values(billingCategoryMap);
+      if (allCats.length === 0) return 0;
+
+      const normYear = normalizeYearString(year);
+      const normTerm = String(term || '').trim().toLowerCase();
+
+      // 1. Filter categories matching year and term (if specified)
+      let categories = allCats.filter(cat => {
+        const catYear = normalizeYearString(cat.academicYear);
+        const catTerm = String(cat.terms || '').trim().toLowerCase();
+
+        const matchYear = !normYear || !catYear || normYear.includes(catYear) || catYear.includes(normYear);
+        const matchTerm = !normTerm || !catTerm || normTerm.includes(catTerm) || catTerm.includes(normTerm);
+
+        return matchYear && matchTerm;
+      });
+
+      if (categories.length === 0) {
+        categories = allCats;
+      }
+
+      // 2. Check if any existing payment for this class references a billing category
+      if (payList && payList.length > 0) {
+        const classPayments = payList.filter(p => {
+          const matchCls = String(p.studentClass || '').trim().toLowerCase() === String(className || '').trim().toLowerCase();
+          const pYear = normalizeYearString(p.academicYear);
+          const pTerm = String(p.term || '').trim().toLowerCase();
+          const matchY = !normYear || !pYear || normYear.includes(pYear) || pYear.includes(normYear);
+          const matchT = !normTerm || !pTerm || normTerm.includes(pTerm) || pTerm.includes(normTerm);
+          return matchCls && matchY && matchT;
+        });
+
+        for (let p of classPayments) {
+          const invId = p.invoiceId || p.billingCategoryId;
+          if (invId && billingCategoryMap[invId]) {
+            const cat = billingCategoryMap[invId];
+            const amt = Number(cat.totalAmount || 0) + Number(cat.nursery || 0);
+            if (amt > 0) return amt;
+          }
+        }
+      }
+
+      // 3. Fallback matching by class group (jhs vs primary/basic)
+      const group = isJHSClass(className) ? 'jhs' : 'primary';
+      const matching = categories.find(cat => {
+        const label = String(cat.category || '').toLowerCase();
+        if (group === 'jhs') return /\bjhs\b|junior\b/.test(label);
+        return /primary|basic|lower\s*primary|primary\s*school|class/.test(label);
+      });
+      const fallback = categories.find(cat => !/\bjhs\b|junior\b/.test(String(cat.category || '').toLowerCase())) || categories[0];
+      const selected = matching || fallback;
+      return Number(selected.totalAmount || 0) + Number(selected.nursery || 0);
+    }
+
+    function formatCurrency(value) {
+      return 'GHS ' + Number(value || 0).toFixed(2);
+    }
+
+    function buildClassChartRow(metric) {
+      const paidRatio = metric.expectedTotal > 0 ? Math.min(1, metric.paidTotal / metric.expectedTotal) : 0;
+      const percent = Math.round(paidRatio * 100);
+      return `
+        <div class="class-chart-row">
+          <div class="chart-label">${metric.className || 'Unknown'}</div>
+          <div class="chart-bar">
+            <span class="chart-bar-fill paid" style="width: ${percent}%;"></span>
+          </div>
+          <div class="chart-value">${formatCurrency(metric.balance)}</div>
+        </div>`;
+    }
+
+    function renderDashboard() {
+      const { year, term } = getDashboardContext();
+      const classCounts = allStudents.reduce((acc, student) => {
+        const cls = student.studentClass || 'Unknown';
+        acc[cls] = (acc[cls] || 0) + 1;
+        return acc;
+      }, {});
+
+      const relevantPayments = payList.filter(p => {
+        if (year && p.academicYear !== year) return false;
+        if (term && p.term !== term) return false;
+        return true;
+      });
+
+      const paymentsByClass = relevantPayments.reduce((acc, payment) => {
+        const cls = payment.studentClass || 'Unknown';
+        acc[cls] = (acc[cls] || 0) + Number(payment.amountPaid || 0);
+        return acc;
+      }, {});
+
+      const classNames = sortClassNames(Object.keys(classCounts));
+      const metrics = classNames.map(className => {
+        const count = classCounts[className] || 0;
+        const rate = getClassBillingRate(className, year, term);
+        const expectedTotal = count * rate;
+        const paidTotal = paymentsByClass[className] || 0;
+        const balance = expectedTotal - paidTotal;
+        return { className, count, rate, expectedTotal, paidTotal, balance };
+      });
+
+      const totalExpected = metrics.reduce((sum, m) => sum + m.expectedTotal, 0);
+      const totalCollected = metrics.reduce((sum, m) => sum + m.paidTotal, 0);
+      const totalBalance = totalExpected - totalCollected;
+
+      document.getElementById('expectedAmount').innerText = formatCurrency(totalExpected);
+      document.getElementById('collectedAmount').innerText = formatCurrency(totalCollected);
+      document.getElementById('balanceAmount').innerText = formatCurrency(totalBalance);
+      document.getElementById('dashboardSubtitle').innerText = `${year || 'All Years'} · ${term || 'All Terms'}`;
+
+      const chartList = document.getElementById('classChartList');
+      chartList.innerHTML = metrics.map(buildClassChartRow).join('') || '<div style="color:#64748b; padding:12px 0;">No class payment data available for the selected year/term.</div>';
+
+      const breakdownTable = document.getElementById('classBreakdownTable');
+      breakdownTable.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Class</th>
+              <th>Students</th>
+              <th>Per Student Due</th>
+              <th>Expected Total</th>
+              <th>Collected</th>
+              <th>Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${metrics.map(m => `
+              <tr>
+                <td>${m.className}</td>
+                <td>${m.count}</td>
+                <td>${formatCurrency(m.rate)}</td>
+                <td>${formatCurrency(m.expectedTotal)}</td>
+                <td>${formatCurrency(m.paidTotal)}</td>
+                <td>${formatCurrency(m.balance)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function updateDashboard() {
+      if (!document.getElementById('paymentDashboard')) return;
+      renderDashboard();
+    }
+
+    function getDashboardMetrics() {
+      const { year, term } = getDashboardContext();
+      const classCounts = allStudents.reduce((acc, student) => {
+        const cls = student.studentClass || 'Unknown';
+        acc[cls] = (acc[cls] || 0) + 1;
+        return acc;
+      }, {});
+
+      const relevantPayments = payList.filter(p => {
+        if (year && p.academicYear !== year) return false;
+        if (term && p.term !== term) return false;
+        return true;
+      });
+
+      const paymentsByClass = relevantPayments.reduce((acc, payment) => {
+        const cls = payment.studentClass || 'Unknown';
+        acc[cls] = (acc[cls] || 0) + Number(payment.amountPaid || 0);
+        return acc;
+      }, {});
+
+      const classNames = sortClassNames(Object.keys(classCounts));
+      const metrics = classNames.map(className => {
+        const count = classCounts[className] || 0;
+        const rate = getClassBillingRate(className, year, term);
+        const expectedTotal = count * rate;
+        const paidTotal = paymentsByClass[className] || 0;
+        const balance = expectedTotal - paidTotal;
+        return { className, count, rate, expectedTotal, paidTotal, balance };
+      });
+
+      const totalExpected = metrics.reduce((sum, m) => sum + m.expectedTotal, 0);
+      const totalCollected = metrics.reduce((sum, m) => sum + m.paidTotal, 0);
+      const totalBalance = totalExpected - totalCollected;
+
+      return { year, term, metrics, totalExpected, totalCollected, totalBalance };
+    }
+
+    function buildDashboardPrintHtml(dashboardData) {
+      const { year, term, metrics, totalExpected, totalCollected, totalBalance } = dashboardData;
+      const rows = metrics.map(m => `
+            <tr>
+              <td>${m.className}</td>
+              <td>${m.count}</td>
+              <td>${formatCurrency(m.rate)}</td>
+              <td>${formatCurrency(m.expectedTotal)}</td>
+              <td>${formatCurrency(m.paidTotal)}</td>
+              <td>${formatCurrency(m.balance)}</td>
+            </tr>
+          `).join('');
+
+      return `
+        <div class="dashboard-print-sheet">
+          <h2 style="margin-bottom: 6px; font-size: 24px; color: #0f172a;">Financial Department Report</h2>
+          <p style="margin: 0 0 20px; color: #475569;">Academic Year: ${year || 'All Years'} | Term: ${term || 'All Terms'}</p>
+          <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px;">
+            <div style="padding: 18px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+              <div style="font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.12em; margin-bottom: 6px;">Total Expected</div>
+              <div style="font-size:22px; font-weight:800; color:#0f172a;">${formatCurrency(totalExpected)}</div>
+            </div>
+            <div style="padding: 18px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+              <div style="font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.12em; margin-bottom: 6px;">Total Collected</div>
+              <div style="font-size:22px; font-weight:800; color:#0f172a;">${formatCurrency(totalCollected)}</div>
+            </div>
+            <div style="padding: 18px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+              <div style="font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.12em; margin-bottom: 6px;">Total Balance</div>
+              <div style="font-size:22px; font-weight:800; color:#0f172a;">${formatCurrency(totalBalance)}</div>
+            </div>
+          </div>
+          <div style="margin-bottom: 18px; font-size: 15px; font-weight: 700; color: #0f172a;">Class Summary</div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse: collapse; font-size:12px;">
+              <thead>
+                <tr>
+                  <th style="padding: 10px 12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:left;">Class</th>
+                  <th style="padding: 10px 12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:left;">Students</th>
+                  <th style="padding: 10px 12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:left;">Per Student</th>
+                  <th style="padding: 10px 12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:left;">Expected</th>
+                  <th style="padding: 10px 12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:left;">Collected</th>
+                  <th style="padding: 10px 12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:left;">Balance</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    function printFinancialDashboard() {
+      const dashboardData = getDashboardMetrics();
+      const container = document.getElementById('dashboardPrintContainer');
+      container.innerHTML = buildDashboardPrintHtml(dashboardData);
+      document.body.classList.add('print-dashboard');
+      window.print();
+      window.onafterprint = function() {
+        document.body.classList.remove('print-dashboard');
+        container.innerHTML = '';
+        window.onafterprint = null;
+      };
+    }
+
+    function exportFinancialDashboardCSV() {
+      const dashboardData = getDashboardMetrics();
+      const rows = [
+        ['Class', 'Students', 'Per Student Due', 'Expected Total', 'Collected', 'Balance'],
+        ...dashboardData.metrics.map(m => [
+          m.className,
+          m.count,
+          m.rate.toFixed(2),
+          m.expectedTotal.toFixed(2),
+          m.paidTotal.toFixed(2),
+          m.balance.toFixed(2)
+        ])
+      ];
+      const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.download = `Financial_Dashboard_${dashboardData.year || 'AllYears'}_${dashboardData.term || 'AllTerms'}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    function clearFilters() {
+      document.getElementById('searchInput').value = '';
+      if (document.getElementById('yearFilter')) document.getElementById('yearFilter').value = '';
+      if (document.getElementById('termFilter')) document.getElementById('termFilter').value = '';
+      if (document.getElementById('classFilter')) document.getElementById('classFilter').value = '';
+      if (document.getElementById('methodFilter')) document.getElementById('methodFilter').value = '';
+      if (document.getElementById('statusFilter')) document.getElementById('statusFilter').value = '';
+      if (document.getElementById('billingFilter')) document.getElementById('billingFilter').value = '';
+      if (document.getElementById('dateFromFilter')) document.getElementById('dateFromFilter').value = '';
+      if (document.getElementById('dateToFilter')) document.getElementById('dateToFilter').value = '';
+      filterTable();
+    }
+
+    /* --- MODAL LOGIC --- */
+    function openAddModal() { 
+      document.getElementById('payForm').reset();
+      document.getElementById('formTransactionId').value = '';
+      document.getElementById('modalTitle').innerText = 'Record New Payment';
+      document.getElementById('saveBtn').innerText = 'Save Payment';
+      document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
+      
+      // Clear selectors and inputs
+      document.getElementById('billingCategoryId').value = '';
+      document.getElementById('studentClass').value = '';
+      document.getElementById('studentSearchInput').value = '';
+      document.getElementById('studentSearchInput').readOnly = true;
+      document.getElementById('studentSearchInput').placeholder = 'Select Class first';
+      document.getElementById('studentSelect').value = '';
+      document.getElementById('studentId').value = '';
+      document.getElementById('studentName').value = '';
+      document.getElementById('academicYear').value = '';
+      document.getElementById('term').value = '';
+      document.getElementById('studentSearchDropdown').innerHTML = '';
+      document.getElementById('studentSearchDropdown').style.display = 'none';
+      
+      document.getElementById('payModal').classList.add('active'); 
+    }
+
+    function openEditModal(transactionId) {
+      const pay = payList.find(p => p.transactionId === transactionId);
+      if (!pay) return alert('Error: Payment not found.');
+
+      document.getElementById('formTransactionId').value = pay.transactionId;
+      document.getElementById('billingCategoryId').value = pay.invoiceId;
+      
+      // Select the Class selector
+      document.getElementById('studentClass').value = pay.studentClass;
+      
+      // Trigger student filter
+      filterStudentsByClass(pay.studentClass);
+      
+      // Select the Student
+      selectStudent(pay.studentId, pay.studentName);
+      
+      // Ensure the academic year is present in the list
+      ensureAcademicYearInDropdown(pay.academicYear);
+      document.getElementById('academicYear').value = pay.academicYear;
+      document.getElementById('term').value = pay.term;
+      document.getElementById('paymentDate').value = pay.paymentDate;
+      document.getElementById('amountPaid').value = pay.amountPaid;
+      document.getElementById('paymentMethod').value = pay.paymentMethod;
+      document.getElementById('referenceNo').value = pay.referenceNo;
+
+      document.getElementById('modalTitle').innerText = 'Edit Payment';
+      document.getElementById('saveBtn').innerText = 'Update Payment';
+      document.getElementById('payModal').classList.add('active');
+    }
+
+    // Exposed to parent shell to open a specific payment record
+    window.openPaymentRecord = function(transactionId) {
+      if (!transactionId) return;
+      const rec = payList.find(p => p.transactionId === transactionId);
+      if (rec) {
+        openEditModal(rec.transactionId);
+        const tr = document.querySelector(`tr[data-transaction-id="${transactionId}"]`);
+        if (tr) { tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); tr.style.boxShadow = 'inset 0 0 0 3px rgba(59,130,246,0.08)'; setTimeout(() => tr.style.boxShadow = '', 3000); }
+        return;
+      }
+      window._pendingOpen = { type: 'payment', transactionId: transactionId };
+      refreshData();
+    };
+
+    function closeModal() { document.getElementById('payModal').classList.remove('active'); }
+
+    function handleSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true; btn.innerText = 'Saving...';
+      
+      const transactionId = document.getElementById('formTransactionId').value;
+      const data = {
+        invoiceId: document.getElementById('billingCategoryId').value,
+        studentId: document.getElementById('studentId').value,
+        studentName: document.getElementById('studentName').value,
+        academicYear: document.getElementById('academicYear').value,
+        term: document.getElementById('term').value,
+        studentClass: document.getElementById('studentClass').value,
+        paymentDate: document.getElementById('paymentDate').value,
+        amountPaid: parseFloat(document.getElementById('amountPaid').value) || 0,
+        paymentMethod: document.getElementById('paymentMethod').value,
+        referenceNo: document.getElementById('referenceNo').value
+      };
+
+      if (transactionId) {
+        // Update
+        google.script.run
+          .withSuccessHandler(function(res) {
+            btn.disabled = false; btn.innerText = 'Update Payment';
+            if(res.success) { closeModal(); refreshData(); }
+          })
+          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Update Payment'; alert('Error: ' + err.message); })
+          .updatePayment(transactionId, data);
+      } else {
+        // Add
+        google.script.run
+          .withSuccessHandler(function(res) {
+            btn.disabled = false; btn.innerText = 'Save Payment';
+            if(res.success) { closeModal(); refreshData(); alert(`Payment recorded! ID: ${res.transactionId}`); }
+          })
+          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Save Payment'; alert('Error: ' + err.message); })
+          .addPayment(data);
+      }
+    }
+
+    function printPaymentReport(transactionId) {
+      const payment = payList.find(p => p.transactionId === transactionId);
+      if (!payment) return alert('Payment record not found.');
+
+      const schoolName  = (systemParameters.find(p => p.param === 'School Name')?.value  || 'School Name').trim();
+      const schoolEmail = (systemParameters.find(p => p.param === 'School Email')?.value || '').trim();
+      const schoolPhone = (systemParameters.find(p => p.param === 'School Phone')?.value || '').trim();
+      const rawLogoUrl  = (systemParameters.find(p => p.param === 'School Logo URL')?.value || '').trim();
+
+      const historyTotal   = payList
+        .filter(p => p.studentId === payment.studentId && p.academicYear === payment.academicYear && p.term === payment.term && p.paymentDate < payment.paymentDate)
+        .reduce((sum, p) => sum + Number(p.amountPaid || 0), 0);
+      const currentAmount  = Number(payment.amountPaid || 0);
+      const cumulativeTotal = historyTotal + currentAmount;
+      const receiptDate = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+
+      // Build the logo element — use base64 if available (fetched server-side), else direct URL
+      function buildLogoTag(src) {
+        if (!src) return '<div style="width:50px;height:50px;"></div>';
+        return `<img class="rc-logo" src="${src}" alt="Logo" crossorigin="anonymous">`;
+      }
+
+      function buildCopy(copyLabel) {
+        return `
+          <div class="receipt-copy">
+            <div class="rc-header">
+              <div class="rc-branding">
+                ${buildLogoTag(rawLogoUrl)}
+                <div>
+                  <div class="rc-school-name">${schoolName}</div>
+                  <div class="rc-school-sub">${[schoolEmail, schoolPhone].filter(Boolean).join(' &bull; ')}</div>
+                </div>
+              </div>
+              <div class="rc-meta">
+                <strong>PAYMENT RECEIPT</strong><br>
+                Date: ${receiptDate}<br>
+                Txn: <strong>${payment.transactionId}</strong>
+              </div>
+            </div>
+
+            <div class="rc-title-row">
+              <div class="rc-title">Receipt</div>
+              <div class="rc-copy-badge">${copyLabel}</div>
+            </div>
+
+            <div class="rc-fields">
+              <div class="rc-label">Student</div>
+              <div class="rc-value">${payment.studentName} &nbsp;<em style="font-size:10px;">(${payment.studentId})</em></div>
+
+              <div class="rc-label">Class</div>
+              <div class="rc-value">${payment.studentClass}</div>
+
+              <div class="rc-label">Academic Year</div>
+              <div class="rc-value">${payment.academicYear}</div>
+
+              <div class="rc-label">Term</div>
+              <div class="rc-value">${payment.term}</div>
+
+              <div class="rc-label">Invoice</div>
+              <div class="rc-value">${payment.invoiceId}</div>
+
+              <div class="rc-label">Payment Date</div>
+              <div class="rc-value">${payment.paymentDate}</div>
+
+              <div class="rc-label">Method</div>
+              <div class="rc-value">${payment.paymentMethod || '—'}</div>
+
+              <div class="rc-label">Reference No.</div>
+              <div class="rc-value">${payment.referenceNo || '—'}</div>
+
+              <div class="rc-label">Balance</div>
+              <div class="rc-value">GHS ${Number(payment.balance || 0).toFixed(2)}</div>
+
+              <div class="rc-label">Status</div>
+              <div class="rc-value">${payment.balanceStatus || '—'}</div>
+            </div>
+
+            <div class="rc-totals">
+              <div class="rc-total-box">
+                <div class="rc-total-label">Prev. Paid</div>
+                <div class="rc-total-value">GHS ${historyTotal.toFixed(2)}</div>
+              </div>
+              <div class="rc-total-box" style="border-width:2px;">
+                <div class="rc-total-label">This Payment</div>
+                <div class="rc-total-value">GHS ${currentAmount.toFixed(2)}</div>
+              </div>
+              <div class="rc-total-box">
+                <div class="rc-total-label">Total Paid</div>
+                <div class="rc-total-value">GHS ${cumulativeTotal.toFixed(2)}</div>
+              </div>
+            </div>
+
+            <div class="rc-sig">
+              <span>Received by: ____________________</span>
+              <span>Signature: ____________________</span>
+            </div>
+          </div>`;
+      }
+
+      const receiptHtml = `
+        <div class="receipt-print-visible">
+          <div class="receipt-cut-wrapper">
+            ${buildCopy('Student Copy')}
+            <div class="receipt-cut-line">✂ &nbsp;Cut Here</div>
+            ${buildCopy('School Copy')}
+          </div>
+        </div>`;
+
+      // If logo URL is a Drive link, fetch as base64 server-side before printing
+      const driveMatch = rawLogoUrl.match(/id=([a-zA-Z0-9_-]+)/) || rawLogoUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const fileId = driveMatch ? driveMatch[1] : null;
+
+      function doRender(logoSrc) {
+        const finalHtml = logoSrc && rawLogoUrl
+          ? receiptHtml.replace(new RegExp(escapeRegex(rawLogoUrl), 'g'), logoSrc)
+          : receiptHtml;
+
+        // Put the receipt into the hidden print container (used by @media print)
+        const printContainer = document.getElementById('receiptPrintContainer');
+        printContainer.innerHTML = finalHtml;
+
+        // Also show it in the scroll area of the preview modal
+        const scrollArea = document.getElementById('receiptScrollArea');
+        scrollArea.innerHTML = finalHtml;
+
+        // Open the preview modal — do NOT auto-print
+        document.getElementById('receiptPreviewModal').classList.add('active');
+      }
+
+      function closeReceiptPreview() {
+        document.getElementById('receiptPreviewModal').classList.remove('active');
+        document.getElementById('receiptScrollArea').innerHTML = '';
+        document.getElementById('receiptPrintContainer').innerHTML = '';
+      }
+
+      function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+      if (fileId) {
+        google.script.run
+          .withSuccessHandler(function(b64) { doRender(b64 || rawLogoUrl); })
+          .withFailureHandler(function()    { doRender(rawLogoUrl); })
+          .getImageAsBase64(rawLogoUrl);
+      } else {
+        doRender(rawLogoUrl);
+      }
+    }
+
+    /* --- DELETE LOGIC --- */
+    function openDeleteModal(transactionId) {
+      currentDeleteId = transactionId;
+      document.getElementById('deletePayId').innerText = transactionId;
+      document.getElementById('deleteModal').classList.add('active');
+    }
+    function closeDeleteModal() { document.getElementById('deleteModal').classList.remove('active'); currentDeleteId = null; }
+
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+      if (!currentDeleteId) return;
+      const btn = this; btn.disabled = true; btn.innerText = 'Deleting...';
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false; btn.innerText = 'Delete';
+          if(res.success) { closeDeleteModal(); refreshData(); }
+        })
+        .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Delete'; alert('Error: ' + err.message); })
+        .deletePayment(currentDeleteId);
+    };
+  </script>
+</body>
+</html>

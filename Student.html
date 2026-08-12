@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      background-color: #f4f7fc;
+      padding: 40px;
+      height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* --- PAGE HEADER --- */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+    }
+
+    .page-title {
+      font-size: 22px;
+      color: #0f172a;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .page-title span {
+      color: #64748b;
+      font-weight: 400;
+      font-size: 16px;
+      background: #e2e8f0;
+      padding: 2px 10px;
+      border-radius: 20px;
+    }
+
+    .action-btn {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-btn:hover {
+      background: #2563eb;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+    }
+
+    /* --- TOOLBAR (Search & Filter) --- */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      padding: 15px 20px;
+      border-radius: 10px 10px 0 0;
+      border-bottom: 1px solid #e2e8f0;
+      margin: 0 -40px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    #bulkActionsBar {
+      display: flex;
+      align-items: center;
+      padding: 8px 16px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      border: 1px solid #e2e8f0;
+      padding: 8px 16px;
+      border-radius: 8px;
+      width: 300px;
+      background: #f8fafc;
+    }
+
+    .search-box input {
+      border: none;
+      outline: none;
+      background: transparent;
+      width: 100%;
+      margin-left: 8px;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .row-checkbox {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+    }
+
+    .row-checkbox:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    #selectAll {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+    }
+
+    /* --- TABLE --- */
+    .table-container {
+      background: white;
+      border-radius: 0 0 10px 10px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      overflow-x: auto;
+      /* Expand to edge of the content area (body has 40px horizontal padding) */
+      margin: 0 -40px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead {
+      background: #f8fafc;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    th {
+      text-align: left;
+      padding: 16px 20px;
+      color: #475569;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 16px 20px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #1e293b;
+    }
+
+    tr:hover {
+      background-color: #f8fafc;
+    }
+
+    /* --- BADGES --- */
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-block;
+    }
+    .status-active { background: #dcfce7; color: #166534; }
+    .status-inactive { background: #fee2e2; color: #991b1b; }
+    .status-completed { background: #dbeafe; color: #0c4a6e; }
+
+    /* --- LOADING STATE --- */
+    #loading {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+    }
+
+    /* --- ACTIONS CELL --- */
+    .actions-cell {
+      display: flex;
+      gap: 10px;
+    }
+
+    .action-icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      color: #64748b;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .action-icon-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .action-icon-btn.edit-btn:hover {
+      background: #eff6ff;
+      color: #2563eb;
+    }
+
+    .action-icon-btn.delete-btn:hover {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    /* --- TOAST NOTIFICATIONS --- */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 2000;
+    }
+
+    .toast {
+      background: #1e293b;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      font-size: 14px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transform: translateY(-20px);
+      opacity: 0;
+      animation: slideIn 0.3s forwards;
+      border-left: 4px solid transparent;
+    }
+
+    @keyframes slideIn {
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .toast.success {
+      border-left-color: #10b981;
+    }
+
+    .toast.error {
+      border-left-color: #ef4444;
+    }
+
+    /* --- MODALS --- */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-content {
+      background: white;
+      width: 90%;
+      max-width: 500px;
+      border-radius: 12px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      transform: scale(0.95);
+      transition: transform 0.25s ease;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-backdrop.active .modal-content {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h3 {
+      font-size: 18px;
+      color: #0f172a;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      color: #94a3b8;
+      font-size: 24px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .modal-close:hover {
+      color: #334155;
+    }
+
+    .modal-body {
+      padding: 24px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #f1f5f9;
+      background: #f8fafc;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .logout-cancel-btn,
+    .logout-confirm-btn {
+      min-width: 120px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .logout-cancel-btn {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .logout-cancel-btn:hover {
+      background: #e2e8f0;
+    }
+
+    .logout-confirm-btn {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #2563eb;
+    }
+
+    .logout-confirm-btn:hover {
+      background: #1d4ed8;
+    }
+
+    .logout-confirm-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    #licenseModal .modal-content {
+      max-width: 480px;
+    }
+
+    #licenseModal .modal-header {
+      border-bottom-color: #fee2e2;
+    }
+
+    #licenseModal .modal-header h3 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #licenseModal .modal-body {
+      padding-top: 12px;
+    }
+
+    #licenseModal input#developerKeyInput {
+      border-color: #cbd5e1;
+      box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+
+    /* --- FORM CONTROLS --- */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #475569;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #0f172a;
+      background: #fff;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .form-input:focus, .form-select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: none;
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #475569;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e1;
+      color: #1e293b;
+    }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: #fff;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .filter-controls select {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #475569;
+      background-color: white;
+      padding: 8px 12px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .filter-controls select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    /* --- INLINE COLUMN FILTERS ROW --- */
+    thead tr.filter-row th {
+      padding: 8px 20px;
+      background: #f1f5f9;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .col-filter {
+      width: 100%;
+      padding: 5px 8px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #475569;
+      background: white;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .col-filter:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.12);
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      body { padding: 20px; }
+      .table-container { margin: 0 -20px; }
+      .page-header { flex-direction: column; align-items: flex-start; gap: 15px; }
+      .page-header > div { width: 100%; }
+      .page-header > div[style*="display: flex"] { flex-wrap: wrap; }
+      .toolbar { flex-direction: column; gap: 12px; }
+      .search-box { width: 100%; }
+      .filter-controls { width: 100%; display: flex; gap: 10px; }
+      .filter-controls select { flex: 1; }
+      th, td { padding: 12px; font-size: 12px; }
+      .form-grid { grid-template-columns: 1fr; gap: 0; }
+    }
+
+    /* --- DARK MODE --- */
+    body.dark-mode { background-color: #0f172a; color: #f1f5f9; }
+    body.dark-mode .page-title { color: #f1f5f9; }
+    body.dark-mode .page-title span { background: #334155; color: #94a3b8; }
+    body.dark-mode .toolbar { background: #1e293b; border-bottom-color: #334155; }
+    body.dark-mode #bulkActionsBar { background: #0f172a; border-color: #334155; }
+    body.dark-mode #selectedCount { color: #94a3b8; }
+    body.dark-mode .search-box { background: #0f172a; border-color: #334155; }
+    body.dark-mode .search-box input { color: #f1f5f9; }
+    body.dark-mode .search-box input::placeholder { color: #64748b; }
+    body.dark-mode .table-container { background: #1e293b; }
+    body.dark-mode thead { background: #0f172a; border-bottom-color: #334155; }
+    body.dark-mode thead tr.filter-row th { background: #1e293b; border-bottom-color: #334155; }
+    body.dark-mode th { color: #94a3b8; }
+    body.dark-mode td { border-bottom-color: #334155; color: #f1f5f9; }
+    body.dark-mode tr:hover { background-color: #334155; }
+    body.dark-mode #loading { color: #94a3b8; }
+    body.dark-mode .col-filter { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+    body.dark-mode .col-filter:focus { border-color: #3b82f6; }
+    body.dark-mode .action-icon-btn { background: #334155; color: #94a3b8; }
+    body.dark-mode .action-icon-btn:hover { background: #475569; color: #f1f5f9; }
+    body.dark-mode .action-icon-btn.edit-btn:hover { background: #1e3a5f; color: #93c5fd; }
+    body.dark-mode .action-icon-btn.delete-btn:hover { background: #7f1d1d; color: #fca5a5; }
+    body.dark-mode .toast { background: #334155; color: #f1f5f9; }
+    body.dark-mode .modal-backdrop { background: rgba(0, 0, 0, 0.6); }
+    body.dark-mode .modal-content { background: #1e293b; }
+    body.dark-mode .modal-header { border-bottom-color: #334155; }
+    body.dark-mode .modal-header h3 { color: #f1f5f9; }
+    body.dark-mode .modal-close { color: #94a3b8; }
+    body.dark-mode .modal-close:hover { color: #f1f5f9; }
+    body.dark-mode .modal-body { color: #f1f5f9; }
+    body.dark-mode .modal-body p { color: #cbd5e1; }
+    body.dark-mode .modal-body strong { color: #f1f5f9; }
+    body.dark-mode .modal-footer { background: #0f172a; border-top-color: #334155; }
+    body.dark-mode .form-label { color: #94a3b8; }
+    body.dark-mode .form-input, body.dark-mode .form-select { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+    body.dark-mode .form-input:focus, body.dark-mode .form-select:focus { border-color: #3b82f6; }
+    body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
+    body.dark-mode .btn-secondary:hover { background: #475569; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="page-title">
+      👨‍🎓 Student Directory
+      <span id="studentCount">0</span>
+    </div>
+    <div style="display: flex; gap: 12px;">
+      <button class="action-btn" style="background: #10b981;" onclick="openImportModal()">
+        📥 Import Students
+      </button>
+      <button class="action-btn" onclick="openAddModal()">
+        + Add Student
+      </button>
+    </div>
+  </div>
+
+  <!-- TOOLBAR: search and bulk actions -->
+  <div class="toolbar">
+    <div class="search-box">
+      <span>🔍</span>
+      <input type="text" id="searchInput" placeholder="Search by name or ID..." onkeyup="filterTable()">
+    </div>
+    <div id="bulkActionsBar" style="display: none; gap: 8px; align-items: center;">
+      <span id="selectedCount" style="color: #64748b; font-size: 14px; margin-right: 8px;">0 selected</span>
+      <select id="bulkStatusChange" class="form-select" style="width: auto; padding: 8px 12px;">
+        <option value="">Change Status...</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+        <option value="Completed">Completed</option>
+      </select>
+      <button class="action-btn" style="background: #ef4444; padding: 8px 16px;" onclick="bulkDelete()">
+        🗑️ Delete Selected
+      </button>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-container">
+    <div id="loading">Loading student data...</div>
+    <table id="studentTable" style="display:none;">
+      <thead>
+        <tr>
+          <th style="width: 40px;">
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" title="Select All">
+          </th>
+          <th>Student ID</th>
+          <th>First Name</th>
+          <th>Last Name</th>
+          <th>Date of Birth</th>
+          <th>Gender</th>
+          <th>Enrollment Date</th>
+          <th>Status</th>
+          <th>Class</th>
+          <th style="text-align: center; width: 120px;">Actions</th>
+        </tr>
+        <tr class="filter-row">
+          <th></th>
+          <th><input class="col-filter" id="filterStudentId" type="text" placeholder="Filter..." oninput="filterTable()"></th>
+          <th><input class="col-filter" id="filterFirstName" type="text" placeholder="Filter..." oninput="filterTable()"></th>
+          <th><input class="col-filter" id="filterLastName" type="text" placeholder="Filter..." oninput="filterTable()"></th>
+          <th><input class="col-filter" id="filterDob" type="text" placeholder="Filter..." oninput="filterTable()"></th>
+          <th>
+            <select class="col-filter" id="genderFilter" onchange="filterTable()">
+              <option value="">All</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </th>
+          <th><input class="col-filter" id="filterEnrollDate" type="text" placeholder="Filter..." oninput="filterTable()"></th>
+          <th>
+            <select class="col-filter" id="statusFilter" onchange="filterTable()">
+              <option value="">All</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </th>
+          <th><input class="col-filter" id="filterClass" type="text" placeholder="Filter..." oninput="filterTable()"></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <!-- Data will be injected here via Javascript -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- STUDENT MODAL -->
+  <div class="modal-backdrop" id="studentModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Add New Student</h3>
+        <button class="modal-close" onclick="closeStudentModal()">&times;</button>
+      </div>
+      <form id="studentForm" onsubmit="handleFormSubmit(event)">
+        <input type="hidden" id="formStudentId">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="firstName">First Name</label>
+              <input type="text" id="firstName" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="lastName">Last Name</label>
+              <input type="text" id="lastName" class="form-input" required>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input type="email" id="email" class="form-input" required>
+          </div>
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="dob">Date of Birth</label>
+              <input type="date" id="dob" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="gender">Gender</label>
+              <select id="gender" class="form-select" required>
+                <option value="" disabled selected>Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="enrollmentDate">Enrollment Date</label>
+              <input type="date" id="enrollmentDate" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="status">Status</label>
+              <select id="status" class="form-select" required>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="classSelect">Class</label>
+            <select id="classSelect" class="form-select">
+              <option value="">Select Class</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeStudentModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveBtn">Save Student</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DEVELOPER UPGRADE MODAL -->
+  <div id="licenseModal" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3 style="color:#e11d48;">🔒 Student Limit Reached</h3>
+        <button class="modal-close" onclick="closeLicenseModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align: center;">
+        <p style="margin-bottom: 15px; color:#475569;">
+          You have reached the maximum allowance of <strong id="modalLimitCount">10</strong> students. To increase your limit or unlock full access, please contact the developer.
+        </p>
+        
+        <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:15px;">
+          <span style="font-size: 13px; color:#64748b;">Developer Contact Email:</span><br>
+          <strong style="font-size: 15px; color:#0f172a;" id="modalDevEmail">support@yourdomain.com</strong>
+        </div>
+
+        <div style="text-align: left; margin-top: 15px;">
+          <label style="font-size:13px; font-weight:600; color:#334155;">Developer Activation Key:</label>
+          <input type="password" id="developerKeyInput" placeholder="Enter master password to unlock" 
+                 style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button onclick="closeLicenseModal()" class="btn btn-secondary">Close</button>
+        <button onclick="submitDeveloperUnlock()" id="unlockBtn" class="btn btn-primary" style="background:#2563eb;">Unlock Full Access</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRM MODAL -->
+  <div class="modal-backdrop" id="deleteModal">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>Delete Student</h3>
+        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: #64748b; font-size: 15px; line-height: 1.5;">
+          Are you sure you want to delete <strong id="deleteStudentName" style="color: #0f172a;"></strong>? This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORT STUDENTS MODAL -->
+  <div class="modal-backdrop" id="importModal">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3>📥 Import Students from CSV</h3>
+        <button class="modal-close" onclick="closeImportModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 20px; padding: 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+          <p style="font-size: 13px; color: #1e40af; margin-bottom: 8px;"><strong>📋 CSV Format Requirements:</strong></p>
+          <p style="font-size: 12px; color: #1e3a8a; line-height: 1.6;">
+            Your CSV file must have the following columns (in order):<br>
+            <code style="background: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">First Name, Last Name, Email, Date of Birth (YYYY-MM-DD), Gender, Class, Enrollment Date (YYYY-MM-DD), Status</code>
+          </p>
+          <p style="font-size: 12px; color: #1e3a8a; margin-top: 8px;">
+            <strong>Example row:</strong><br>
+            <code style="background: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">John,Doe,john@email.com,2010-05-15,Male,Grade 5,2024-09-01,Active</code>
+          </p>
+          <button onclick="downloadTemplate()" style="margin-top: 12px; padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+            📄 Download CSV Template
+          </button>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Upload CSV File</label>
+          <input type="file" id="csvFileInput" accept=".csv" class="form-input" style="padding: 8px;">
+        </div>
+        
+        <div id="importPreview" style="display: none; margin-top: 20px;">
+          <label class="form-label">Preview (First 5 rows)</label>
+          <div style="max-height: 200px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <table style="width: 100%; font-size: 12px;">
+              <thead style="position: sticky; top: 0; background: #f8fafc;">
+                <tr>
+                  <th style="padding: 8px; text-align: left;">First Name</th>
+                  <th style="padding: 8px; text-align: left;">Last Name</th>
+                  <th style="padding: 8px; text-align: left;">Email</th>
+                  <th style="padding: 8px; text-align: left;">DOB</th>
+                  <th style="padding: 8px; text-align: left;">Gender</th>
+                  <th style="padding: 8px; text-align: left;">Class</th>
+                </tr>
+              </thead>
+              <tbody id="previewTableBody"></tbody>
+            </table>
+          </div>
+          <p id="importSummary" style="margin-top: 12px; font-size: 13px; color: #64748b;"></p>
+        </div>
+        
+        <div id="importProgress" style="display: none; margin-top: 20px;">
+          <div style="background: #f1f5f9; border-radius: 8px; padding: 16px;">
+            <p style="font-size: 14px; color: #475569; margin-bottom: 8px;">Importing students...</p>
+            <div style="background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden;">
+              <div id="progressBar" style="background: #3b82f6; height: 100%; width: 0%; transition: width 0.3s;"></div>
+            </div>
+            <p id="progressText" style="font-size: 12px; color: #64748b; margin-top: 8px;">0 / 0 students processed</p>
+          </div>
+        </div>
+        
+        <div id="importResults" style="display: none; margin-top: 20px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="importBtn" onclick="processImport()" disabled>Import Students</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    let studentsList = []; // Global store for loaded data
+    let currentLicenseInfo = { limit: 10, developerEmail: '' };
+
+    // 1. Load data when page opens
+    document.addEventListener('DOMContentLoaded', function() {
+      refreshData();
+      fetchLicenseDetails();
+      // Load classes for dropdown
+      google.script.run.withSuccessHandler(populateClasses).getClassesData();
+    });
+
+    function fetchLicenseDetails() {
+      google.script.run.withSuccessHandler(function(details) {
+        if (details) {
+          currentLicenseInfo = details;
+        }
+      }).getLicenseDetails();
+    }
+
+    function showLicenseModal(data) {
+      const modal = document.getElementById('licenseModal');
+      const limitSpan = document.getElementById('modalLimitCount');
+      const emailSpan = document.getElementById('modalDevEmail');
+      
+      const limit = (data && data.limit) ? data.limit : currentLicenseInfo.limit;
+      const email = (data && data.developerEmail) ? data.developerEmail : (currentLicenseInfo.developerEmail || '');
+
+      if (limitSpan) limitSpan.innerText = limit;
+      if (emailSpan) emailSpan.innerText = email || 'Developer Email in Settings';
+
+      modal.style.display = 'flex';
+      modal.classList.add('active');
+    }
+
+    function refreshData() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('studentTable').style.display = 'none';
+      google.script.run
+        .withSuccessHandler(renderTable)
+        .withFailureHandler(function(err){
+          document.getElementById('loading').style.display = 'none';
+          showToast('Error loading students: ' + (err && err.message ? err.message : err), 'error');
+        })
+        .getStudentsData();
+    }
+
+    // Convert date string/object to YYYY-MM-DD input format
+    function formatDateForInput(dateVal) {
+      if (!dateVal) return '';
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Convert date for presentation (e.g., MM/DD/YYYY or YYYY-MM-DD string)
+    function formatDateForDisplay(dateVal) {
+      if (!dateVal) return '-';
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return dateVal;
+      return d.toLocaleDateString();
+    }
+
+    // 2. Render the Table
+    function renderTable(data) {
+      try {
+        console.log('renderTable payload:', data);
+        if (!data || !Array.isArray(data)) data = [];
+        studentsList = data;
+
+        if (data.length === 0) {
+          const tbody = document.getElementById('tableBody');
+          const loading = document.getElementById('loading');
+          const table = document.getElementById('studentTable');
+          const countBadge = document.getElementById('studentCount');
+          loading.style.display = 'none';
+          table.style.display = 'table';
+          tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No students found.</td></tr>`;
+          countBadge.innerText = '0';
+          return;
+        }
+      const tbody = document.getElementById('tableBody');
+      const loading = document.getElementById('loading');
+      const table = document.getElementById('studentTable');
+      const countBadge = document.getElementById('studentCount');
+
+      loading.style.display = 'none';
+      table.style.display = 'table';
+      countBadge.innerText = data.length;
+      tbody.innerHTML = '';
+
+      data.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-gender', row.gender || '');
+        tr.setAttribute('data-student-id', row.studentId || '');
+        tr.setAttribute('data-status', row.status || 'Active');
+        
+        let statusClass = 'status-active';
+        let statusText = 'Active';
+        if(row.status && row.status.toLowerCase() === 'inactive') {
+          statusClass = 'status-inactive';
+          statusText = 'Inactive';
+        }
+        if(row.status && row.status.toLowerCase() === 'completed') {
+          statusClass = 'status-completed';
+          statusText = 'Completed';
+        }
+        const isCompletedJHS3 = row.status === 'Completed' && (row.class || '').toUpperCase().includes('JHS 3');
+        const canEdit = !isCompletedJHS3;
+
+        const actionsHtml = `
+          <div class="actions-cell">
+            <button class="action-icon-btn edit-btn" onclick="${canEdit ? `openEditModal('${row.studentId}')` : `showToast('Cannot edit completed JHS 3 student', 'error')`}" title="${canEdit ? 'Edit Student' : 'Student record is locked (Completed JHS 3)'}" ${!canEdit ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button class="action-icon-btn delete-btn" onclick="${canEdit ? `openDeleteModal('${row.studentId}', '${row.firstName} ${row.lastName}')` : `showToast('Cannot delete completed JHS 3 student', 'error')`}" title="${canEdit ? 'Delete Student' : 'Student record is locked (Completed JHS 3)'}" ${!canEdit ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          </div>
+        `;
+
+        tr.innerHTML = `
+          <td><input type="checkbox" class="row-checkbox" data-student-id="${row.studentId || ''}" onchange="updateBulkActions()" ${!canEdit ? 'disabled title="Cannot select completed JHS 3 student"' : ''}></td>
+          <td><strong>${row.studentId || '-'}</strong></td>
+          <td>${row.firstName || '-'}</td>
+          <td>${row.lastName || '-'}</td>
+          <td>${formatDateForDisplay(row.dob)}</td>
+          <td>${row.gender || '-'}</td>
+          <td>${formatDateForDisplay(row.enrollmentDate)}</td>
+          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+          <td>${row.class || '-'}</td>
+          <td style="display: flex; justify-content: center; align-items: center;">${actionsHtml}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+      } catch (err) {
+        console.error('renderTable error', err);
+        const loading = document.getElementById('loading');
+        loading.style.display = 'none';
+        showToast('Error rendering student table: ' + (err && err.message ? err.message : err), 'error');
+      }
+    }
+
+    // Allow the parent window to request opening / focusing a student record
+    window.__pendingOpenStudent = null;
+    window.openStudentRecord = function(idOrName) {
+      try {
+        if (!idOrName) return;
+        if (studentsList && studentsList.length > 0) {
+          const byId = studentsList.find(s => String(s.studentId || '').toLowerCase() === String(idOrName || '').toLowerCase());
+          const byName = studentsList.find(s => (((s.firstName||'') + ' ' + (s.lastName||'')).toLowerCase().indexOf(String(idOrName || '').toLowerCase()) !== -1));
+          const target = byId || byName;
+          if (target) {
+            openEditModal(target.studentId);
+            const tr = document.querySelector(`#tableBody tr[data-student-id="${CSS.escape(target.studentId)}"]`);
+            if (tr) {
+              tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              tr.style.transition = 'background-color 0.3s';
+              const orig = tr.style.backgroundColor;
+              tr.style.backgroundColor = '#fffbeb';
+              setTimeout(() => { tr.style.backgroundColor = orig || ''; }, 1200);
+            }
+            return;
+          }
+        }
+        window.__pendingOpenStudent = idOrName;
+        refreshData();
+      } catch (e) {
+        console.error('openStudentRecord error', e);
+      }
+    };
+
+    const origRenderTable = renderTable;
+    renderTable = function(data) {
+      origRenderTable(data);
+      try {
+        if (window.__pendingOpenStudent) {
+          const pending = window.__pendingOpenStudent;
+          window.__pendingOpenStudent = null;
+          window.openStudentRecord(pending);
+        }
+      } catch (e) { console.error(e); }
+    };
+
+    function populateClasses(classes) {
+      const classSelect = document.getElementById('classSelect');
+      if (!classSelect) return;
+      classSelect.innerHTML = '<option value="">Select Class</option>';
+      if (!classes || !Array.isArray(classes) || classes.length === 0) return;
+      classes.forEach(c => {
+        const opt = document.createElement('option');
+        // Handle both string and object formats
+        const className = typeof c === 'string' ? c : (c.className || c);
+        opt.value = className;
+        opt.innerText = className;
+        classSelect.appendChild(opt);
+      });
+    }
+
+    // 3. Search/Filter Function
+    function filterTable() {
+      const searchVal    = (document.getElementById('searchInput').value || '').toLowerCase();
+      const filterIdVal  = (document.getElementById('filterStudentId').value || '').toLowerCase();
+      const filterFnVal  = (document.getElementById('filterFirstName').value || '').toLowerCase();
+      const filterLnVal  = (document.getElementById('filterLastName').value || '').toLowerCase();
+      const filterDobVal = (document.getElementById('filterDob').value || '').toLowerCase();
+      const genderVal    = (document.getElementById('genderFilter').value || '').toLowerCase();
+      const filterEdVal  = (document.getElementById('filterEnrollDate').value || '').toLowerCase();
+      const statusVal    = (document.getElementById('statusFilter').value || '').toLowerCase();
+      const filterClsVal = (document.getElementById('filterClass').value || '').toLowerCase();
+
+      const rows = document.querySelectorAll('#tableBody tr');
+      const countBadge = document.getElementById('studentCount');
+      let visibleCount = 0;
+
+      rows.forEach(row => {
+        if (row.cells.length === 1 && row.cells[0].getAttribute('colspan')) return;
+
+        // Account for checkbox column (index 0), so all other columns shift by +1
+        const cellText = (i) => (row.cells[i] ? row.cells[i].innerText.toLowerCase() : '');
+        const rowGender = (row.getAttribute('data-gender') || '').toLowerCase();
+        const rowStatus = (row.getAttribute('data-status') || '').toLowerCase();
+
+        const matchSearch  = !searchVal   || row.innerText.toLowerCase().includes(searchVal);
+        const matchId      = !filterIdVal || cellText(1).includes(filterIdVal);  // Was 0, now 1
+        const matchFn      = !filterFnVal || cellText(2).includes(filterFnVal);  // Was 1, now 2
+        const matchLn      = !filterLnVal || cellText(3).includes(filterLnVal);  // Was 2, now 3
+        const matchDob     = !filterDobVal|| cellText(4).includes(filterDobVal); // Was 3, now 4
+        const matchGender  = !genderVal   || rowGender === genderVal;
+        const matchEd      = !filterEdVal || cellText(6).includes(filterEdVal);  // Was 5, now 6
+        const matchStatus  = !statusVal   || rowStatus === statusVal;
+        const matchClass   = !filterClsVal|| cellText(8).includes(filterClsVal); // Was 7, now 8
+
+        if (matchSearch && matchId && matchFn && matchLn && matchDob && matchGender && matchEd && matchStatus && matchClass) {
+          row.style.display = '';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+
+      countBadge.innerText = visibleCount;
+    }
+
+    // === BULK ACTIONS ===
+    function toggleSelectAll() {
+      const selectAllCheckbox = document.getElementById('selectAll');
+      const checkboxes = document.querySelectorAll('.row-checkbox:not([disabled])');
+      checkboxes.forEach(cb => {
+        cb.checked = selectAllCheckbox.checked;
+      });
+      updateBulkActions();
+    }
+
+    function updateBulkActions() {
+      const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+      const bulkBar = document.getElementById('bulkActionsBar');
+      const selectedCount = document.getElementById('selectedCount');
+      const selectAllCheckbox = document.getElementById('selectAll');
+      
+      selectedCount.textContent = `${checkboxes.length} selected`;
+      
+      if (checkboxes.length > 0) {
+        bulkBar.style.display = 'flex';
+      } else {
+        bulkBar.style.display = 'none';
+      }
+      
+      // Update "select all" checkbox state
+      const allCheckboxes = document.querySelectorAll('.row-checkbox:not([disabled])');
+      selectAllCheckbox.checked = allCheckboxes.length > 0 && checkboxes.length === allCheckboxes.length;
+    }
+
+    function getSelectedStudentIds() {
+      const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+      return Array.from(checkboxes).map(cb => cb.getAttribute('data-student-id')).filter(id => id);
+    }
+
+    function bulkDelete() {
+      const selectedIds = getSelectedStudentIds();
+      if (selectedIds.length === 0) {
+        showToast('No students selected', 'error');
+        return;
+      }
+      
+      if (!confirm(`Are you sure you want to delete ${selectedIds.length} student(s)? This action cannot be undone.`)) {
+        return;
+      }
+      
+      showToast(`Deleting ${selectedIds.length} student(s)...`, 'success');
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      selectedIds.forEach((id, index) => {
+        google.script.run
+          .withSuccessHandler(() => {
+            successCount++;
+            if (successCount + errorCount === selectedIds.length) {
+              showToast(`Successfully deleted ${successCount} student(s)${errorCount > 0 ? `, ${errorCount} failed` : ''}`, successCount > 0 ? 'success' : 'error');
+              refreshData();
+            }
+          })
+          .withFailureHandler((err) => {
+            errorCount++;
+            console.error(`Failed to delete student ${id}:`, err);
+            if (successCount + errorCount === selectedIds.length) {
+              showToast(`Successfully deleted ${successCount} student(s)${errorCount > 0 ? `, ${errorCount} failed` : ''}`, successCount > 0 ? 'success' : 'error');
+              refreshData();
+            }
+          })
+          .deleteStudent(id);
+      });
+    }
+
+    // Event listener for bulk status change
+    document.addEventListener('DOMContentLoaded', function() {
+      const bulkStatusSelect = document.getElementById('bulkStatusChange');
+      if (bulkStatusSelect) {
+        bulkStatusSelect.addEventListener('change', function() {
+          const newStatus = this.value;
+          if (!newStatus) return;
+          
+          const selectedIds = getSelectedStudentIds();
+          if (selectedIds.length === 0) {
+            showToast('No students selected', 'error');
+            this.value = '';
+            return;
+          }
+          
+          if (!confirm(`Change status to "${newStatus}" for ${selectedIds.length} student(s)?`)) {
+            this.value = '';
+            return;
+          }
+          
+          showToast(`Updating ${selectedIds.length} student(s)...`, 'success');
+          
+          let successCount = 0;
+          let errorCount = 0;
+          
+          selectedIds.forEach((id) => {
+            // Get student data first
+            const student = studentsList.find(s => s.studentId === id);
+            if (!student) {
+              errorCount++;
+              return;
+            }
+            
+            google.script.run
+              .withSuccessHandler(() => {
+                successCount++;
+                if (successCount + errorCount === selectedIds.length) {
+                  showToast(`Successfully updated ${successCount} student(s)${errorCount > 0 ? `, ${errorCount} failed` : ''}`, successCount > 0 ? 'success' : 'error');
+                  refreshData();
+                }
+              })
+              .withFailureHandler((err) => {
+                errorCount++;
+                console.error(`Failed to update student ${id}:`, err);
+                if (successCount + errorCount === selectedIds.length) {
+                  showToast(`Successfully updated ${successCount} student(s)${errorCount > 0 ? `, ${errorCount} failed` : ''}`, successCount > 0 ? 'success' : 'error');
+                  refreshData();
+                }
+              })
+              .updateStudent(
+                id,
+                student.firstName,
+                student.lastName,
+                student.email,
+                student.dob,
+                student.gender,
+                student.enrollmentDate,
+                newStatus,  // Use the new status
+                student.class
+              );
+          });
+          
+          this.value = '';
+        });
+      }
+    });
+
+    /* --- TOAST SYSTEM --- */
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      const icon = type === 'success' ? '✅' : '❌';
+      toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.animation = 'slideIn 0.3s reverse forwards';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    /* --- ADD / EDIT STUDENT MODAL LOGIC --- */
+    function openAddModal() {
+      if (studentsList && currentLicenseInfo.limit && studentsList.length >= currentLicenseInfo.limit) {
+        showToast(`Student limit of ${currentLicenseInfo.limit} reached. Contact developer to increase limit.`, 'error');
+        showLicenseModal(currentLicenseInfo);
+        return;
+      }
+
+      const modal = document.getElementById('studentModal');
+      const form = document.getElementById('studentForm');
+      form.reset();
+      
+      document.getElementById('formStudentId').value = '';
+      document.getElementById('modalTitle').innerText = 'Add New Student';
+      document.getElementById('saveBtn').innerText = 'Save Student';
+      
+      document.getElementById('enrollmentDate').value = formatDateForInput(new Date());
+      document.getElementById('status').value = 'Active';
+      const classSelect = document.getElementById('classSelect');
+      if (classSelect) classSelect.value = '';
+
+      modal.classList.add('active');
+    }
+
+    function openEditModal(studentId) {
+      const student = studentsList.find(s => s.studentId === studentId);
+      if (!student) {
+        showToast('Error: Student data not found.', 'error');
+        return;
+      }
+
+      const isCompletedJHS3 = student.status === 'Completed' && (student.class || '').toUpperCase().includes('JHS 3');
+      if (isCompletedJHS3) {
+        showToast('Cannot edit this student: Completed JHS 3 record is locked.', 'error');
+        return;
+      }
+
+      const modal = document.getElementById('studentModal');
+      document.getElementById('formStudentId').value = student.studentId;
+      document.getElementById('firstName').value = student.firstName || '';
+      document.getElementById('lastName').value = student.lastName || '';
+      document.getElementById('email').value = student.email || '';
+      document.getElementById('dob').value = formatDateForInput(student.dob);
+      document.getElementById('gender').value = student.gender || '';
+      document.getElementById('classSelect').value = student.class || '';
+      document.getElementById('enrollmentDate').value = formatDateForInput(student.enrollmentDate);
+      document.getElementById('status').value = student.status || 'Active';
+
+      document.getElementById('modalTitle').innerText = 'Edit Student Details';
+      document.getElementById('saveBtn').innerText = 'Update Student';
+      
+      modal.classList.add('active');
+    }
+
+    function closeStudentModal() {
+      document.getElementById('studentModal').classList.remove('active');
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      
+      const studentId = document.getElementById('formStudentId').value;
+      const currentStudent = studentId ? studentsList.find(s => s.studentId === studentId) : null;
+      const isCompletedJHS3 = currentStudent && currentStudent.status === 'Completed' && (currentStudent.class || '').toUpperCase().includes('JHS 3');
+      
+      if (isCompletedJHS3) {
+        showToast('Cannot update this student: Completed JHS 3 record is locked.', 'error');
+        return;
+      }
+      
+      const saveBtn = document.getElementById('saveBtn');
+      saveBtn.disabled = true;
+      saveBtn.innerText = 'Saving...';
+
+      const studentData = {
+        firstName: document.getElementById('firstName').value.trim(),
+        lastName: document.getElementById('lastName').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        dob: document.getElementById('dob').value,
+        gender: document.getElementById('gender').value,
+        class: document.getElementById('classSelect') ? document.getElementById('classSelect').value : '',
+        enrollmentDate: document.getElementById('enrollmentDate').value,
+        status: document.getElementById('status').value
+      };
+
+      const normalizedFirst = studentData.firstName.toLowerCase();
+      const normalizedLast = studentData.lastName.toLowerCase();
+
+      const duplicate = studentsList.find(s => {
+        if (s.studentId === studentId) return false;
+        const sameName = s.firstName && s.lastName &&
+          s.firstName.trim().toLowerCase() === normalizedFirst &&
+          s.lastName.trim().toLowerCase() === normalizedLast;
+        return sameName;
+      });
+
+      if (duplicate) {
+        saveBtn.disabled = false;
+        saveBtn.innerText = studentId ? 'Update Student' : 'Save Student';
+        showToast('A student with the same first name and last name already exists.', 'error');
+        return;
+      }
+
+      if (studentId) {
+        // Edit mode
+        google.script.run
+          .withSuccessHandler(function(response) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = 'Update Student';
+            if (response && response.success) {
+              closeStudentModal();
+              showToast('Student details updated successfully!', 'success');
+              refreshData();
+            } else {
+              showToast(response && response.message ? response.message : 'Failed to update student details.', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = 'Update Student';
+            showToast('Error: ' + err.message, 'error');
+          })
+          .updateStudent(studentId, studentData);
+      } else {
+        // Add mode
+        google.script.run
+          .withSuccessHandler(function(response) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = 'Save Student';
+            handleAddStudentResponse(response);
+          })
+          .withFailureHandler(function(err) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = 'Save Student';
+            showToast('Error: ' + err.message, 'error');
+          })
+          .addStudent(studentData);
+      }
+    }
+
+    function handleAddStudentResponse(res) {
+      if (res && res.success) {
+        showToast('Student added successfully!', 'success');
+        closeStudentModal();
+        refreshData();
+      } else if (res && res.licenseLimitReached) {
+        showToast(res.message || 'Student limit reached.', 'error');
+        showLicenseModal(res);
+      } else {
+        showToast('Error: ' + (res && res.message ? res.message : 'Unknown error.'), 'error');
+      }
+    }
+
+    function closeLicenseModal() {
+      const m = document.getElementById('licenseModal');
+      m.style.display = 'none';
+      m.classList.remove('active');
+      const input = document.getElementById('developerKeyInput');
+      if (input) input.value = '';
+    }
+
+    function submitDeveloperUnlock() {
+      const pass = document.getElementById('developerKeyInput').value.trim();
+      const btn = document.getElementById('unlockBtn');
+
+      if (!pass) {
+        showToast('Please enter the master developer password.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = 'Verifying...';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Unlock Full Access';
+
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            closeLicenseModal();
+            fetchLicenseDetails();
+            refreshData();
+          } else {
+            showToast(res && res.message ? res.message : 'Unlock failed.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = 'Unlock Full Access';
+          showToast('Verification failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+        })
+        .activateFullLicense(pass);
+    }
+
+    /* --- DELETE DIALOG LOGIC --- */
+    let currentDeleteId = null;
+
+    function openDeleteModal(studentId, fullName) {
+      currentDeleteId = studentId;
+      document.getElementById('deleteStudentName').innerText = fullName;
+      const modal = document.getElementById('deleteModal');
+      
+      const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+      confirmDeleteBtn.disabled = false;
+      confirmDeleteBtn.innerText = 'Delete';
+      
+      modal.classList.add('active');
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('deleteModal').classList.remove('active');
+      currentDeleteId = null;
+    }
+
+    // Set confirm delete button handler
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+      if (!currentDeleteId) return;
+      
+      const confirmDeleteBtn = this;
+      confirmDeleteBtn.disabled = true;
+      confirmDeleteBtn.innerText = 'Deleting...';
+
+      google.script.run
+        .withSuccessHandler(function(response) {
+          confirmDeleteBtn.disabled = false;
+          confirmDeleteBtn.innerText = 'Delete';
+          if (response && response.success) {
+            closeDeleteModal();
+            showToast('Student successfully deleted.', 'success');
+            refreshData();
+          } else {
+            showToast('Failed to delete student.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          confirmDeleteBtn.disabled = false;
+          confirmDeleteBtn.innerText = 'Delete';
+          showToast('Error: ' + err.message, 'error');
+        })
+        .deleteStudent(currentDeleteId);
+    };
+
+    /* --- IMPORT STUDENTS LOGIC --- */
+    let parsedImportData = [];
+
+    function downloadTemplate() {
+      const csvContent = 'First Name,Last Name,Email,Date of Birth,Gender,Class,Enrollment Date,Status\n' +
+                        'John,Doe,john.doe@email.com,2010-05-15,Male,Grade 5,2024-09-01,Active\n' +
+                        'Jane,Smith,jane.smith@email.com,2011-08-22,Female,Grade 4,2024-09-01,Active\n' +
+                        'Alex,Johnson,alex.johnson@email.com,2009-12-10,Other,Grade 6,2024-09-01,Inactive';
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'student_import_template.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToast('Template downloaded successfully', 'success');
+    }
+
+    function openImportModal() {
+      if (studentsList && currentLicenseInfo.limit && studentsList.length >= currentLicenseInfo.limit) {
+        showToast(`Student limit of ${currentLicenseInfo.limit} reached. Contact developer to increase limit.`, 'error');
+        showLicenseModal(currentLicenseInfo);
+        return;
+      }
+      const modal = document.getElementById('importModal');
+      document.getElementById('csvFileInput').value = '';
+      document.getElementById('importPreview').style.display = 'none';
+      document.getElementById('importProgress').style.display = 'none';
+      document.getElementById('importResults').style.display = 'none';
+      document.getElementById('importBtn').disabled = true;
+      parsedImportData = [];
+      modal.classList.add('active');
+    }
+
+    function closeImportModal() {
+      document.getElementById('importModal').classList.remove('active');
+    }
+
+    // Listen for file selection
+    document.getElementById('csvFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) {
+        document.getElementById('importPreview').style.display = 'none';
+        document.getElementById('importBtn').disabled = true;
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const csvText = event.target.result;
+          const rows = csvText.split('\n').map(row => row.trim()).filter(row => row);
+          
+          if (rows.length < 2) {
+            showToast('CSV file must contain at least a header row and one data row', 'error');
+            document.getElementById('importBtn').disabled = true;
+            return;
+          }
+
+          // Parse CSV (simple comma-split; doesn't handle quoted commas)
+          const headers = rows[0].split(',').map(h => h.trim());
+          const dataRows = rows.slice(1);
+          
+          // Validate headers
+          const expectedHeaders = ['First Name', 'Last Name', 'Email', 'Date of Birth', 'Gender', 'Class', 'Enrollment Date', 'Status'];
+          const headersMatch = expectedHeaders.every((h, i) => headers[i] && headers[i].toLowerCase() === h.toLowerCase());
+          
+          if (!headersMatch) {
+            showToast('CSV headers do not match expected format. Please check the format requirements.', 'error');
+            document.getElementById('importBtn').disabled = true;
+            return;
+          }
+
+          // Parse data rows
+          parsedImportData = dataRows.map((row, idx) => {
+            const cols = row.split(',').map(c => c.trim());
+            return {
+              rowNumber: idx + 2, // +2 because: +1 for 0-index, +1 for header row
+              firstName: cols[0] || '',
+              lastName: cols[1] || '',
+              email: cols[2] || '',
+              dob: cols[3] || '',
+              gender: cols[4] || '',
+              class: cols[5] || '',
+              enrollmentDate: cols[6] || '',
+              status: cols[7] || 'Active'
+            };
+          }).filter(d => d.firstName || d.lastName || d.email); // Filter out empty rows
+
+          if (parsedImportData.length === 0) {
+            showToast('No valid student data found in CSV', 'error');
+            document.getElementById('importBtn').disabled = true;
+            return;
+          }
+
+          // Show preview
+          displayImportPreview();
+          document.getElementById('importBtn').disabled = false;
+
+        } catch (err) {
+          console.error('CSV parse error:', err);
+          showToast('Error parsing CSV file: ' + err.message, 'error');
+          document.getElementById('importBtn').disabled = true;
+        }
+      };
+      
+      reader.onerror = function() {
+        showToast('Error reading file', 'error');
+        document.getElementById('importBtn').disabled = true;
+      };
+      
+      reader.readAsText(file);
+    });
+
+    function displayImportPreview() {
+      const previewBody = document.getElementById('previewTableBody');
+      const summary = document.getElementById('importSummary');
+      const previewDiv = document.getElementById('importPreview');
+      
+      previewBody.innerHTML = '';
+      
+      const preview = parsedImportData.slice(0, 5);
+      preview.forEach(student => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${student.firstName}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${student.lastName}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${student.email}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${student.dob}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${student.gender}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${student.class}</td>
+        `;
+        previewBody.appendChild(tr);
+      });
+      
+      summary.innerHTML = `<strong>${parsedImportData.length}</strong> student(s) ready to import`;
+      previewDiv.style.display = 'block';
+    }
+
+    function processImport() {
+      if (parsedImportData.length === 0) return;
+      
+      const importBtn = document.getElementById('importBtn');
+      importBtn.disabled = true;
+      importBtn.innerText = 'Importing...';
+      
+      document.getElementById('importProgress').style.display = 'block';
+      document.getElementById('importResults').style.display = 'none';
+      document.getElementById('progressBar').style.width = '0%';
+      document.getElementById('progressText').innerText = `0 / ${parsedImportData.length} students processed`;
+      
+      // Call backend to import students
+      google.script.run
+        .withSuccessHandler(function(result) {
+          importBtn.disabled = false;
+          importBtn.innerText = 'Import Students';
+          document.getElementById('importProgress').style.display = 'none';
+          
+          if (result && result.success) {
+            const resultsDiv = document.getElementById('importResults');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = `
+              <div style="padding: 16px; background: #dcfce7; border: 1px solid #86efac; border-radius: 8px;">
+                <p style="font-size: 14px; color: #166534; margin-bottom: 8px;"><strong>✅ Import Completed!</strong></p>
+                <p style="font-size: 13px; color: #15803d;">
+                  Successfully imported: <strong>${result.imported}</strong><br>
+                  ${result.failed > 0 ? `Failed: <strong>${result.failed}</strong><br>` : ''}
+                  ${result.duplicates > 0 ? `Skipped (duplicates): <strong>${result.duplicates}</strong>` : ''}
+                </p>
+                ${result.errors && result.errors.length > 0 ? `
+                  <details style="margin-top: 8px;">
+                    <summary style="cursor: pointer; font-size: 12px; color: #15803d;">View log details</summary>
+                    <ul style="margin-top: 8px; font-size: 11px; color: #166534; list-style: inside;">
+                      ${result.errors.slice(0, 10).map(e => `<li>${e}</li>`).join('')}
+                      ${result.errors.length > 10 ? `<li>...and ${result.errors.length - 10} more</li>` : ''}
+                    </ul>
+                  </details>
+                ` : ''}
+              </div>
+            `;
+            
+            showToast(`Import completed: ${result.imported} student(s) imported.`, 'success');
+            refreshData();
+            
+            if (result.licenseLimitReached) {
+              setTimeout(() => {
+                showLicenseModal(result);
+              }, 1200);
+            } else if (result.failed === 0 && result.duplicates === 0) {
+              setTimeout(() => closeImportModal(), 3000);
+            }
+          } else if (result && result.licenseLimitReached) {
+            showToast(result.message || 'Student limit reached.', 'error');
+            showLicenseModal(result);
+          } else {
+            const resultsDiv = document.getElementById('importResults');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = `
+              <div style="padding: 16px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px;">
+                <p style="font-size: 14px; color: #991b1b;"><strong>❌ Import Failed</strong></p>
+                <p style="font-size: 13px; color: #dc2626; margin-top: 4px;">${(result && result.message) ? result.message : 'An error occurred during import'}</p>
+              </div>
+            `;
+            showToast('Import failed: ' + ((result && result.message) ? result.message : 'Unknown error'), 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          importBtn.disabled = false;
+          importBtn.innerText = 'Import Students';
+          document.getElementById('importProgress').style.display = 'none';
+          
+          const resultsDiv = document.getElementById('importResults');
+          resultsDiv.style.display = 'block';
+          resultsDiv.innerHTML = `
+            <div style="padding: 16px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 8px;">
+              <p style="font-size: 14px; color: #991b1b;"><strong>❌ Import Failed</strong></p>
+              <p style="font-size: 13px; color: #dc2626; margin-top: 4px;">${err.message || 'Unknown error occurred'}</p>
+            </div>
+          `;
+          showToast('Import error: ' + (err.message || 'Unknown error'), 'error');
+        })
+        .importStudents(parsedImportData);
+    }
+
+  </script>
+</body>
+</html>

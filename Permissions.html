@@ -1,0 +1,461 @@
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body { background-color: #f4f7fc; padding: 30px; min-height: 100vh; overflow-x: hidden; color: #0f172a; }
+
+    /* --- PAGE HEADER --- */
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+    .page-title { font-size: 22px; color: #0f172a; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .page-subtitle { font-size: 14px; color: #64748b; font-weight: 400; margin-top: 5px; }
+
+    /* --- CARD/CONTAINER --- */
+    .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden; padding: 20px; margin-bottom: 25px; }
+
+    /* --- PERMISSION GRID (For Permissions View) --- */
+    .permission-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr 3fr;
+      gap: 20px;
+      padding: 16px 0;
+      border-bottom: 1px solid #f1f5f9;
+      align-items: center;
+    }
+    .permission-grid:last-child { border-bottom: none; }
+    .permission-grid.header { border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+
+    /* --- HEADERS --- */
+    .header-title { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #475569; letter-spacing: 0.5px; }
+
+    /* --- DATA STYLES --- */
+    .role-name { font-weight: 600; color: #0f172a; font-size: 15px; }
+    .access-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background: #f1f5f9; color: #475569; }
+    
+    .access-full { background: #dcfce7; color: #166534; }
+    .access-financial { background: #fef3c7; color: #b45309; }
+    .access-readonly { background: #e0f2fe; color: #0369a1; }
+    .access-restricted { background: #fce7f3; color: #9d174d; }
+    .access-class { background: #e0e7ff; color: #3730a3; }
+    .access-general { background: #f1f5f9; color: #475569; }
+
+    .actions-text { font-size: 14px; color: #334155; line-height: 1.5; }
+
+    /* --- LOADING --- */
+    .loading { text-align: center; padding: 40px; color: #64748b; font-size: 14px; }
+
+    /* --- ADD BUTTON --- */
+    .add-btn {
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 20px;
+    }
+    .add-btn:hover { background-color: #2563eb; transform: translateY(-2px); }
+
+    /* --- ACTION BUTTONS --- */
+    .action-buttons { display: flex; gap: 8px; margin-top: 10px; }
+    .edit-btn, .delete-btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .edit-btn { background-color: #f59e0b; color: white; }
+    .edit-btn:hover { background-color: #d97706; }
+    .delete-btn { background-color: #ef4444; color: white; }
+    .delete-btn:hover { background-color: #dc2626; }
+
+    /* --- MODAL STYLES (FIXED FOR HEADER & FOOTER VISIBILITY) --- */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal.active { display: flex; }
+    
+    .modal-content {
+      background-color: #fefefe;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 600px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .modal-header {
+      padding: 18px 24px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 18px;
+      font-weight: 600;
+      color: #0f172a;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0; /* Impide que la cabecera se comprima */
+    }
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex-grow: 1; /* Permite que el cuerpo tome el espacio restante y scrollee si es necesario */
+      min-height: 50px;
+    }
+    .modal-footer {
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      flex-shrink: 0; /* Impide que el pie de página se comprima u oculte */
+    }
+
+    .close-modal {
+      font-size: 24px;
+      font-weight: bold;
+      color: #64748b;
+      cursor: pointer;
+      line-height: 1;
+      background: none;
+      border: none;
+    }
+    .close-modal:hover { color: #0f172a; }
+    .modal-icon { display: inline-flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 18px; }
+
+    /* --- FORM STYLES --- */
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; font-weight: 500; color: #0f172a; font-size: 14px; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      background: #fff;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+
+    /* --- BUTTONS --- */
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary { background-color: #3b82f6; color: white; }
+    .btn-primary:hover { background-color: #2563eb; }
+    .btn-secondary { background-color: #e2e8f0; color: #0f172a; }
+    .btn-secondary:hover { background-color: #cbd5e1; }
+    .btn-danger { background-color: #ef4444; color: white; }
+    .btn-danger:hover { background-color: #dc2626; }
+
+    /* --- RESPONSIVE --- */
+    @media (max-width: 900px) {
+      body { padding: 15px; }
+      .permission-grid { grid-template-columns: 1fr; gap: 5px; border-bottom: 1px solid #e2e8f0; padding: 16px 0; }
+      .permission-grid.header { display: none; }
+      .role-name { font-size: 16px; display: block; margin-bottom: 4px; }
+      .access-badge { font-size: 12px; margin-bottom: 6px; display: inline-block; }
+      .actions-text { font-size: 13px; color: #64748b; }
+    }
+
+    /* --- DARK MODE --- */
+    body.dark-mode { background-color: #0f172a; color: #f1f5f9; }
+    body.dark-mode .page-title { color: #f1f5f9; }
+    body.dark-mode .page-subtitle { color: #94a3b8; }
+    body.dark-mode .card { background: #1e293b; border-color: #334155; }
+    body.dark-mode .permission-grid { border-bottom-color: #334155; }
+    body.dark-mode .permission-grid.header { border-bottom-color: #334155; }
+    body.dark-mode .header-title { color: #94a3b8; }
+    body.dark-mode .role-name { color: #f1f5f9; }
+    body.dark-mode .actions-text { color: #cbd5e1; }
+    body.dark-mode .loading { color: #94a3b8; }
+    body.dark-mode .modal-content { background: #1e293b; border: 1px solid #334155; }
+    body.dark-mode .modal-header, body.dark-mode .modal-footer { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+    body.dark-mode .close-modal { color: #94a3b8; }
+    body.dark-mode .close-modal:hover { color: #f1f5f9; }
+    body.dark-mode .form-group label { color: #f1f5f9; }
+    body.dark-mode .form-group input, body.dark-mode .form-group textarea, body.dark-mode .form-group select { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+    body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
+    body.dark-mode .btn-secondary:hover { background: #475569; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <div class="page-title">🛡️ System Permissions</div>
+      <div class="page-subtitle">Manage system access roles and permitted actions.</div>
+    </div>
+  </div>
+
+  <button class="add-btn" onclick="openAddModal()">+ Add New Permission</button>
+  <div class="card">
+    <div id="loading" class="loading">Loading permissions data...</div>
+    <div class="permission-grid header">
+      <div class="header-title">Role</div>
+      <div class="header-title">Access Level</div>
+      <div class="header-title">Permitted Actions</div>
+    </div>
+    <div id="permissionsContainer"></div>
+  </div>
+
+  <!-- MODAL FOR ADD/EDIT PERMISSION -->
+  <div id="permissionModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="modalTitle">Add New Permission</span>
+        <button class="close-modal" onclick="closeModal()">&times;</button>
+      </div>
+      
+      <form id="permissionForm" onsubmit="savePermission(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="roleInput">Role Name *</label>
+            <input type="text" id="roleInput" required>
+          </div>
+
+          <div class="form-group">
+            <label for="accessLevelInput">Access Level *</label>
+            <input type="text" id="accessLevelInput" placeholder="e.g., Full Access, Read Only" required>
+          </div>
+
+          <div class="form-group">
+            <label for="actionsInput">Permitted Actions *</label>
+            <textarea id="actionsInput" required></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveBtn">Save Permission</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CONFIRMATION MODAL -->
+  <div id="confirmModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center;">
+          <span class="modal-icon">⚠️</span>
+          <span id="confirmModalTitle">Confirm</span>
+        </div>
+        <button class="close-modal" onclick="closeConfirmModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="confirmModalMessage"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmModalButton">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentEditingRole = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadPermissions();
+    });
+
+    // Close modals when clicking outside
+    window.onclick = function(event) {
+      const pModal = document.getElementById('permissionModal');
+      const cModal = document.getElementById('confirmModal');
+      if (event.target == pModal) closeModal();
+      if (event.target == cModal) closeConfirmModal();
+    };
+
+    function loadPermissions() {
+      document.getElementById('loading').style.display = 'block';
+      
+      google.script.run
+        .withSuccessHandler(function(permissions) {
+          const container = document.getElementById('permissionsContainer');
+          const loading = document.getElementById('loading');
+          
+          if(loading) loading.style.display = 'none';
+          container.innerHTML = '';
+
+          if(!permissions || permissions.length === 0) {
+            container.innerHTML = `<div style="padding: 40px; text-align: center; color: #64748b;">No permission roles defined. Click "Add New Permission" to create one.</div>`;
+            return;
+          }
+
+          permissions.forEach(row => {
+            const div = document.createElement('div');
+            div.className = 'permission-grid';
+
+            let accessClass = 'access-general';
+            if(row.accessLevel.includes('Full')) accessClass = 'access-full';
+            else if(row.accessLevel.includes('Financial')) accessClass = 'access-financial';
+            else if(row.accessLevel.includes('Read Only')) accessClass = 'access-readonly';
+            else if(row.accessLevel.includes('Restricted')) accessClass = 'access-restricted';
+            else if(row.accessLevel.includes('Class Management')) accessClass = 'access-class';
+
+            div.innerHTML = `
+              <div class="role-name">${row.role}</div>
+              <div><span class="access-badge ${accessClass}">${row.accessLevel}</span></div>
+              <div>
+                <div class="actions-text">${row.actions}</div>
+                <div class="action-buttons">
+                  <button class="edit-btn" onclick="openEditModal('${row.role}', '${row.accessLevel}', '${row.actions.replace(/'/g, "\\'")}')">Edit</button>
+                  <button class="delete-btn" onclick="deletePermission('${row.role}')">Delete</button>
+                </div>
+              </div>
+            `;
+            container.appendChild(div);
+          });
+        })
+        .withFailureHandler(function(error) {
+          const container = document.getElementById('permissionsContainer');
+          const loading = document.getElementById('loading');
+          if(loading) loading.style.display = 'none';
+          container.innerHTML = `<div style="padding: 40px; text-align: center; color: #dc2626;">Error loading permissions: ${error}</div>`;
+          console.error('Error:', error);
+        })
+        .getPermissionsData();
+    }
+
+    function openAddModal() {
+      currentEditingRole = null;
+      document.getElementById('modalTitle').innerText = 'Add New Permission';
+      document.getElementById('permissionForm').reset();
+      document.getElementById('roleInput').disabled = false;
+      document.getElementById('saveBtn').innerText = 'Save Permission';
+      document.getElementById('permissionModal').classList.add('active');
+    }
+
+    function openEditModal(role, accessLevel, actions) {
+      currentEditingRole = role;
+      document.getElementById('modalTitle').innerText = 'Edit Permission';
+      document.getElementById('roleInput').value = role;
+      document.getElementById('roleInput').disabled = true;
+      document.getElementById('accessLevelInput').value = accessLevel;
+      document.getElementById('actionsInput').value = actions;
+      document.getElementById('saveBtn').innerText = 'Update Permission';
+      document.getElementById('permissionModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('permissionModal').classList.remove('active');
+      document.getElementById('permissionForm').reset();
+      currentEditingRole = null;
+    }
+
+    function openConfirmModal(options) {
+      const modal = document.getElementById('confirmModal');
+      if (!modal) return;
+      document.getElementById('confirmModalTitle').textContent = options.title || 'Confirm';
+      document.getElementById('confirmModalMessage').textContent = options.message || '';
+      const button = document.getElementById('confirmModalButton');
+      button.textContent = options.confirmText || 'Confirm';
+      button.className = 'btn ' + (options.confirmClass || 'btn-primary');
+      button.onclick = function() {
+        closeConfirmModal();
+        if (typeof options.onConfirm === 'function') options.onConfirm();
+      };
+      modal.classList.add('active');
+    }
+
+    function closeConfirmModal() {
+      const modal = document.getElementById('confirmModal');
+      if (!modal) return;
+      modal.classList.remove('active');
+      const button = document.getElementById('confirmModalButton');
+      if (button) button.onclick = null;
+    }
+
+    function savePermission(event) {
+      event.preventDefault();
+      
+      const role = document.getElementById('roleInput').value;
+      const accessLevel = document.getElementById('accessLevelInput').value;
+      const actions = document.getElementById('actionsInput').value;
+
+      if(!role || !accessLevel || !actions) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      if(currentEditingRole) {
+        google.script.run
+          .withSuccessHandler(function() {
+            closeModal();
+            loadPermissions();
+            console.log('Permission updated successfully!');
+          })
+          .withFailureHandler(function(error) {
+            alert('Error updating permission: ' + error);
+          })
+          .updatePermission(currentEditingRole, accessLevel, actions);
+      } else {
+        google.script.run
+          .withSuccessHandler(function() {
+            closeModal();
+            loadPermissions();
+            console.log('Permission created successfully!');
+          })
+          .withFailureHandler(function(error) {
+            alert('Error creating permission: ' + error);
+          })
+          .addPermission(role, accessLevel, actions);
+      }
+    }
+
+    function deletePermission(role) {
+      openConfirmModal({
+        title: 'Delete Permission',
+        message: 'Are you sure you want to delete the "' + role + '" permission?',
+        confirmText: 'Delete',
+        confirmClass: 'btn-danger',
+        onConfirm: function() {
+          google.script.run
+            .withSuccessHandler(function() {
+              loadPermissions();
+              console.log('Permission deleted successfully!');
+            })
+            .withFailureHandler(function(error) {
+              alert('Error deleting permission: ' + error);
+            })
+            .deletePermission(role);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

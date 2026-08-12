@@ -1,0 +1,1931 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    // Define critical functions early to prevent ReferenceError
+    window.toggleDarkMode = function() {
+      try {
+        const body = document.body;
+        body.classList.toggle('dark-mode');
+        const icon = document.getElementById('darkModeIcon');
+        const text = document.getElementById('darkModeText');
+        if (icon) icon.textContent = body.classList.contains('dark-mode') ? '☀️' : '🌙';
+        if (text) text.textContent = body.classList.contains('dark-mode') ? 'Light' : 'Dark';
+        try { 
+          localStorage.setItem('darkMode', body.classList.contains('dark-mode') ? 'enabled' : 'disabled'); 
+        } catch (e) {}
+        
+        // Apply dark mode to iframe if it exists
+        const iframe = document.getElementById('studentIframe');
+        if (iframe && iframe.contentWindow) {
+          try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            if (iframeDoc && iframeDoc.body) {
+              const darkModeEnabled = body.classList.contains('dark-mode');
+              if (darkModeEnabled) {
+                iframeDoc.body.classList.add('dark-mode');
+              } else {
+                iframeDoc.body.classList.remove('dark-mode');
+              }
+            }
+          } catch (e) {
+            console.warn('Could not apply dark mode to iframe:', e);
+          }
+        }
+      } catch (e) {
+        console.warn('toggleDarkMode error', e);
+      }
+    };
+    
+    window.toggleSidebar = function() {
+      const sidebar = document.getElementById('sidebarMenuContainer');
+      const overlay = document.getElementById('sidebarOverlay');
+      if (!sidebar || !overlay) return;
+      
+      if (window.innerWidth <= 1024) {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+      } else {
+        sidebar.classList.toggle('collapsed');
+        overlay.classList.remove('active');
+      }
+    };
+  </script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      background-color: #f4f7fc;
+      overflow: hidden;
+    }
+
+    /* --- SIDEBAR STYLES --- */
+    .sidebar {
+      width: 260px;
+      background: #ffffff;
+      height: 100%;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #e2e8f0;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.02);
+      flex-shrink: 0;
+      transition: transform 0.3s ease, width 0.3s ease;
+      z-index: 1000;
+      position: relative;
+    }
+
+    .logo-area {
+      margin-bottom: 15px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .logo-area h2 {
+      font-size: 18px;
+      color: #1e293b;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-menu {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex-grow: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .nav-menu::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .nav-menu::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .nav-menu::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+
+    .nav-menu::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    .nav-item {
+      padding: 8px 10px;
+      border-radius: 8px;
+      color: #64748b;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .nav-item:hover {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .nav-item.active {
+      background-color: #3b82f6; /* Modern Blue */
+      color: white;
+      box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+      position: relative;
+    }
+
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 10px;
+      bottom: 10px;
+      width: 4px;
+      border-radius: 0 4px 4px 0;
+      background: #2563eb;
+    }
+
+    .nav-icon {
+      font-size: 18px;
+      width: 24px;
+      text-align: center;
+    }
+
+    /* --- SIDEBAR FOOTER STYLES --- */
+    .sidebar-footer {
+      border-top: 1px solid #f1f5f9;
+      padding-top: 10px;
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .logout-btn {
+      width: 100%;
+      padding: 10px;
+      background-color: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .logout-btn:hover {
+      background-color: #dc2626;
+      box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .logout-btn:active {
+      transform: translateY(0);
+    }
+
+    .logout-icon {
+      font-size: 16px;
+    }
+
+    /* --- HAMBURGER OVERLAY --- */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.4);
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .sidebar-overlay.active {
+      opacity: 1;
+    }
+
+    .page-loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.85);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .page-loading-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .page-loading-card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px 30px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 260px;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 4px solid #e2e8f0;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .page-loading-text {
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    /* --- MAIN CONTENT STYLES --- */
+    .main-content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 0 40px 40px 40px;
+      min-width: 0; /* Prevents flex overflow */
+    }
+
+    /* --- TOP NAVBAR STYLES --- */
+    .top-nav {
+      padding: 20px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      border-bottom: 1px solid #e2e8f0;
+      position: sticky;
+      top: 0;
+      background-color: #f4f7fc;
+      z-index: 10;
+    }
+
+    .top-nav-left {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    /* --- HAMBURGER MENU BUTTON --- */
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #1e293b;
+      cursor: pointer;
+      padding: 5px;
+      transition: color 0.2s;
+    }
+    .menu-toggle:hover {
+      color: #3b82f6;
+    }
+
+    /* --- DARK MODE TOGGLE --- */
+    .dark-mode-toggle {
+      background: white;
+      border: 1px solid #e2e8f0;
+      padding: 8px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      color: #64748b;
+      transition: all 0.2s;
+    }
+    .dark-mode-toggle:hover {
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+    .dark-mode-icon {
+      font-size: 18px;
+    }
+
+    /* --- DARK MODE STYLES --- */
+    body.dark-mode {
+      background-color: #0f172a;
+    }
+    body.dark-mode .sidebar {
+      background: #1e293b;
+      border-right-color: #334155;
+    }
+    body.dark-mode .logo-area {
+      border-bottom-color: #334155;
+    }
+    body.dark-mode .logo-area h2 {
+      color: #f1f5f9;
+    }
+    body.dark-mode .nav-item {
+      color: #94a3b8;
+    }
+    body.dark-mode .nav-item:hover {
+      background-color: #334155;
+      color: #f1f5f9;
+    }
+    body.dark-mode .nav-item.active {
+      background-color: #3b82f6;
+      color: white;
+    }
+    body.dark-mode .sidebar-footer {
+      border-top-color: #334155;
+    }
+    body.dark-mode .main-content {
+      background-color: #0f172a;
+    }
+    body.dark-mode .top-nav {
+      background-color: #0f172a;
+      border-bottom-color: #334155;
+    }
+    body.dark-mode .page-title {
+      color: #f1f5f9;
+    }
+    body.dark-mode .search-bar {
+      background: #1e293b;
+      border-color: #334155;
+      color: #94a3b8;
+    }
+    body.dark-mode .search-bar:hover {
+      border-color: #3b82f6;
+    }
+    body.dark-mode .search-bar input {
+      color: #f1f5f9;
+    }
+    body.dark-mode .user-profile {
+      background: #1e293b;
+      border-color: #334155;
+    }
+    body.dark-mode .user-profile span {
+      color: #f1f5f9;
+    }
+    body.dark-mode .stat-card {
+      background: #1e293b;
+      border-color: #334155;
+    }
+    body.dark-mode .stat-label {
+      color: #94a3b8;
+    }
+    body.dark-mode .stat-value {
+      color: #f1f5f9;
+    }
+    body.dark-mode .chart-card {
+      background: #1e293b;
+      border-color: #334155;
+    }
+    body.dark-mode .chart-card h3 {
+      color: #f1f5f9;
+    }
+    body.dark-mode .insight-item {
+      background: #0f172a;
+      border-color: #334155;
+    }
+    body.dark-mode .insight-item span {
+      color: #94a3b8;
+    }
+    body.dark-mode .insight-item strong {
+      color: #f1f5f9;
+    }
+    body.dark-mode .dark-mode-toggle {
+      background: #1e293b;
+      border-color: #334155;
+      color: #94a3b8;
+    }
+    body.dark-mode .dark-mode-toggle:hover {
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+    body.dark-mode .menu-toggle {
+      color: #f1f5f9;
+    }
+    body.dark-mode .menu-toggle:hover {
+      color: #3b82f6;
+    }
+    body.dark-mode .page-loading-overlay {
+      background: rgba(15, 23, 42, 0.85);
+    }
+    body.dark-mode .page-loading-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+    body.dark-mode .page-loading-text {
+      color: #f1f5f9;
+    }
+    body.dark-mode .spinner {
+      border-color: #334155;
+      border-top-color: #3b82f6;
+    }
+
+    .page-title {
+      font-size: 24px;
+      color: #0f172a;
+      font-weight: 600;
+    }
+
+    .top-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    /* --- LICENSE BADGE --- */
+    .license-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 13px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      border: 1.5px solid;
+      white-space: nowrap;
+      transition: opacity 0.3s;
+      text-transform: uppercase;
+    }
+    .license-badge.plan-copper  { background:#fffbeb; border-color:#d97706; color:#92400e; }
+    .license-badge.plan-silver  { background:#f8fafc; border-color:#94a3b8; color:#334155; }
+    .license-badge.plan-diamond { background:#eef2ff; border-color:#6366f1; color:#3730a3; }
+    .license-badge.plan-gold    { background:#fefce8; border-color:#eab308; color:#713f12; }
+    .license-badge.plan-demo    { background:#fff1f2; border-color:#f43f5e; color:#be123c; }
+    body.dark-mode .license-badge.plan-copper  { background:#292019; border-color:#d97706; color:#fcd34d; }
+    body.dark-mode .license-badge.plan-silver  { background:#1e293b; border-color:#94a3b8; color:#cbd5e1; }
+    body.dark-mode .license-badge.plan-diamond { background:#1e1b4b; border-color:#818cf8; color:#a5b4fc; }
+    body.dark-mode .license-badge.plan-gold    { background:#292107; border-color:#eab308; color:#fde68a; }
+    body.dark-mode .license-badge.plan-demo    { background:#2a0d10; border-color:#f43f5e; color:#fda4af; }
+
+    /* --- DASHBOARD FILTER BAR STYLES --- */
+    .dashboard-filter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      padding: 14px 20px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      border: 1px solid #e2e8f0;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .filter-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .filter-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .filter-controls select {
+      min-width: 160px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 13px;
+      color: #0f172a;
+      background: #ffffff;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .filter-controls select:focus {
+      border-color: #3b82f6;
+    }
+    body.dark-mode .dashboard-filter-bar {
+      background: #1e293b;
+      border-color: #334155;
+    }
+    body.dark-mode .filter-title {
+      color: #f1f5f9;
+    }
+    body.dark-mode .filter-controls select {
+      background: #0f172a;
+      border-color: #334155;
+      color: #f1f5f9;
+    }
+
+    .search-bar {
+      background: white;
+      border: 1px solid #e2e8f0;
+      padding: 8px 16px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #64748b;
+      font-size: 14px;
+      transition: 0.2s;
+    }
+
+    .search-bar:hover {
+      border-color: #3b82f6;
+    }
+
+    .search-bar input {
+      border: none;
+      outline: none;
+      background: transparent;
+      width: 100px;
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: white;
+      padding: 6px 12px 6px 6px;
+      border-radius: 30px;
+      border: 1px solid #e2e8f0;
+      cursor: pointer;
+    }
+
+    .user-profile span {
+      color: #0f172a;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      background: #3b82f6;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    /* --- DASHBOARD CARDS --- */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 18px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
+      min-height: 110px;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 12px -3px rgba(0, 0, 0, 0.08);
+    }
+
+    .stat-label {
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .card-icon {
+      font-size: 18px;
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+
+    .dashboard-charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+
+    .chart-card {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .chart-card h3 {
+      margin-bottom: 16px;
+      color: #0f172a;
+      font-size: 16px;
+    }
+
+    .chart-card canvas {
+      width: 100% !important;
+      max-height: 320px;
+      min-height: 260px;
+      display: block;
+    }
+
+    .insight-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .insight-item {
+      background: #f8fafc;
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .insight-item span {
+      display: block;
+      color: #475569;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .insight-item strong {
+      display: block;
+      font-size: 18px;
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    /* --- RESPONSIVE BREAKPOINTS --- */
+    @media (max-width: 1024px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100%;
+        transform: translateX(-100%); /* Hidden by default */
+        box-shadow: 4px 0 12px rgba(0,0,0,0.1);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .sidebar-overlay {
+        display: none;
+        /* Keep the overlay out of the interaction flow until the menu is open */
+        pointer-events: none;
+      }
+      .sidebar-overlay.active {
+        display: block;
+        pointer-events: auto;
+      }
+      .search-bar input {
+        width: 80px;
+      }
+    }
+
+    /* Show hamburger on all screen sizes */
+    .menu-toggle {
+      display: block;
+    }
+
+    /* On larger screens, also keep sidebar visible by default */
+    @media (min-width: 1025px) {
+      .sidebar {
+        position: relative;
+        transform: translateX(0);
+      }
+      /* Allow toggling on large screens too */
+      .sidebar.collapsed {
+        width: 80px;
+        min-width: 80px;
+        overflow: hidden;
+      }
+    }
+
+    .sidebar.collapsed {
+      width: 80px;
+      min-width: 80px;
+      overflow: hidden;
+    }
+
+    .sidebar.collapsed .logo-area h2,
+    .sidebar.collapsed .nav-item,
+    .sidebar.collapsed .sidebar-footer {
+      justify-content: center;
+    }
+
+    .sidebar.collapsed .nav-item {
+      padding-left: 10px;
+      padding-right: 10px;
+      gap: 0;
+    }
+
+    .sidebar.collapsed .nav-text,
+    .sidebar.collapsed .logo-text,
+    .sidebar.collapsed .logout-btn span:not(.logout-icon) {
+      display: none;
+    }
+
+    .sidebar.collapsed .nav-icon {
+      margin-right: 0;
+    }
+
+    @media (max-width: 768px) {
+      .main-content {
+        padding: 0 20px 20px 20px;
+      }
+      .top-nav-actions .search-bar {
+        display: none; /* Hide search on very small screens */
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* --- Logout Modal Styles --- */
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.4); display: flex; align-items: center; justify-content: center; z-index: 3000; opacity: 0; pointer-events: none; transition: opacity 0.18s ease; }
+    .modal-backdrop.active { opacity: 1; pointer-events: auto; }
+    .modal-content { background: #fff; width: 92%; max-width: 420px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); overflow: hidden; transform: translateY(-6px); transition: transform 0.18s ease; }
+    .modal-backdrop.active .modal-content { transform: translateY(0); }
+    .modal-header { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; }
+    .modal-header h3 { margin:0; font-size:16px; color:#0f172a; }
+    .modal-close { background:none; border:none; font-size:20px; cursor:pointer; color:#94a3b8; }
+    .modal-body { padding: 16px 18px; color:#475569; font-size:14px; }
+    .modal-footer { padding: 12px 18px; border-top: 1px solid #f1f5f9; display:flex; justify-content:flex-end; gap:8px; background:#fff; }
+    .logout-confirm-btn { padding:8px 12px; border-radius:8px; background:#ef4444; color:#fff; border:none; cursor:pointer; }
+    .logout-cancel-btn { padding:8px 12px; border-radius:8px; background:#fff; border:1px solid #e2e8f0; color:#111827; cursor:pointer; }
+    .modal-icon { display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:18px; }
+
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR OVERLAY -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+  <!-- PAGE LOADING OVERLAY -->
+  <div class="page-loading-overlay" id="pageLoadingOverlay">
+    <div class="page-loading-card">
+      <div class="spinner"></div>
+      <div class="page-loading-text">Loading dashboard…</div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebarMenuContainer">
+    <div class="logo-area">
+      <h2><span class="nav-icon"><i class="fas fa-chart-pie"></i></span><span class="logo-text">SMS</span></h2>
+    </div>
+    <ul class="nav-menu" id="sidebarMenu">
+      <!-- Sidebar items will be generated here by JS -->
+    </ul>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="handleLogout()">
+        <span class="logout-icon"><i class="fas fa-sign-out-alt"></i></span>
+        <span>Logout</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Logout Confirmation Modal -->
+  <div class="modal-backdrop" id="logoutModal">
+    <div class="modal-content">
+      <div class="modal-header" id="logoutModalHeader">
+        <h3><span class="modal-icon">🔒</span>Confirm Logout</h3>
+        <button class="modal-close" onclick="closeLogoutModal()">&times;</button>
+      </div>
+      <div class="modal-body">Are you sure you want to logout?</div>
+      <div class="modal-footer">
+        <button class="logout-cancel-btn" onclick="closeLogoutModal()">Cancel</button>
+        <button id="logoutConfirmBtn" class="logout-confirm-btn">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <!-- TOP NAV -->
+    <nav class="top-nav">
+      <div class="top-nav-left">
+        <!-- HAMBURGER BUTTON -->
+        <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+        <div class="page-title">Dashboard</div>
+      </div>
+      <div class="top-nav-actions">
+        <button class="dark-mode-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode">
+          <span class="dark-mode-icon" id="darkModeIcon">🌙</span>
+          <span id="darkModeText">Dark</span>
+        </button>
+        <!-- LICENSE PLAN BADGE -->
+        <span class="license-badge plan-demo" id="licenseBadge" title="Current license plan" style="opacity:0;">⏳ Loading</span>
+        <div class="search-bar">
+          <span>🔍</span>
+          <input id="globalSearchInput" list="searchSuggestions" type="text" placeholder="Search..." autocomplete="off">
+          <datalist id="searchSuggestions"></datalist>
+        </div>
+        <div class="user-profile" id="userProfile">
+          <div class="user-avatar" id="userAvatar">U</div>
+          <span style="font-size: 14px; font-weight: 500;" id="userFullName">Loading...</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- DASHBOARD VIEW -->
+    <div id="dashboardView">
+      <!-- DASHBOARD FILTERS TOOLBAR -->
+      <div class="dashboard-filter-bar" id="dashboardFilterBar">
+        <div class="filter-title">
+          <span>📊</span>
+          <span>Filter Dashboard Data</span>
+        </div>
+        <div class="filter-controls">
+          <select id="dashYearFilter" class="form-select" onchange="loadDashboardStatsWithFilters()">
+            <option value="">All Academic Years</option>
+          </select>
+          <select id="dashTermFilter" class="form-select" onchange="loadDashboardStatsWithFilters()">
+            <option value="">All Terms</option>
+            <option value="Term 1">Term 1</option>
+            <option value="Term 2">Term 2</option>
+            <option value="Term 3">Term 3</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- DASHBOARD STATS -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="card-icon">🎓</div>
+          <div class="stat-label">Total Students</div>
+          <div class="stat-value" id="statStudents">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="card-icon">📚</div>
+          <div class="stat-label">Active Courses</div>
+          <div class="stat-value" id="statCourses">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="card-icon">📈</div>
+          <div class="stat-label">Average Attendance</div>
+          <div class="stat-value" id="statAttendance">0%</div>
+        </div>
+        <div class="stat-card">
+          <div class="card-icon">💰</div>
+          <div class="stat-label">Total Invoices</div>
+          <div class="stat-value" id="statInvoices">0</div>
+        </div>
+      </div>
+
+      <div class="dashboard-charts">
+        <div class="chart-card">
+          <h3>💰 Billing Snapshot</h3>
+          <canvas id="billingChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>📅 Attendance Trend</h3>
+          <canvas id="attendanceChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>🏫 Students by Class</h3>
+          <canvas id="classChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>✨ Quick Insights</h3>
+          <div class="insight-list">
+            <div class="insight-item">
+              <span>Invoices</span>
+              <strong id="insightInvoices">0</strong>
+            </div>
+            <div class="insight-item">
+              <span>Total Billed</span>
+              <strong id="insightTotalBilled">GHS 0.00</strong>
+            </div>
+            <div class="insight-item">
+              <span>Paid / Unpaid</span>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <strong id="insightPaid" style="color:#10b981; font-size:16px;">0% paid</strong>
+                <strong id="insightUnpaid" style="color:#ef4444; font-size:16px;">0% unpaid</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGES VIEW (srcdoc-based, no session re-check) -->
+    <div id="studentsView" style="display: none; flex-grow: 1; height: calc(100vh - 120px); position: relative;">
+      <!-- Page loading spinner shown while fetching HTML -->
+      <div id="pageContentLoading" style="display:none; position:absolute; inset:0; background:rgba(244,247,252,0.9); z-index:10; align-items:center; justify-content:center; flex-direction:column; gap:12px;">
+        <div class="spinner"></div>
+        <div style="color:#64748b; font-size:14px; font-weight:500;">Loading page…</div>
+      </div>
+      <iframe id="studentIframe" style="width: 100%; height: 100%; border: none; border-radius: 8px;"></iframe>
+    </div>
+
+  </div>
+
+  <script>
+    // Get script URL - with fallback to current location
+    let SCRIPT_URL = '<?= scriptUrl ?>';
+    if (!SCRIPT_URL || SCRIPT_URL === '' || SCRIPT_URL.includes('\x3c?=')) {
+      // Fallback: use current URL without query params
+      SCRIPT_URL = window.location.origin + window.location.pathname;
+      console.warn('scriptUrl template variable not set, using fallback:', SCRIPT_URL);
+    }
+    // Dynamic dev/exec switcher based on the actual hosting environment
+    if (window.location.href.includes('/dev') && SCRIPT_URL.includes('/exec')) {
+      SCRIPT_URL = SCRIPT_URL.replace('/exec', '/dev');
+    } else if (window.location.href.includes('/exec') && SCRIPT_URL.includes('/dev')) {
+      SCRIPT_URL = SCRIPT_URL.replace('/dev', '/exec');
+    }
+    console.log('SCRIPT_URL:', SCRIPT_URL);
+
+    // Initialize the dashboard after DOM and Google Apps Script API are ready
+    function initializeDashboard() {
+      // --- LOAD USER PROFILE ---
+      google.script.run
+        .withSuccessHandler(function(user) {
+          if (user) {
+            document.getElementById('userAvatar').textContent = user.initials;
+            document.getElementById('userFullName').textContent = user.fullName;
+          }
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('userFullName').textContent = 'User';
+        })
+        .getLoggedInUser();
+
+      // --- LOGOUT HANDLER ---
+      window.handleLogout = function() { openLogoutModal(); };
+
+      function openLogoutModal() {
+        const m = document.getElementById('logoutModal');
+        if (m) m.classList.add('active');
+      }
+      function closeLogoutModal() {
+        const m = document.getElementById('logoutModal');
+        if (m) m.classList.remove('active');
+      }
+
+      // Wire the modal confirm button to perform the logout
+      (function setupLogoutConfirm() {
+        const btn = document.getElementById('logoutConfirmBtn');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+          btn.disabled = true; btn.innerText = 'Logging out...';
+          
+          // Clear localStorage before logging out
+          try {
+            localStorage.removeItem('currentPage');
+            localStorage.removeItem('currentPageTitle');
+            console.log('Cleared saved page data on logout');
+          } catch (e) {
+            console.warn('Could not clear localStorage:', e);
+          }
+          
+          google.script.run
+            .withSuccessHandler(function() { window.location.href = SCRIPT_URL + '?page=Login'; })
+            .withFailureHandler(function() { window.location.href = SCRIPT_URL + '?page=Login'; })
+            .logoutUser();
+        });
+      })();
+
+      function enableLogoutModalDrag() {
+        const modal = document.getElementById('logoutModal');
+        const header = document.getElementById('logoutModalHeader');
+        const modalContent = modal && modal.querySelector('.modal-content');
+        if (!modal || !header || !modalContent) return;
+
+        let isDragging = false;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        header.style.cursor = 'grab';
+
+        header.addEventListener('mousedown', function(event) {
+          isDragging = true;
+          const rect = modalContent.getBoundingClientRect();
+          offsetX = event.clientX - rect.left;
+          offsetY = event.clientY - rect.top;
+          modalContent.style.position = 'absolute';
+          modalContent.style.left = rect.left + 'px';
+          modalContent.style.top = rect.top + 'px';
+          document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', function(event) {
+          if (!isDragging) return;
+          modalContent.style.left = event.clientX - offsetX + 'px';
+          modalContent.style.top = event.clientY - offsetY + 'px';
+        });
+
+        document.addEventListener('mouseup', function() {
+          if (!isDragging) return;
+          isDragging = false;
+          document.body.style.userSelect = '';
+        });
+      }
+
+      enableLogoutModalDrag();
+
+      // --- SIDEBAR TOGGLE LOGIC ---
+      window.toggleSidebar = function() {
+        const sidebar = document.getElementById('sidebarMenuContainer');
+        const overlay = document.getElementById('sidebarOverlay');
+        
+        if (window.innerWidth <= 1024) {
+          // Mobile behavior - slide in/out
+          sidebar.classList.toggle('open');
+          overlay.classList.toggle('active');
+        } else {
+          // Desktop behavior - collapse/expand
+          sidebar.classList.toggle('collapsed');
+          overlay.classList.remove('active');
+        }
+      };
+
+      // --- DARK MODE TOGGLE LOGIC ---
+      window.toggleDarkMode = function() {
+        const body = document.body;
+        const icon = document.getElementById('darkModeIcon');
+        const text = document.getElementById('darkModeText');
+        
+        body.classList.toggle('dark-mode');
+        
+        if (body.classList.contains('dark-mode')) {
+          icon.textContent = '☀️';
+          text.textContent = 'Light';
+          localStorage.setItem('darkMode', 'enabled');
+        } else {
+          icon.textContent = '🌙';
+          text.textContent = 'Dark';
+          localStorage.setItem('darkMode', 'disabled');
+        }
+        
+        // Apply dark mode to iframe content
+        applyDarkModeToIframe();
+      };
+
+      // --- APPLY DARK MODE TO IFRAME ---
+      function applyDarkModeToIframe() {
+        const iframe = document.getElementById('studentIframe');
+        if (!iframe || !iframe.contentWindow) return;
+        
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          const darkModeEnabled = document.body.classList.contains('dark-mode');
+          
+          if (darkModeEnabled) {
+            iframeDoc.body.classList.add('dark-mode');
+          } else {
+            iframeDoc.body.classList.remove('dark-mode');
+          }
+        } catch (e) {
+          console.warn('Could not apply dark mode to iframe:', e);
+        }
+      }
+
+      // --- APPLY SAVED DARK MODE PREFERENCE ---
+      (function applySavedDarkMode() {
+        const darkMode = localStorage.getItem('darkMode');
+        if (darkMode === 'enabled') {
+          document.body.classList.add('dark-mode');
+          document.getElementById('darkModeIcon').textContent = '☀️';
+          document.getElementById('darkModeText').textContent = 'Light';
+        }
+      })();
+
+      // --- PAGE LOADING HELPERS ---
+      const loadingOverlay = document.getElementById('pageLoadingOverlay');
+      function setPageLoading(active) {
+        if (!loadingOverlay) return;
+        loadingOverlay.classList.toggle('active', active);
+      }
+
+      const pageContentLoading = document.getElementById('pageContentLoading');
+      function setContentLoading(active) {
+        if (!pageContentLoading) return;
+        pageContentLoading.style.display = active ? 'flex' : 'none';
+      }
+
+      // --- NAVIGATE TO A PAGE VIA srcdoc ---
+      // Fetches subpage HTML via getPageHtml() and injects it via srcdoc.
+      // Aliases window.google = window.parent.google inside the iframe so that
+      // google.script.run features work perfectly without nested iframe session blocks.
+      window.navigateToPage = function(pageName, title) {
+        const dashboardView = document.getElementById('dashboardView');
+        const studentsView  = document.getElementById('studentsView');
+        const studentIframe = document.getElementById('studentIframe');
+        const pageTitle     = document.querySelector('.page-title');
+
+        dashboardView.style.display = 'none';
+        studentsView.style.display  = 'flex';
+        studentsView.style.flexDirection = 'column';
+        pageTitle.innerText = title;
+        
+        // Save current page to localStorage for persistence on refresh
+        try {
+          localStorage.setItem('currentPage', pageName);
+          localStorage.setItem('currentPageTitle', title);
+        } catch (e) {
+          console.warn('Could not save current page to localStorage:', e);
+        }
+
+        // Show loader spinner
+        setContentLoading(true);
+
+        google.script.run
+          .withSuccessHandler(function(html) {
+            setContentLoading(false);
+            if (!html) {
+              studentIframe.srcdoc = '<p style="padding:20px;color:#ef4444;">Page returned no content.</p>';
+              return;
+            }
+            // Inject script to alias the parent Google Apps Script API object into the iframe context
+            // Also inject dark mode detection and application script
+            var darkModeScript = '<script>' +
+              'window.google = window.parent.google;' +
+              '(function() {' +
+              '  function applyDarkMode() {' +
+              '    try {' +
+              '      var darkMode = window.parent.localStorage.getItem("darkMode");' +
+              '      if (darkMode === "enabled") {' +
+              '        if (document.body) document.body.classList.add("dark-mode");' +
+              '        document.documentElement.classList.add("dark-mode");' +
+              '      } else {' +
+              '        if (document.body) document.body.classList.remove("dark-mode");' +
+              '        document.documentElement.classList.remove("dark-mode");' +
+              '      }' +
+              '    } catch (e) { console.warn("Dark mode sync error:", e); }' +
+              '  }' +
+              '  if (document.readyState === "loading") {' +
+              '    document.addEventListener("DOMContentLoaded", applyDarkMode);' +
+              '  } else {' +
+              '    applyDarkMode();' +
+              '  }' +
+              '  window.addEventListener("focus", applyDarkMode);' +
+              '  setTimeout(applyDarkMode, 50);' +
+              '  setTimeout(applyDarkMode, 200);' +
+              '})();' +
+              '<\/script>';
+            
+            // Insert the scripts right after the <head> tag or at the very beginning
+            var finalHtml = html;
+            if (finalHtml.indexOf('<head>') !== -1) {
+              finalHtml = finalHtml.replace('<head>', '<head>' + darkModeScript);
+            } else {
+              finalHtml = darkModeScript + finalHtml;
+            }
+            
+            studentIframe.srcdoc = finalHtml;
+            
+            // Apply dark mode after iframe loads
+            studentIframe.addEventListener('load', function() {
+              setTimeout(applyDarkModeToIframe, 100);
+            }, { once: true });
+          })
+          .withFailureHandler(function(err) {
+            setContentLoading(false);
+            var errMsg = err && err.message ? err.message : String(err);
+            studentIframe.srcdoc = '<p style="padding:20px;font-family:sans-serif;color:#ef4444;">Error loading page: ' + errMsg + '</p>';
+            console.error('getPageHtml error:', err);
+          })
+          .getPageHtml(pageName);
+      };
+
+      // 1. Build Sidebar
+      setPageLoading(true);
+
+      const PAGE_ROUTES = {
+        'dashboard':          { type: 'dashboard',    title: 'Dashboard' },
+        'billing categories': { page: 'Billing Categories', title: 'Billing Categories' },
+        'billings':           { page: 'Billings',     title: 'Billing' },
+        'student':            { page: 'Student',      title: 'Student Directory' },
+        'course':             { page: 'Courses',      title: 'Course Catalog' },
+        'attendance':         { page: 'Attendance',   title: 'Attendance Records' },
+        'enroll':             { page: 'Enrollments',  title: 'Enrollments' },
+        'classes':            { page: 'Classes',      title: 'Classes' },
+        'teacher':            { page: 'Teachers',     title: 'Teachers' },
+        'academic':           { page: 'Academic Years', title: 'Academic Years' },
+        'performance':        { page: 'Performance',  title: 'Performance' },
+        'invoice':            { page: 'Invoices',     title: 'Invoices' },
+        'payment':            { page: 'Payments',     title: 'Payments' },
+        'settings':           { page: 'Settings',     title: 'Settings' },
+        'user':               { page: 'Users',        title: 'User Management' },
+        'parent':             { page: 'Parents',      title: 'Parents' },
+        'permission':         { page: 'Permissions',  title: 'User Permissions' },
+        'report':             { page: 'Reports',      title: 'System Reports' }
+      };
+
+      function normalizeHashValue(hash) {
+        if (!hash) return '';
+        const raw = hash.startsWith('#') ? hash.slice(1) : hash;
+        try { return decodeURIComponent(raw).trim().toLowerCase(); }
+        catch (e) { return raw.trim().toLowerCase(); }
+      }
+
+      function extractRequestedPage(hashValue) {
+        if (!hashValue) return '';
+        return hashValue.startsWith('page=') ? hashValue.slice(5).trim() : hashValue;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(sheets) {
+          const sidebar       = document.getElementById('sidebarMenu');
+          const dashboardView = document.getElementById('dashboardView');
+          const studentsView  = document.getElementById('studentsView');
+          const pageTitle     = document.querySelector('.page-title');
+
+          sidebar.innerHTML = '';
+
+          const dashboardItem = document.createElement('li');
+          dashboardItem.className = 'nav-item';
+          dashboardItem.innerHTML = `<span class="nav-icon"><i class="fas fa-chart-line"></i></span><span class="nav-text">Dashboard</span>`;
+          dashboardItem.onclick = function() {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            this.classList.add('active');
+            dashboardView.style.display = 'block';
+            studentsView.style.display = 'none';
+            pageTitle.innerText = 'Dashboard';
+            window.location.hash = 'dashboard';
+            
+            // Save dashboard state to localStorage
+            try {
+              localStorage.setItem('currentPage', 'dashboard');
+              localStorage.setItem('currentPageTitle', 'Dashboard');
+            } catch (e) {
+              console.warn('Could not save current page to localStorage:', e);
+            }
+            
+            if (window.innerWidth <= 1024) window.toggleSidebar();
+          };
+
+          sidebar.appendChild(dashboardItem);
+
+          if (!sheets || sheets.length === 0) {
+            sidebar.innerHTML = '<li style="padding: 20px; color: #64748b;">No sheets found.</li>';
+            setPageLoading(false);
+            return;
+          }
+
+          const requestedPage = extractRequestedPage(normalizeHashValue(window.location.hash));
+          let pageToActivate = null;
+
+          // Check if there's a saved page in localStorage (from previous session/refresh)
+          let savedPage = null;
+          let savedPageTitle = null;
+          try {
+            savedPage = localStorage.getItem('currentPage');
+            savedPageTitle = localStorage.getItem('currentPageTitle');
+          } catch (e) {
+            console.warn('Could not read saved page from localStorage:', e);
+          }
+
+          // Priority: URL hash > saved page > dashboard
+          if (!requestedPage || requestedPage === 'dashboard') {
+            if (savedPage && savedPage !== 'dashboard') {
+              // Restore the saved page instead of going to dashboard
+              // (Will be handled below in the loop)
+            } else {
+              pageToActivate = dashboardItem;
+            }
+          }
+
+          sheets.forEach(function(sheetName, index) {
+            const nameLower = sheetName.trim().toLowerCase();
+            const item = document.createElement('li');
+            item.className = 'nav-item';
+
+            // Icon picker
+            let icon = '<i class="fas fa-file"></i>';
+            if      (nameLower.includes('billing categories')) icon = '<i class="fas fa-list"></i>';
+            else if (nameLower.includes('billings'))    icon = '<i class="fas fa-file-invoice-dollar"></i>';
+            else if (nameLower.includes('student'))     icon = '<i class="fas fa-user"></i>';
+            else if (nameLower.includes('course'))      icon = '<i class="fas fa-book"></i>';
+            else if (nameLower.includes('enroll'))      icon = '<i class="fas fa-pen-to-square"></i>';
+            else if (nameLower.includes('attend'))      icon = '<i class="fas fa-check-circle"></i>';
+            else if (nameLower.includes('classes'))     icon = '<i class="fas fa-layer-group"></i>';
+            else if (nameLower.includes('teacher'))     icon = '<i class="fas fa-chalkboard-user"></i>';
+            else if (nameLower.includes('academic'))    icon = '<i class="fas fa-calendar"></i>';
+            else if (nameLower.includes('performance')) icon = '<i class="fas fa-chart-line"></i>';
+            else if (nameLower.includes('invoice'))     icon = '<i class="fas fa-file-invoice"></i>';
+            else if (nameLower.includes('payment'))     icon = '<i class="fas fa-credit-card"></i>';
+            else if (nameLower.includes('settings'))    icon = '<i class="fas fa-cog"></i>';
+            else if (nameLower.includes('user'))        icon = '<i class="fas fa-users"></i>';
+            else if (nameLower.includes('parent'))      icon = '<i class="fas fa-male"></i>';
+            else if (nameLower.includes('permission'))  icon = '<i class="fas fa-shield-alt"></i>';
+            else if (nameLower.includes('report'))      icon = '<i class="fas fa-chart-bar"></i>';
+
+            item.innerHTML = `<span class="nav-icon">${icon}</span><span class="nav-text">${sheetName}</span>`;
+
+            const routeEntry = Object.entries(PAGE_ROUTES).find(([kw]) => nameLower.includes(kw));
+            const route = routeEntry ? routeEntry[1] : null;
+
+            item.onclick = function() {
+              document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+              this.classList.add('active');
+
+              if (route && route.type === 'dashboard') {
+                dashboardView.style.display = 'block';
+                studentsView.style.display  = 'none';
+                pageTitle.innerText = route.title;
+                window.location.hash = 'dashboard';
+              } else if (route && route.page) {
+                window.navigateToPage(route.page, route.title);
+                window.location.hash = encodeURIComponent(route.page);
+              } else {
+                // Unrecognised page — fall back to dashboard view
+                dashboardView.style.display = 'block';
+                studentsView.style.display  = 'none';
+                pageTitle.innerText = sheetName;
+                window.location.hash = '';
+                alert(`Page "${sheetName}" is not yet mapped to an HTML file.`);
+              }
+
+              if (window.innerWidth <= 1024) window.toggleSidebar();
+            };
+
+            if (requestedPage && (
+              nameLower.includes(requestedPage) ||
+              (route && route.page.toLowerCase().includes(requestedPage))
+            )) {
+              pageToActivate = item;
+            }
+            
+            // If no URL hash but we have a saved page, check if this is it
+            if (!pageToActivate && savedPage && savedPage !== 'dashboard' && (
+              nameLower.includes(savedPage.toLowerCase()) ||
+              (route && route.page && route.page.toLowerCase() === savedPage.toLowerCase())
+            )) {
+              pageToActivate = item;
+            }
+
+            sidebar.appendChild(item);
+          });
+
+          if (pageToActivate) {
+            pageToActivate.click();
+          } else if (!sidebar.querySelector('.nav-item.active')) {
+            const firstItem = sidebar.querySelector('.nav-item');
+            if (firstItem) firstItem.classList.add('active');
+          }
+            // Setup search suggestions and behavior
+            (function setupSearch() {
+              const input = document.getElementById('globalSearchInput');
+              const datalist = document.getElementById('searchSuggestions');
+              if (!input || !datalist) return;
+
+              // Populate datalist with simple page suggestions
+              datalist.innerHTML = '';
+              const baseItems = ['Dashboard'].concat(sheets || []);
+              baseItems.forEach(function(it) {
+                const opt = document.createElement('option');
+                opt.value = it;
+                datalist.appendChild(opt);
+              });
+
+              // Live filter sidebar items
+              input.addEventListener('input', function() {
+                const q = (input.value || '').trim().toLowerCase();
+                document.querySelectorAll('#sidebarMenu .nav-item').forEach(function(li) {
+                  const text = (li.textContent || '').trim().toLowerCase();
+                  li.style.display = q === '' || text.indexOf(q) !== -1 ? '' : 'none';
+                });
+              });
+
+              // Enter navigation: call server searchIndex for comprehensive matches
+              input.addEventListener('keydown', function(e) {
+                if (e.key !== 'Enter') return;
+                const q = (input.value || '').trim();
+                if (!q) return;
+                // Ask server for matches (students, pages, invoices)
+                google.script.run.withSuccessHandler(function(results) {
+                  results = results || [];
+                  // Prefer exact student match
+                  const studentMatch = results.find(r => r.type === 'student');
+                  if (studentMatch) {
+                    // Navigate to Student page and instruct iframe to open the record after load
+                    window._pendingOpen = { type: 'student', studentId: studentMatch.studentId };
+                    window.navigateToPage('Student', 'Student Directory');
+                    input.blur();
+                    return;
+                  }
+                  // If a page match, navigate to that page
+                  const pageMatch = results.find(r => r.type === 'page');
+                  if (pageMatch) {
+                    // find sidebar item that matches page title and click it
+                    const li = Array.from(document.querySelectorAll('#sidebarMenu .nav-item'))
+                      .find(x => (x.textContent || '').toLowerCase().indexOf((pageMatch.title || pageMatch.page || '').toLowerCase()) !== -1);
+                    if (li) { li.click(); input.blur(); return; }
+                    // Fallback: navigate via route
+                    window.navigateToPage(pageMatch.page || pageMatch.title, pageMatch.title || pageMatch.page);
+                    input.blur();
+                    return;
+                  }
+                  // Otherwise, fall back to local visible-first behavior
+                  const visible = Array.from(document.querySelectorAll('#sidebarMenu .nav-item'))
+                    .filter(li => li.style.display !== 'none');
+                  const match = visible.find(li => (li.textContent || '').toLowerCase().indexOf(q.toLowerCase()) !== -1);
+                  if (match) { match.click(); input.blur(); return; }
+                  alert('No matching page or student found.');
+                }).searchIndex(q);
+              });
+            })();
+
+            setPageLoading(false);
+        })
+        .withFailureHandler(function(err) {
+          console.error('Sidebar load failed:', err);
+          setPageLoading(false);
+          document.getElementById('sidebarMenu').innerHTML = '<li style="padding:12px;color:#ef4444;">Failed to load navigation. Please refresh.</li>';
+        })
+        .getSheetNames();
+
+      // 2. Load License Badge
+      (function loadLicenseBadge() {
+        google.script.run
+          .withSuccessHandler(function(params) {
+            const badge = document.getElementById('licenseBadge');
+            if (!badge || !params) return;
+
+            const status = (params['License Status'] || 'Demo').trim();
+            const limit  = Number(params['Student Limit']) || 0;
+
+            // Map limit → plan name
+            let planName, planClass, planIcon;
+            if (status.toLowerCase().indexOf('demo') !== -1) {
+              planName = 'Demo'; planClass = 'plan-demo'; planIcon = '🔒';
+            } else if (limit >= 200) {
+              planName = 'Gold'; planClass = 'plan-gold'; planIcon = '🏆';
+            } else if (limit >= 150) {
+              planName = 'Diamond'; planClass = 'plan-diamond'; planIcon = '💎';
+            } else if (limit >= 100) {
+              planName = 'Silver'; planClass = 'plan-silver'; planIcon = '🥈';
+            } else if (limit >= 50) {
+              planName = 'Copper'; planClass = 'plan-copper'; planIcon = '🥉';
+            } else {
+              planName = 'Demo'; planClass = 'plan-demo'; planIcon = '🔒';
+            }
+
+            // Remove old plan classes and apply new one
+            badge.className = 'license-badge ' + planClass;
+            badge.textContent = planIcon + ' ' + planName;
+            badge.title = status + ' — ' + (limit || '—') + ' student limit';
+            badge.style.opacity = '1';
+          })
+          .withFailureHandler(function() {
+            // silently hide on failure
+          })
+          .getParameters();
+      })();
+
+      // Load Academic Years into the Dashboard filter dropdown
+      (function loadAcademicYearsForDashboard() {
+        google.script.run
+          .withSuccessHandler(function(years) {
+            const select = document.getElementById('dashYearFilter');
+            if (!select || !years) return;
+            select.innerHTML = '<option value="">All Academic Years</option>';
+            years.forEach(function(item) {
+              const y = typeof item === 'object' ? (item.academicYear || item.year) : item;
+              if (y) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y + (item.status === 'Active' ? ' (Active)' : '');
+                select.appendChild(opt);
+              }
+            });
+          })
+          .withFailureHandler(function() {})
+          .getAcademicYearsData();
+      })();
+
+      // Global function to fetch and render dashboard stats based on selected filters
+      window.loadDashboardStatsWithFilters = function() {
+        const yearSelect = document.getElementById('dashYearFilter');
+        const termSelect = document.getElementById('dashTermFilter');
+        const year = yearSelect ? yearSelect.value : '';
+        const term = termSelect ? termSelect.value : '';
+
+        google.script.run
+          .withSuccessHandler(function(stats) {
+            stats = stats || {};
+            const totalInvoiced = Number(stats.totalInvoiced) || 0;
+            const totalPaid = Number(stats.totalPaid) || 0;
+            const totalUnpaid = Number(stats.totalUnpaid) || 0;
+
+            document.getElementById('statStudents').innerText   = stats.totalStudents || 0;
+            document.getElementById('statCourses').innerText    = stats.activeCourses || 0;
+            document.getElementById('statAttendance').innerText = stats.avgAttendance || '0%';
+            document.getElementById('statInvoices').innerText   = stats.invoiceCount || 0;
+            document.getElementById('insightInvoices').innerText = stats.invoiceCount || 0;
+            document.getElementById('insightTotalBilled').innerText = 'GHS ' + totalInvoiced.toFixed(2);
+            const paidPct = totalInvoiced > 0 ? Math.round((totalPaid / totalInvoiced) * 100) : 0;
+            const unpaidPct = totalInvoiced > 0 ? Math.round((totalUnpaid / totalInvoiced) * 100) : 0;
+            document.getElementById('insightPaid').innerText = paidPct + '% paid';
+            document.getElementById('insightUnpaid').innerText = unpaidPct + '% unpaid';
+            renderDashboardCharts(stats);
+          })
+          .withFailureHandler(function(err) {
+            console.error('Stats error:', err);
+            renderDashboardCharts({ attendanceTrend: [], studentClassCounts: {} });
+          })
+          .getDashboardStats(year, term);
+      };
+
+      // 3. Initial load of Dashboard Stats
+      loadDashboardStatsWithFilters();
+
+      function renderDashboardCharts(stats) {
+        renderBillingChart(stats);
+        renderAttendanceTrendChart(stats.attendanceTrend || []);
+        renderClassChart(stats.studentClassCounts || {});
+      }
+
+      function renderBillingChart(stats) {
+        const canvas = document.getElementById('billingChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        const paid = stats.totalPaid || 0;
+        const unpaid = stats.totalUnpaid || 0;
+        const chartData = [paid, unpaid];
+
+        if (!canvas._chartInstance) {
+          canvas._chartInstance = new Chart(canvas, {
+            type: 'doughnut',
+            data: {
+              labels: ['Paid', 'Unpaid'],
+              datasets: [
+                {
+                  data: chartData,
+                  backgroundColor: ['#10b981', '#ef4444'],
+                  borderColor: 'transparent',
+                },
+              ],
+            },
+            options: {
+              maintainAspectRatio: false,
+              cutout: '65%',
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    boxWidth: 12,
+                    padding: 16,
+                    font: { size: 12 },
+                  },
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return context.label + ': GHS ' + Number(context.parsed).toFixed(2);
+                    },
+                  },
+                },
+              },
+            },
+          });
+        } else {
+          canvas._chartInstance.data.datasets[0].data = chartData;
+          canvas._chartInstance.update();
+        }
+      }
+
+      function renderAttendanceTrendChart(trendData) {
+        const canvas = document.getElementById('attendanceChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        const labels = trendData.map((item) => item.label);
+        const values = trendData.map((item) => item.presentPct);
+
+        if (!canvas._chartInstance) {
+          canvas._chartInstance = new Chart(canvas, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: 'Attendance (%)',
+                  data: values,
+                  borderColor: '#3b82f6',
+                  backgroundColor: 'rgba(59,130,246,0.12)',
+                  fill: true,
+                  tension: 0.35,
+                  pointRadius: 4,
+                  pointBackgroundColor: '#ffffff',
+                  pointBorderColor: '#3b82f6',
+                  pointBorderWidth: 2,
+                },
+              ],
+            },
+            options: {
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 100,
+                  ticks: {
+                    callback: function(value) {
+                      return value + '%';
+                    },
+                  },
+                },
+              },
+              plugins: {
+                legend: {
+                  display: false,
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return context.parsed.y + '% attendance';
+                    },
+                  },
+                },
+              },
+            },
+          });
+        } else {
+          canvas._chartInstance.data.labels = labels;
+          canvas._chartInstance.data.datasets[0].data = values;
+          canvas._chartInstance.update();
+        }
+      }
+
+      function renderClassChart(classCounts) {
+        const canvas = document.getElementById('classChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        const labels = Object.keys(classCounts).sort();
+        const values = labels.map(label => classCounts[label] || 0);
+
+        if (!canvas._chartInstance) {
+          canvas._chartInstance = new Chart(canvas, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: 'Students',
+                  data: values,
+                  backgroundColor: 'rgba(59,130,246,0.75)',
+                  borderColor: '#2563eb',
+                  borderWidth: 1,
+                },
+              ],
+            },
+            options: {
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    precision: 0,
+                  },
+                },
+              },
+              plugins: {
+                legend: {
+                  display: false,
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return context.parsed.y + ' student' + (context.parsed.y === 1 ? '' : 's');
+                    },
+                  },
+                },
+              },
+            },
+          });
+        } else {
+          canvas._chartInstance.data.labels = labels;
+          canvas._chartInstance.data.datasets[0].data = values;
+          canvas._chartInstance.update();
+        }
+      }
+
+      // 3. AUTO-CLOSE SIDEBAR ON RESIZE
+      window.addEventListener('resize', function() {
+        const sidebar = document.getElementById('sidebarMenuContainer');
+        const overlay = document.getElementById('sidebarOverlay');
+        
+        if (window.innerWidth > 1024) {
+          // On desktop, remove mobile classes
+          sidebar.classList.remove('open');
+          overlay.classList.remove('active');
+        } else {
+          // On mobile, remove desktop classes
+          sidebar.classList.remove('collapsed');
+        }
+      });
+
+      // 4. USER ACTIVITY & INACTIVITY TIMEOUT LOGIC
+      let lastActivityTime = Date.now();
+      const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes of idle time before logout
+
+      function resetActivityTimer() {
+        lastActivityTime = Date.now();
+      }
+
+      // Bind event listeners to parent document
+      ['click', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(eventName => {
+        document.addEventListener(eventName, resetActivityTimer, { passive: true });
+      });
+
+      // Automatically bind event listeners to the iframe document whenever it loads new content
+      const studentIframe = document.getElementById('studentIframe');
+      if (studentIframe) {
+        studentIframe.addEventListener('load', function() {
+          try {
+            const iframeDoc = studentIframe.contentDocument || studentIframe.contentWindow.document;
+            if (iframeDoc) {
+              ['click', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(eventName => {
+                iframeDoc.addEventListener(eventName, resetActivityTimer, { passive: true });
+              });
+            }
+          } catch (e) {
+            console.warn("Could not bind activity listeners inside the iframe: ", e);
+          }
+        });
+      }
+
+      // Allow parent to instruct iframe to open a specific record after navigation
+      window._pendingOpen = null;
+      if (studentIframe) {
+        studentIframe.addEventListener('load', function() {
+          try {
+            const win = studentIframe.contentWindow;
+            if (!window._pendingOpen || !win) return;
+            try {
+              const p = window._pendingOpen;
+              if (p.type === 'student' && typeof win.openStudentRecord === 'function') {
+                win.openStudentRecord(p.studentId);
+              } else if (p.type === 'invoice' && typeof win.openInvoiceRecord === 'function') {
+                win.openInvoiceRecord(p.invoiceId);
+              } else if (p.type === 'payment' && typeof win.openPaymentRecord === 'function') {
+                win.openPaymentRecord(p.transactionId || p.paymentId || p.invoiceId);
+              } else if (p.type === 'billing' && typeof win.openBillingRecord === 'function') {
+                win.openBillingRecord(p.billingId);
+              } else if (p.type === 'user' && typeof win.openUserRecord === 'function') {
+                win.openUserRecord(p.userId);
+              } else if (p.type === 'parent' && typeof win.openParentRecord === 'function') {
+                win.openParentRecord(p.parentId);
+              }
+            } catch (err) {
+              console.warn('Failed to deliver pending open to iframe:', err);
+            }
+            window._pendingOpen = null;
+          } catch (e) {
+            console.warn('Error while delivering pending open to iframe:', e);
+          }
+        });
+      }
+
+      // Instantly run initial session check (with retry grace period after login)
+      const urlParams = new URLSearchParams(window.location.search);
+      const justLoggedIn = urlParams.get('login') === '1';
+      if (justLoggedIn) {
+        // User just logged in - clear any saved page data for fresh start
+        try {
+          localStorage.removeItem('currentPage');
+          localStorage.removeItem('currentPageTitle');
+          console.log('Fresh login detected - cleared saved page data');
+        } catch (e) {
+          console.warn('Could not clear localStorage on fresh login:', e);
+        }
+        
+        window.history.replaceState({}, document.title, SCRIPT_URL + '?page=Index');
+        setTimeout(checkBackendSession, 1500);
+      } else {
+        checkBackendSession();
+      }
+
+      // Check session status periodically  
+      setInterval(function() {
+        const timeSinceLastActivity = Date.now() - lastActivityTime;
+        
+        // If client has been idle for too long, log them out locally
+        if (timeSinceLastActivity > INACTIVITY_TIMEOUT_MS) {
+          console.warn("Inactivity timeout reached. Logging out...");
+          google.script.run
+            .withSuccessHandler(redirectToLogin)
+            .withFailureHandler(redirectToLogin)
+            .logoutUser();
+          return;
+        }
+        
+        // Otherwise, verify session with backend
+        checkBackendSession();
+      }, 60 * 1000); // Check every 60 seconds
+
+      let sessionCheckAttempts = 0;
+      const MAX_SESSION_CHECK_ATTEMPTS = 5;
+
+      function checkBackendSession() {
+        google.script.run
+          .withSuccessHandler(function(isLoggedIn) {
+            if (!isLoggedIn) {
+              sessionCheckAttempts++;
+              if (sessionCheckAttempts < MAX_SESSION_CHECK_ATTEMPTS) {
+                setTimeout(checkBackendSession, 400);
+                return;
+              }
+              redirectToLogin();
+              return;
+            }
+            sessionCheckAttempts = 0;
+          })
+          .withFailureHandler(function() {
+            sessionCheckAttempts++;
+            if (sessionCheckAttempts < MAX_SESSION_CHECK_ATTEMPTS) {
+              setTimeout(checkBackendSession, 400);
+              return;
+            }
+            redirectToLogin();
+          })
+          .checkSession();
+      }
+
+      function redirectToLogin() {
+        // Clear saved page data when session expires
+        try {
+          localStorage.removeItem('currentPage');
+          localStorage.removeItem('currentPageTitle');
+          console.log('Session expired - cleared saved page data');
+        } catch (e) {
+          console.warn('Could not clear localStorage on session expiry:', e);
+        }
+        window.location.href = SCRIPT_URL + '?page=Login';
+      }
+    } // End of initializeDashboard()
+
+    // Start initialization once the Google Apps Script API is ready
+    function waitForGoogleScript(callback, attempt) {
+      attempt = attempt || 0;
+      if (window.google && window.google.script && window.google.script.run) {
+        callback();
+        return;
+      }
+      if (attempt >= 30) {
+        console.error('Google Apps Script API unavailable.');
+        return;
+      }
+      setTimeout(function() { waitForGoogleScript(callback, attempt + 1); }, 100);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        waitForGoogleScript(initializeDashboard);
+      });
+    } else {
+      waitForGoogleScript(initializeDashboard);
+    }
+  </script>
+</body>
+</html>
