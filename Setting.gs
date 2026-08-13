@@ -47,6 +47,46 @@ function isStrongPassword(value) {
   return /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/.test(String(value || ''));
 }
 
+function isSensitiveSettingName(paramName) {
+  return /password|secret|token|key/i.test(String(paramName || '').trim());
+}
+
+function maskSettingAuditValue(paramName, value) {
+  if (value == null || value === '') return '';
+  return isSensitiveSettingName(paramName) ? '••••••' : value;
+}
+
+function buildSettingAuditSnapshot(fields) {
+  if (!fields) return null;
+
+  return buildAuditSnapshot({
+    param: fields.param,
+    value: maskSettingAuditValue(fields.param, fields.value),
+    listType: fields.listType,
+    columnLetter: fields.columnLetter,
+    oldValue: fields.oldValue,
+    newValue: fields.newValue
+  });
+}
+
+function getSettingParameterSnapshot(paramName) {
+  const params = getSystemParameters();
+  const normalizedTarget = normalizeParamName(paramName);
+  const match = params.find(function(item) {
+    return normalizeParamName(item.param) === normalizedTarget;
+  });
+
+  return match ? buildSettingAuditSnapshot({ param: match.param, value: match.value }) : null;
+}
+
+function getSettingsListType(columnLetter) {
+  const normalized = String(columnLetter || '').trim().toUpperCase();
+  if (normalized === 'E') return 'Categories';
+  if (normalized === 'F') return 'Payment Methods';
+  if (normalized === 'G') return 'Statuses';
+  return 'Settings List';
+}
+
 function updateSystemParameter(paramName, newValue) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Settings");
@@ -55,6 +95,7 @@ function updateSystemParameter(paramName, newValue) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 5) throw new Error("No system parameters found.");
 
+  const beforeSnapshot = getSettingParameterSnapshot(paramName);
   const normalizedTarget = normalizeParamName(paramName);
   const paramsRange = sheet.getRange(5, 2, lastRow - 4, 1);
   const params = paramsRange.getValues();
@@ -79,10 +120,40 @@ function updateSystemParameter(paramName, newValue) {
 
   if (foundRow === -1) {
     sheet.getRange(lastRow + 1, 2, 1, 2).setValues([[paramName, storedValue]]);
+
+    const createdSnapshot = buildSettingAuditSnapshot({
+      param: paramName,
+      value: storedValue
+    });
+
+    safeLogAuditEvent(
+      'Create',
+      'Settings',
+      String(paramName || '').trim(),
+      'Created system parameter ' + String(paramName || '').trim(),
+      null,
+      createdSnapshot
+    );
+
     return { success: true };
   }
 
   sheet.getRange(foundRow, 3).setValue(storedValue);
+
+  const afterSnapshot = buildSettingAuditSnapshot({
+    param: paramName,
+    value: storedValue
+  });
+
+  safeLogAuditEvent(
+    'Update',
+    'Settings',
+    String(paramName || '').trim(),
+    'Updated system parameter ' + String(paramName || '').trim(),
+    beforeSnapshot,
+    afterSnapshot
+  );
+
   return { success: true };
 }
 
@@ -124,12 +195,37 @@ function updateSystemListItem(columnLetter, oldValue, newValue) {
   const colIndex = columnLetter.charCodeAt(0) - 64; 
   if (colIndex < 5 || colIndex > 7) throw new Error("Invalid column.");
 
+  const listType = getSettingsListType(columnLetter);
+  const oldSnapshot = buildSettingAuditSnapshot({
+    listType: listType,
+    columnLetter: String(columnLetter || '').trim().toUpperCase(),
+    oldValue: oldValue,
+    newValue: oldValue
+  });
+
   const lastRow = sheet.getLastRow();
   // Search from Row 6 down to find the old value
   for (let r = 6; r <= lastRow; r++) {
     const cell = sheet.getRange(r, colIndex);
     if (String(cell.getValue()).trim() === oldValue) {
       cell.setValue(newValue);
+
+      const newSnapshot = buildSettingAuditSnapshot({
+        listType: listType,
+        columnLetter: String(columnLetter || '').trim().toUpperCase(),
+        oldValue: oldValue,
+        newValue: newValue
+      });
+
+      safeLogAuditEvent(
+        'Update',
+        'Settings',
+        listType,
+        'Updated settings list item in ' + listType,
+        oldSnapshot,
+        newSnapshot
+      );
+
       return { success: true };
     }
   }

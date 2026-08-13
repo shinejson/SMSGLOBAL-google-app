@@ -1,5 +1,18 @@
 // --- PASSWORD SECURITY FUNCTIONS ---
 
+function buildSecurityAuditSnapshot(fields) {
+  if (!fields) return null;
+
+  return buildAuditSnapshot({
+    totalUsers: fields.totalUsers,
+    hashedPasswords: fields.hashedPasswords,
+    plainTextPasswords: fields.plainTextPasswords,
+    migrated: fields.migrated,
+    secure: fields.secure,
+    message: fields.message
+  });
+}
+
 /**
  * Get or initialize the salt from Script Properties
  * The salt is stored securely and used for all password hashing
@@ -55,6 +68,7 @@ function verifyPassword(inputPassword, storedHash) {
  * @returns {object} Migration results
  */
 function migratePasswordsToHash() {
+  const beforeStatus = checkPasswordSecurityStatus();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Users");
   
@@ -91,11 +105,31 @@ function migratePasswordsToHash() {
     migrated++;
   }
   
-  return {
+  const result = {
     success: true,
     message: `Successfully migrated ${migrated} password(s) to secure hashes`,
     migrated: migrated
   };
+
+  const afterStatus = checkPasswordSecurityStatus();
+
+  safeLogAuditEvent(
+    'Migrate',
+    'Security',
+    'UserPasswords',
+    'Migrated stored user passwords to secure hashes',
+    buildSecurityAuditSnapshot(beforeStatus),
+    buildSecurityAuditSnapshot({
+      totalUsers: afterStatus.totalUsers,
+      hashedPasswords: afterStatus.hashedPasswords,
+      plainTextPasswords: afterStatus.plainTextPasswords,
+      migrated: migrated,
+      secure: afterStatus.secure,
+      message: result.message
+    })
+  );
+
+  return result;
 }
 
 /**

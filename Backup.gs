@@ -1,5 +1,22 @@
 // --- BACKUP AND RESTORE SYSTEM ---
 
+function buildBackupAuditSnapshot(fields) {
+  if (!fields) return null;
+
+  return buildAuditSnapshot({
+    fileId: fields.fileId,
+    fileName: fields.fileName,
+    backupType: fields.backupType,
+    sheetCount: fields.sheetCount,
+    sheetNames: fields.sheetNames,
+    restoredSheets: fields.restoredSheets,
+    folderId: fields.folderId,
+    autoBackupEnabled: fields.autoBackupEnabled,
+    deletedTriggers: fields.deletedTriggers,
+    message: fields.message
+  });
+}
+
 /**
  * Initialize and authorize Drive access
  * Run this function ONCE to grant permissions
@@ -55,8 +72,8 @@ function createFullBackup() {
     const downloadUrl = 'https://docs.google.com/spreadsheets/d/' + backupFile.getId() + '/export?format=xlsx';
     
     Logger.log('Backup created: ' + backupName);
-    
-    return {
+
+    const result = {
       success: true,
       fileId: backupFile.getId(),
       fileName: backupName,
@@ -68,6 +85,24 @@ function createFullBackup() {
       size: formatFileSize(backupFile.getSize()),
       message: 'Backup created successfully'
     };
+
+    safeLogAuditEvent(
+      'Create',
+      'Backups',
+      result.fileId,
+      'Created full backup ' + backupName,
+      null,
+      buildBackupAuditSnapshot({
+        fileId: result.fileId,
+        fileName: backupName,
+        backupType: 'Full',
+        sheetCount: ss.getSheets().length,
+        folderId: backupFolder.getId(),
+        message: result.message
+      })
+    );
+    
+    return result;
     
   } catch (error) {
     Logger.log('Backup error: ' + error.message);
@@ -116,7 +151,7 @@ function createSelectiveBackup(sheetNames) {
     
     const downloadUrl = 'https://docs.google.com/spreadsheets/d/' + newSSId + '/export?format=xlsx';
     
-    return {
+    const result = {
       success: true,
       fileId: newSSId,
       fileName: backupName,
@@ -127,6 +162,25 @@ function createSelectiveBackup(sheetNames) {
       sheetsBackedUp: sheetNames,
       message: 'Selective backup created successfully'
     };
+
+    safeLogAuditEvent(
+      'Create',
+      'Backups',
+      result.fileId,
+      'Created selective backup ' + backupName,
+      null,
+      buildBackupAuditSnapshot({
+        fileId: result.fileId,
+        fileName: backupName,
+        backupType: 'Selective',
+        sheetCount: sheetNames.length,
+        sheetNames: sheetNames,
+        folderId: backupFolder.getId(),
+        message: result.message
+      })
+    );
+
+    return result;
     
   } catch (error) {
     Logger.log('Selective backup error: ' + error.message);
@@ -218,6 +272,18 @@ function deleteBackup(fileId) {
     file.setTrashed(true);
     
     Logger.log('Backup deleted: ' + fileName);
+
+    safeLogAuditEvent(
+      'Delete',
+      'Backups',
+      fileId,
+      'Deleted backup ' + fileName,
+      buildBackupAuditSnapshot({
+        fileId: fileId,
+        fileName: fileName
+      }),
+      null
+    );
     
     return {
       success: true,
@@ -294,12 +360,28 @@ function restoreFromBackup(backupFileId, sheetNames) {
     clearAllIndexes();
     
     Logger.log('Restore completed: ' + restored.length + ' sheets');
-    
-    return {
+
+    const result = {
       success: true,
       restoredSheets: restored,
       message: 'Restored ' + restored.length + ' sheet(s) successfully'
     };
+
+    safeLogAuditEvent(
+      'Restore',
+      'Backups',
+      String(backupFileId || '').trim(),
+      'Restored backup into ' + restored.length + ' sheet(s)',
+      null,
+      buildBackupAuditSnapshot({
+        fileId: backupFileId,
+        restoredSheets: restored,
+        sheetCount: restored.length,
+        message: result.message
+      })
+    );
+    
+    return result;
     
   } catch (error) {
     Logger.log('Restore error: ' + error.message);
@@ -332,6 +414,15 @@ function setupAutomaticBackups() {
       .create();
     
     Logger.log('Automatic backup trigger created');
+
+    safeLogAuditEvent(
+      'Enable',
+      'Backups',
+      'AutomaticBackups',
+      'Enabled automatic daily backups at 2 AM',
+      buildBackupAuditSnapshot({ autoBackupEnabled: false }),
+      buildBackupAuditSnapshot({ autoBackupEnabled: true, message: 'Automatic daily backups enabled (2 AM)' })
+    );
     
     return {
       success: true,
@@ -363,6 +454,15 @@ function disableAutomaticBackups() {
     });
     
     Logger.log('Automatic backup triggers deleted: ' + deleted);
+
+    safeLogAuditEvent(
+      'Disable',
+      'Backups',
+      'AutomaticBackups',
+      'Disabled automatic backups',
+      buildBackupAuditSnapshot({ autoBackupEnabled: true, deletedTriggers: 0 }),
+      buildBackupAuditSnapshot({ autoBackupEnabled: false, deletedTriggers: deleted, message: 'Automatic backups disabled' })
+    );
     
     return {
       success: true,

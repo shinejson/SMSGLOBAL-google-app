@@ -56,6 +56,18 @@ function findBillingRowById(sheet, billingId) {
   return -1;
 }
 
+function buildBillingAuditSnapshot(billingData) {
+  if (!billingData) return null;
+
+  return buildAuditSnapshot({
+    billingId: billingData.billingId,
+    item: billingData.item,
+    amount: Number(billingData.amount) || 0,
+    status: billingData.status,
+    description: billingData.description
+  });
+}
+
 // 4. Add New Billing Item (Create)
 function addBilling(billingData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -77,6 +89,23 @@ function addBilling(billingData) {
     ]
   ]);
 
+  const createdBilling = buildBillingAuditSnapshot({
+    billingId: nextId,
+    item: billingData.item,
+    amount: billingData.amount,
+    status: billingData.status || 'Active',
+    description: billingData.description
+  });
+
+  safeLogAuditEvent(
+    'Create',
+    'Billing',
+    nextId,
+    'Created billing item ' + String(billingData.item || nextId).trim(),
+    null,
+    createdBilling
+  );
+
   return { success: true, billingId: nextId };
 }
 
@@ -86,6 +115,7 @@ function updateBilling(billingId, billingData) {
   const sheet = ss.getSheetByName("Billings");
   if (!sheet) throw new Error("Billings worksheet not found.");
 
+  const existingBilling = getBillingsData().find((billing) => String(billing.billingId).trim() === String(billingId).trim()) || null;
   const row = findBillingRowById(sheet, billingId);
   if (row === -1) throw new Error("Billing record not found.");
 
@@ -99,6 +129,17 @@ function updateBilling(billingId, billingData) {
     ]
   ]);
 
+  const updatedBilling = buildBillingAuditSnapshot(Object.assign({}, existingBilling || {}, billingData, { billingId: billingId }));
+
+  safeLogAuditEvent(
+    'Update',
+    'Billing',
+    billingId,
+    'Updated billing item ' + String((updatedBilling && updatedBilling.item) || billingId).trim(),
+    buildBillingAuditSnapshot(existingBilling),
+    updatedBilling
+  );
+
   return { success: true };
 }
 
@@ -108,9 +149,20 @@ function deleteBilling(billingId) {
   const sheet = ss.getSheetByName("Billings");
   if (!sheet) throw new Error("Billings worksheet not found.");
 
+  const existingBilling = getBillingsData().find((billing) => String(billing.billingId).trim() === String(billingId).trim()) || null;
   const row = findBillingRowById(sheet, billingId);
   if (row === -1) throw new Error("Billing record not found.");
 
   sheet.deleteRow(row);
+
+  safeLogAuditEvent(
+    'Delete',
+    'Billing',
+    billingId,
+    'Deleted billing item ' + String(((existingBilling && existingBilling.item) || billingId)).trim(),
+    buildBillingAuditSnapshot(existingBilling),
+    null
+  );
+
   return { success: true };
 }

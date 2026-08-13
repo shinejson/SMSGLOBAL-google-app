@@ -1782,12 +1782,24 @@ function checkAndFixAttendanceHeaders() {
     "Attendance ID", "Date", "Academic Year", "Class",
     "Student ID", "Student Name", "Course ID", "Status", "Term"
   ];
+  const currentHeaders = sheet.getRange(2, 2, 1, expectedHeaders.length).getValues()[0].map((header) => String(header || '').trim());
+
   try {
     sheet.getRange(2, 2, 1, expectedHeaders.length).setValues([expectedHeaders]);
     const headerRange = sheet.getRange(2, 2, 1, expectedHeaders.length);
     headerRange.setFontWeight("bold");
     headerRange.setBackground("#4A90E2");
     headerRange.setFontColor("#FFFFFF");
+
+    safeLogAuditEvent(
+      'Repair',
+      'Attendance',
+      'Headers',
+      'Repaired attendance sheet headers',
+      buildAuditSnapshot({ headers: currentHeaders }),
+      buildAuditSnapshot({ headers: expectedHeaders })
+    );
+
     return { success: true, message: "Headers verified and fixed successfully!" };
   } catch (e) {
     return { success: false, message: "Error fixing headers: " + e.message };
@@ -2466,6 +2478,25 @@ function getPerformanceDataFromSheet() {
     });
 }
 
+function buildPerformanceAuditSnapshot(perfData) {
+  if (!perfData) return null;
+
+  return buildAuditSnapshot({
+    performanceId: perfData.performanceId,
+    studentId: perfData.studentId,
+    studentName: perfData.studentName,
+    studentClass: perfData.studentClass,
+    term: perfData.term,
+    academicYear: perfData.academicYear,
+    classScore: Number(perfData.classScore) || 0,
+    examScore100: Number(perfData.examScore100) || 0,
+    examScore60: Number(perfData.examScore60) || 0,
+    total: Number(perfData.total) || 0,
+    rank: perfData.rank,
+    course: perfData.course
+  });
+}
+
 /**
  * Recalculate ranks for ALL performance records
  * Call this once to fix existing records that don't have ranks
@@ -2628,6 +2659,19 @@ function removeDuplicatePerformanceRecords() {
     }
   }
 
+  const deletedRecords = rowsToDelete.map(function(rowNum) {
+    const row = allVals[rowNum - 3] || [];
+    return buildAuditSnapshot({
+      performanceId: 'ROW-' + rowNum,
+      studentId: idxStudentId !== -1 ? String(row[idxStudentId] || '').trim() : '',
+      studentName: idxName !== -1 ? String(row[idxName] || '').trim() : '',
+      studentClass: idxClass !== -1 ? String(row[idxClass] || '').trim() : '',
+      term: idxTerm !== -1 ? String(row[idxTerm] || '').trim() : '',
+      academicYear: idxYear !== -1 ? String(row[idxYear] || '').trim() : '',
+      course: idxCourse !== -1 ? String(row[idxCourse] || '').trim() : ''
+    });
+  });
+
   // Delete duplicate rows from bottom to top to preserve row indexing
   rowsToDelete.reverse().forEach(rowNum => {
     sheet.deleteRow(rowNum);
@@ -2636,6 +2680,15 @@ function removeDuplicatePerformanceRecords() {
   if (rowsToDelete.length > 0) {
     try { recalculateAllRanks(); } catch (e) { /* ignore */ }
     try { invalidatePerformanceCache(); } catch (e) { /* ignore */ }
+
+    safeLogAuditEvent(
+      'Cleanup',
+      'Performance',
+      'Duplicates',
+      'Removed duplicate performance records',
+      buildAuditSnapshot({ duplicateCount: rowsToDelete.length, deletedRecords: deletedRecords }),
+      buildAuditSnapshot({ duplicateCount: 0 })
+    );
   }
 
   return {
@@ -2831,6 +2884,7 @@ function addPerformance(perfData) {
     }
 
     const targetRow = lastRow + 1;
+    const performanceId = `ROW-${targetRow}`;
 
     // Write values to their respective columns
     if (colName !== -1)
@@ -2866,7 +2920,31 @@ function addPerformance(perfData) {
 
     Logger.log('Performance record added successfully at row: ' + targetRow);
     try { invalidatePerformanceCache(); } catch (e) { /* fail silently */ }
-    return { success: true, performanceId: `ROW-${targetRow}` };
+
+    const createdPerformance = getPerformanceDataFromSheet().find((record) => record.rowNumber === targetRow) || buildPerformanceAuditSnapshot({
+      performanceId: performanceId,
+      studentId: perfData.studentId || perfData.studentName || '',
+      studentName: perfData.studentName,
+      studentClass: perfData.studentClass,
+      term: perfData.term,
+      academicYear: perfData.academicYear,
+      classScore: perfData.classScore,
+      examScore100: perfData.examScore100,
+      examScore60: perfData.examScore50 || perfData.examScore60 || 0,
+      total: perfData.total,
+      course: perfData.course
+    });
+
+    safeLogAuditEvent(
+      'Create',
+      'Performance',
+      performanceId,
+      'Created performance record for ' + String(perfData.studentName || performanceId).trim(),
+      null,
+      buildPerformanceAuditSnapshot(createdPerformance)
+    );
+
+    return { success: true, performanceId: performanceId };
     
   } catch (error) {
     Logger.log('ERROR in addPerformance: ' + error.toString());
@@ -2926,6 +3004,7 @@ function updatePerformance(performanceId, perfData) {
     return -1;
   }
 
+  const existingPerformance = getPerformanceDataFromSheet().find((record) => String(record.performanceId).trim() === String(performanceId).trim()) || null;
   const row = findPerformanceRowById(sheet, performanceId);
   if (row === -1) return { success: false, message: "Record not found." };
 
@@ -3052,6 +3131,31 @@ function updatePerformance(performanceId, perfData) {
 
   Logger.log('Update successful');
   try { invalidatePerformanceCache(); } catch (e) { /* fail silently */ }
+
+  const updatedPerformance = getPerformanceDataFromSheet().find((record) => String(record.performanceId).trim() === String(performanceId).trim()) || buildPerformanceAuditSnapshot(Object.assign({}, existingPerformance || {}, {
+    performanceId: performanceId,
+    studentId: perfData.studentId || perfData.studentName || '',
+    studentName: perfData.studentName || '',
+    studentClass: perfData.studentClass || '',
+    term: perfData.term || '',
+    academicYear: perfData.academicYear || '',
+    classScore: perfData.classScore || 0,
+    examScore100: perfData.examScore100 || 0,
+    examScore60: perfData.examScore60 !== undefined ? perfData.examScore60 : perfData.examScore50 || 0,
+    total: perfData.total || 0,
+    rank: perfData.rank || '',
+    course: perfData.course || ''
+  }));
+
+  safeLogAuditEvent(
+    'Update',
+    'Performance',
+    performanceId,
+    'Updated performance record for ' + String((updatedPerformance && updatedPerformance.studentName) || performanceId).trim(),
+    buildPerformanceAuditSnapshot(existingPerformance),
+    buildPerformanceAuditSnapshot(updatedPerformance)
+  );
+
   return { success: true };
   } catch (error) {
     Logger.log('ERROR in updatePerformance: ' + error.toString());
@@ -3066,10 +3170,21 @@ function deletePerformance(performanceId) {
   const sheet = ss.getSheetByName("Performance");
   if (!sheet)
     return { success: false, message: "Performance sheet not found." };
+  const existingPerformance = getPerformanceDataFromSheet().find((record) => String(record.performanceId).trim() === String(performanceId).trim()) || null;
   const row = findPerformanceRowById(sheet, performanceId);
   if (row === -1) return { success: false, message: "Record not found." };
   sheet.deleteRow(row);
   try { invalidatePerformanceCache(); } catch (e) { /* fail silently */ }
+
+  safeLogAuditEvent(
+    'Delete',
+    'Performance',
+    performanceId,
+    'Deleted performance record for ' + String(((existingPerformance && existingPerformance.studentName) || performanceId)).trim(),
+    buildPerformanceAuditSnapshot(existingPerformance),
+    null
+  );
+
   return { success: true };
   } catch (error) {
     Logger.log('ERROR in deletePerformance: ' + error.toString());

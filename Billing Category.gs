@@ -64,6 +64,41 @@ function findBillingCategoryRowById(sheet, id) {
   return -1;
 }
 
+function buildBillingCategoryAuditSnapshot(categoryData) {
+  if (!categoryData) return null;
+
+  return buildAuditSnapshot({
+    id: categoryData.id,
+    academicYear: categoryData.academicYear,
+    terms: categoryData.terms,
+    category: categoryData.category,
+    items: categoryData.items,
+    totalAmount: Number(categoryData.totalAmount) || 0,
+    nursery: Number(categoryData.nursery) || 0,
+    date: categoryData.date || '',
+    descriptions: categoryData.descriptions || ''
+  });
+}
+
+function buildGeneratedInvoiceAuditSnapshot(fields) {
+  return buildAuditSnapshot({
+    invoiceId: fields.invoiceId,
+    studentId: fields.studentId,
+    studentName: fields.studentName,
+    studentClass: fields.studentClass,
+    academicYear: fields.academicYear,
+    term: fields.term,
+    category: fields.category,
+    items: fields.items,
+    amountDue: Number(fields.amountDue) || 0,
+    issueDate: fields.issueDate,
+    dueDate: fields.dueDate,
+    status: fields.status,
+    paymentStatus: fields.paymentStatus,
+    source: fields.source
+  });
+}
+
 // 4. Add New Billing Category (Create)
 function addBillingCategory(catData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -89,6 +124,27 @@ function addBillingCategory(catData) {
     ]
   ]);
 
+  const createdCategory = buildBillingCategoryAuditSnapshot({
+    id: nextId,
+    academicYear: catData.academicYear,
+    terms: catData.terms,
+    category: catData.category,
+    items: catData.items,
+    totalAmount: catData.totalAmount,
+    nursery: catData.nursery || 0,
+    date: catData.date,
+    descriptions: catData.descriptions
+  });
+
+  safeLogAuditEvent(
+    'Create',
+    'Billing Categories',
+    nextId,
+    'Created billing category ' + String(catData.category || nextId).trim(),
+    null,
+    createdCategory
+  );
+
   return { success: true, id: nextId };
 }
 
@@ -98,6 +154,7 @@ function updateBillingCategory(id, catData) {
   const sheet = ss.getSheetByName("Billing Categories");
   if (!sheet) throw new Error("Billing Categories worksheet not found.");
 
+  const existingCategory = getBillingCategoriesData().find((category) => String(category.id).trim() === String(id).trim()) || null;
   const row = findBillingCategoryRowById(sheet, id);
   if (row === -1) throw new Error("Billing Category record not found.");
 
@@ -115,6 +172,17 @@ function updateBillingCategory(id, catData) {
     ]
   ]);
 
+  const updatedCategory = buildBillingCategoryAuditSnapshot(Object.assign({}, existingCategory || {}, catData, { id: id }));
+
+  safeLogAuditEvent(
+    'Update',
+    'Billing Categories',
+    id,
+    'Updated billing category ' + String((updatedCategory && updatedCategory.category) || id).trim(),
+    buildBillingCategoryAuditSnapshot(existingCategory),
+    updatedCategory
+  );
+
   return { success: true };
 }
 
@@ -124,10 +192,21 @@ function deleteBillingCategory(id) {
   const sheet = ss.getSheetByName("Billing Categories");
   if (!sheet) throw new Error("Billing Categories worksheet not found.");
 
+  const existingCategory = getBillingCategoriesData().find((category) => String(category.id).trim() === String(id).trim()) || null;
   const row = findBillingCategoryRowById(sheet, id);
   if (row === -1) throw new Error("Billing Category record not found.");
 
   sheet.deleteRow(row);
+
+  safeLogAuditEvent(
+    'Delete',
+    'Billing Categories',
+    id,
+    'Deleted billing category ' + String(((existingCategory && existingCategory.category) || id)).trim(),
+    buildBillingCategoryAuditSnapshot(existingCategory),
+    null
+  );
+
   return { success: true };
 }
 
@@ -221,6 +300,32 @@ function generateStudentBillings(data) {
           ]
         ]);
 
+        const createdInvoice = buildGeneratedInvoiceAuditSnapshot({
+          invoiceId: nextInvoiceId,
+          studentId: student.studentId,
+          studentName: studentName,
+          studentClass: studentClass,
+          academicYear: data.academicYear,
+          term: data.term,
+          category: data.category,
+          items: items,
+          amountDue: totalAmount,
+          issueDate: issueDate,
+          dueDate: dueDate,
+          status: 'Pending',
+          paymentStatus: 'Unpaid',
+          source: 'Billing Category Generation'
+        });
+
+        safeLogAuditEvent(
+          'Create',
+          'Invoices',
+          nextInvoiceId,
+          'Generated invoice from billing category ' + String(data.category || '').trim() + ' for ' + studentName,
+          null,
+          createdInvoice
+        );
+
         successCount++;
         Logger.log('Invoice created: ' + nextInvoiceId + ' for student: ' + studentId + ' - ' + studentName);
         
@@ -233,6 +338,23 @@ function generateStudentBillings(data) {
     if (errors.length > 0) {
       Logger.log('Some invoices failed: ' + errors.join('; '));
     }
+
+    safeLogAuditEvent(
+      'Generate',
+      'Billing Categories',
+      String(data.category || '').trim(),
+      'Generated ' + successCount + ' invoice(s) from billing category ' + String(data.category || '').trim(),
+      null,
+      buildAuditSnapshot({
+        academicYear: data.academicYear,
+        term: data.term,
+        category: data.category,
+        studentClass: data.studentClass,
+        selectedStudents: studentIds.length,
+        generatedInvoices: successCount,
+        errors: errors.length
+      })
+    );
 
     return { 
       success: true, 

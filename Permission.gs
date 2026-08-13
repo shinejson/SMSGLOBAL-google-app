@@ -20,6 +20,30 @@ function getPermissionsData() {
   }));
 }
 
+function buildPermissionAuditSnapshot(permissionData) {
+  if (!permissionData) return null;
+
+  return buildAuditSnapshot({
+    role: permissionData.role,
+    accessLevel: permissionData.accessLevel,
+    actions: permissionData.actions
+  });
+}
+
+function findPermissionRowByRole(sheet, role) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return -1;
+
+  const data = sheet.getRange(3, 2, lastRow - 2, 1).getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim().toLowerCase() === String(role).trim().toLowerCase()) {
+      return i + 3;
+    }
+  }
+
+  return -1;
+}
+
 // 2. Add New Permission
 function addPermission(role, accessLevel, actions) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -40,6 +64,21 @@ function addPermission(role, accessLevel, actions) {
     [role, accessLevel, actions]
   ]);
 
+  const createdPermission = buildPermissionAuditSnapshot({
+    role: role,
+    accessLevel: accessLevel,
+    actions: actions
+  });
+
+  safeLogAuditEvent(
+    'Create',
+    'Permissions',
+    String(role || '').trim(),
+    'Created permission role ' + String(role || '').trim(),
+    null,
+    createdPermission
+  );
+
   return { success: true };
 }
 
@@ -52,17 +91,8 @@ function updatePermission(role, accessLevel, actions) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 3) throw new Error("No permissions found to update");
 
-  // Get all data and find the row
-  const dataRange = sheet.getRange(3, 2, lastRow - 2, 3);
-  const data = dataRange.getValues();
-
-  let foundRow = -1;
-  for (let i = 0; i < data.length; i++) {
-    if (String(data[i][0]).trim().toLowerCase() === String(role).trim().toLowerCase()) {
-      foundRow = i + 3; // +3 because data starts at row 3
-      break;
-    }
-  }
+  const existingPermission = getPermissionsData().find((permission) => String(permission.role).trim().toLowerCase() === String(role).trim().toLowerCase()) || null;
+  const foundRow = findPermissionRowByRole(sheet, role);
 
   if (foundRow === -1) {
     throw new Error("Permission role not found");
@@ -72,6 +102,21 @@ function updatePermission(role, accessLevel, actions) {
   sheet.getRange(foundRow, 2, 1, 3).setValues([
     [role, accessLevel, actions]
   ]);
+
+  const updatedPermission = buildPermissionAuditSnapshot({
+    role: role,
+    accessLevel: accessLevel,
+    actions: actions
+  });
+
+  safeLogAuditEvent(
+    'Update',
+    'Permissions',
+    String(role || '').trim(),
+    'Updated permission role ' + String(role || '').trim(),
+    buildPermissionAuditSnapshot(existingPermission),
+    updatedPermission
+  );
 
   return { success: true };
 }
@@ -85,17 +130,8 @@ function deletePermission(role) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 3) throw new Error("No permissions found to delete");
 
-  // Get all data and find the row
-  const dataRange = sheet.getRange(3, 2, lastRow - 2, 3);
-  const data = dataRange.getValues();
-
-  let foundRow = -1;
-  for (let i = 0; i < data.length; i++) {
-    if (String(data[i][0]).trim().toLowerCase() === String(role).trim().toLowerCase()) {
-      foundRow = i + 3; // +3 because data starts at row 3
-      break;
-    }
-  }
+  const existingPermission = getPermissionsData().find((permission) => String(permission.role).trim().toLowerCase() === String(role).trim().toLowerCase()) || null;
+  const foundRow = findPermissionRowByRole(sheet, role);
 
   if (foundRow === -1) {
     throw new Error("Permission role not found");
@@ -103,6 +139,15 @@ function deletePermission(role) {
 
   // Delete the row
   sheet.deleteRow(foundRow);
+
+  safeLogAuditEvent(
+    'Delete',
+    'Permissions',
+    String(role || '').trim(),
+    'Deleted permission role ' + String(role || '').trim(),
+    buildPermissionAuditSnapshot(existingPermission),
+    null
+  );
 
   return { success: true };
 }
