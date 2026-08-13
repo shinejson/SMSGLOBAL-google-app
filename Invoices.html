@@ -441,25 +441,43 @@
         term: document.getElementById('term').value
       };
 
-      if (invoiceId) {
-        // Update
-        google.script.run
+      function submitInvoice(payload) {
+        const isUpdate = !!invoiceId;
+        const runner = google.script.run
           .withSuccessHandler(function(res) {
-            btn.disabled = false; btn.innerText = 'Update Invoice';
-            if(res.success) { closeModal(); refreshData(); }
+            if (res && res.requiresAdminOverride && !payload.__adminAcademicYearOverride) {
+              const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+              if (!proceed) {
+                btn.disabled = false; btn.innerText = isUpdate ? 'Update Invoice' : 'Save Invoice';
+                alert('Invoice action cancelled.');
+                return;
+              }
+              payload.__adminAcademicYearOverride = true;
+              submitInvoice(payload);
+              return;
+            }
+            btn.disabled = false; btn.innerText = isUpdate ? 'Update Invoice' : 'Save Invoice';
+            if(res.success) {
+              closeModal();
+              refreshData();
+              if (!isUpdate) alert(`Invoice created! ID: ${res.invoiceId}`);
+            } else {
+              alert('Error: ' + (res && res.message ? res.message : 'Failed to save invoice'));
+            }
           })
-          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Update Invoice'; alert('Error: ' + err.message); })
-          .updateInvoice(invoiceId, data);
-      } else {
-        // Add
-        google.script.run
-          .withSuccessHandler(function(res) {
-            btn.disabled = false; btn.innerText = 'Save Invoice';
-            if(res.success) { closeModal(); refreshData(); alert(`Invoice created! ID: ${res.invoiceId}`); }
-          })
-          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Save Invoice'; alert('Error: ' + err.message); })
-          .addInvoice(data);
+          .withFailureHandler(function(err) {
+            btn.disabled = false; btn.innerText = isUpdate ? 'Update Invoice' : 'Save Invoice';
+            alert('Error: ' + err.message);
+          });
+
+        if (isUpdate) {
+          runner.updateInvoice(invoiceId, payload);
+        } else {
+          runner.addInvoice(payload);
+        }
       }
+
+      submitInvoice(data);
     }
 
     /* --- DELETE LOGIC --- */
@@ -473,13 +491,29 @@
     document.getElementById('confirmDeleteBtn').onclick = function() {
       if (!currentDeleteId) return;
       const btn = this; btn.disabled = true; btn.innerText = 'Deleting...';
-      google.script.run
-        .withSuccessHandler(function(res) {
-          btn.disabled = false; btn.innerText = 'Delete';
-          if(res.success) { closeDeleteModal(); refreshData(); }
-        })
-        .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Delete'; alert('Error: ' + err.message); })
-        .deleteInvoice(currentDeleteId);
+
+      function submitDelete(options) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.requiresAdminOverride && !(options && options.adminAcademicYearOverride)) {
+              const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+              if (!proceed) {
+                btn.disabled = false; btn.innerText = 'Delete';
+                alert('Invoice delete cancelled.');
+                return;
+              }
+              submitDelete({ adminAcademicYearOverride: true });
+              return;
+            }
+            btn.disabled = false; btn.innerText = 'Delete';
+            if(res.success) { closeDeleteModal(); refreshData(); }
+            else { alert('Error: ' + (res && res.message ? res.message : 'Failed to delete invoice')); }
+          })
+          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Delete'; alert('Error: ' + err.message); })
+          .deleteInvoice(currentDeleteId, options || null);
+      }
+
+      submitDelete(null);
     };
   </script>
 </body>

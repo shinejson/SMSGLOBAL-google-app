@@ -87,6 +87,30 @@ function addInvoice(invData) {
   if (!sheet) throw new Error("Invoices worksheet not found.");
 
   const nextId = generateNextInvoiceId(sheet);
+  const pendingInvoiceSnapshot = buildAuditSnapshot({
+    invoiceId: nextId,
+    studentId: invData.studentId || '',
+    studentName: invData.studentName || '',
+    studentClass: invData.studentClass || '',
+    academicYear: invData.academicYear || '',
+    term: invData.term || '',
+    category: invData.category || '',
+    items: invData.items || '',
+    amountDue: Number(invData.amountDue) || 0,
+    issueDate: invData.issueDate || '',
+    dueDate: invData.dueDate || '',
+    status: invData.status || 'Pending',
+    paymentStatus: invData.paymentStatus || 'Unpaid'
+  });
+  const createInvoiceYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Create',
+    module: 'Invoices',
+    recordId: nextId,
+    academicYear: invData.academicYear,
+    newValue: pendingInvoiceSnapshot,
+    overrideConfirmed: invData && invData.__adminAcademicYearOverride === true
+  });
+  if (!createInvoiceYearGuard.allowed) return createInvoiceYearGuard;
   const lastRow = sheet.getLastRow();
   const targetRow = lastRow + 1;
 
@@ -140,7 +164,7 @@ function addInvoice(invData) {
     'Create',
     'Invoices',
     nextId,
-    'Created invoice for ' + String(createdInvoice.studentName || createdInvoice.studentId || nextId).trim(),
+    appendAcademicYearOverrideAuditDetails('Created invoice for ' + String(createdInvoice.studentName || createdInvoice.studentId || nextId).trim(), createInvoiceYearGuard),
     null,
     createdInvoice
   );
@@ -155,6 +179,17 @@ function updateInvoice(invoiceId, invData) {
   if (!sheet) throw new Error("Invoices worksheet not found.");
 
   const existingInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || null;
+  const pendingUpdatedInvoice = buildAuditSnapshot(Object.assign({}, existingInvoice || {}, invData, { invoiceId: invoiceId }));
+  const updateInvoiceYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Update',
+    module: 'Invoices',
+    recordId: invoiceId,
+    academicYears: [existingInvoice && existingInvoice.academicYear, invData.academicYear],
+    oldValue: existingInvoice,
+    newValue: pendingUpdatedInvoice,
+    overrideConfirmed: invData && invData.__adminAcademicYearOverride === true
+  });
+  if (!updateInvoiceYearGuard.allowed) return updateInvoiceYearGuard;
   const row = findInvoiceRowById(sheet, invoiceId);
   if (row === -1) throw new Error("Invoice record not found.");
 
@@ -193,7 +228,7 @@ function updateInvoice(invoiceId, invData) {
     'Update',
     'Invoices',
     invoiceId,
-    'Updated invoice for ' + String((updatedInvoice && (updatedInvoice.studentName || updatedInvoice.studentId)) || invoiceId).trim(),
+    appendAcademicYearOverrideAuditDetails('Updated invoice for ' + String((updatedInvoice && (updatedInvoice.studentName || updatedInvoice.studentId)) || invoiceId).trim(), updateInvoiceYearGuard),
     existingInvoice,
     updatedInvoice
   );
@@ -208,6 +243,15 @@ function deleteInvoice(invoiceId) {
   if (!sheet) throw new Error("Invoices worksheet not found.");
 
   const existingInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || null;
+  const deleteInvoiceYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Delete',
+    module: 'Invoices',
+    recordId: invoiceId,
+    academicYear: existingInvoice && existingInvoice.academicYear,
+    oldValue: existingInvoice,
+    overrideConfirmed: arguments[1] && arguments[1].adminAcademicYearOverride === true
+  });
+  if (!deleteInvoiceYearGuard.allowed) return deleteInvoiceYearGuard;
   const row = findInvoiceRowById(sheet, invoiceId);
   if (row === -1) throw new Error("Invoice record not found.");
 
@@ -217,7 +261,7 @@ function deleteInvoice(invoiceId) {
     'Delete',
     'Invoices',
     invoiceId,
-    'Deleted invoice for ' + String(((existingInvoice && (existingInvoice.studentName || existingInvoice.studentId)) || invoiceId)).trim(),
+    appendAcademicYearOverrideAuditDetails('Deleted invoice for ' + String(((existingInvoice && (existingInvoice.studentName || existingInvoice.studentId)) || invoiceId)).trim(), deleteInvoiceYearGuard),
     existingInvoice,
     null
   );

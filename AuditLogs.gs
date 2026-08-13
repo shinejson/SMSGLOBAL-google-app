@@ -425,7 +425,10 @@ function getActionBadge(action) {
     'Login': 'badge-login',
     'Logout': 'badge-logout',
     'Export': 'badge-export',
-    'Import': 'badge-import'
+    'Import': 'badge-import',
+    'Generate': 'badge-generate',
+    'Warning': 'badge-warning',
+    'Denied': 'badge-denied'
   };
   return badges[action] || 'badge-other';
 }
@@ -435,7 +438,10 @@ function getTimelineIndicator(action) {
     'Create': 'timeline-create',
     'Update': 'timeline-update',
     'Delete': 'timeline-delete',
-    'View': 'timeline-view'
+    'View': 'timeline-view',
+    'Generate': 'timeline-generate',
+    'Warning': 'timeline-warning',
+    'Denied': 'timeline-denied'
   };
   return indicators[action] || 'timeline-other';
 }

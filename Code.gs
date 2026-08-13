@@ -1595,6 +1595,27 @@ function addAttendance(attendanceData) {
     rawStatus = statuses.length > 0 ? statuses[0].value : "Present";
   }
 
+  const createdSnapshot = buildAuditSnapshot({
+    attendanceId: nextId,
+    studentId: studentId,
+    studentName: attendanceData.studentName || '',
+    date: dateString,
+    academicYear: attendanceData.academicYear || '',
+    className: attendanceData.className || '',
+    courseId: attendanceData.courseId || '',
+    status: rawStatus,
+    term: attendanceData.term || ''
+  });
+  const createYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Create',
+    module: 'Attendance',
+    recordId: nextId,
+    academicYear: attendanceData.academicYear,
+    newValue: createdSnapshot,
+    overrideConfirmed: attendanceData && attendanceData.__adminAcademicYearOverride === true
+  });
+  if (!createYearGuard.allowed) return createYearGuard;
+
   function setCellVal(idx, val) {
     if (idx >= 0) {
       sheet.getRange(targetRow, idx + 2).setValue(val);
@@ -1626,19 +1647,9 @@ function addAttendance(attendanceData) {
     'Create',
     'Attendance',
     nextId,
-    'Created attendance record',
+    appendAcademicYearOverrideAuditDetails('Created attendance record', createYearGuard),
     null,
-    buildAuditSnapshot({
-      attendanceId: nextId,
-      studentId: studentId,
-      studentName: attendanceData.studentName || '',
-      date: dateString,
-      academicYear: attendanceData.academicYear || '',
-      className: attendanceData.className || '',
-      courseId: attendanceData.courseId || '',
-      status: rawStatus,
-      term: attendanceData.term || ''
-    })
+    createdSnapshot
   );
 
   return { success: true, attendanceId: nextId };
@@ -1690,6 +1701,28 @@ function updateAttendance(attendanceId, attendanceData) {
     rawStatus = statuses.length > 0 ? statuses[0].value : "Present";
   }
 
+  const updatedSnapshot = buildAuditSnapshot({
+    attendanceId: attendanceId,
+    date: attendanceData.date || '',
+    academicYear: attendanceData.academicYear || '',
+    className: attendanceData.className || '',
+    studentId: attendanceData.studentId || '',
+    studentName: attendanceData.studentName || '',
+    courseId: attendanceData.courseId || '',
+    status: rawStatus,
+    term: attendanceData.term || ''
+  });
+  const updateYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Update',
+    module: 'Attendance',
+    recordId: attendanceId,
+    academicYears: [oldSnapshot.academicYear, attendanceData.academicYear],
+    oldValue: oldSnapshot,
+    newValue: updatedSnapshot,
+    overrideConfirmed: attendanceData && attendanceData.__adminAcademicYearOverride === true
+  });
+  if (!updateYearGuard.allowed) return updateYearGuard;
+
   function setCellVal(idx, val) {
     if (idx >= 0) {
       sheet.getRange(row, idx + 2).setValue(val);
@@ -1713,19 +1746,9 @@ function updateAttendance(attendanceId, attendanceData) {
     'Update',
     'Attendance',
     attendanceId,
-    'Updated attendance record',
+    appendAcademicYearOverrideAuditDetails('Updated attendance record', updateYearGuard),
     oldSnapshot,
-    buildAuditSnapshot({
-      attendanceId: attendanceId,
-      date: attendanceData.date || '',
-      academicYear: attendanceData.academicYear || '',
-      className: attendanceData.className || '',
-      studentId: attendanceData.studentId || '',
-      studentName: attendanceData.studentName || '',
-      courseId: attendanceData.courseId || '',
-      status: rawStatus,
-      term: attendanceData.term || ''
-    })
+    updatedSnapshot
   );
 
   return { success: true, message: "Attendance record updated." };
@@ -1753,6 +1776,15 @@ function deleteAttendance(attendanceId) {
     status: String(currentValues[7] || '').trim(),
     term: String(currentValues[8] || '').trim()
   });
+  const deleteYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Delete',
+    module: 'Attendance',
+    recordId: attendanceId,
+    academicYear: deletedSnapshot.academicYear,
+    oldValue: deletedSnapshot,
+    overrideConfirmed: arguments[1] && arguments[1].adminAcademicYearOverride === true
+  });
+  if (!deleteYearGuard.allowed) return deleteYearGuard;
 
   sheet.deleteRow(row);
   if (typeof invalidateAttendanceCache === "function") {
@@ -1763,7 +1795,7 @@ function deleteAttendance(attendanceId) {
     'Delete',
     'Attendance',
     attendanceId,
-    'Deleted attendance record',
+    appendAcademicYearOverrideAuditDetails('Deleted attendance record', deleteYearGuard),
     deletedSnapshot,
     null
   );
@@ -2332,6 +2364,22 @@ function addTeacher(teacherData) {
   if (!sheet) throw new Error("Teachers worksheet not found.");
 
   const nextId = generateNextTeacherId(sheet);
+  const teacherSnapshot = buildAuditSnapshot({
+    teacherId: nextId,
+    firstName: teacherData.firstName,
+    lastName: teacherData.lastName,
+    class: teacherData.class,
+    academicYear: teacherData.academicYear
+  });
+  const teacherYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Create',
+    module: 'Teachers',
+    recordId: nextId,
+    academicYear: teacherData.academicYear,
+    newValue: teacherSnapshot,
+    overrideConfirmed: teacherData && teacherData.__adminAcademicYearOverride === true
+  });
+  if (!teacherYearGuard.allowed) return teacherYearGuard;
   const lastRow = sheet.getLastRow();
   const targetRow = lastRow + 1;
 
@@ -2352,15 +2400,9 @@ function addTeacher(teacherData) {
     'Create',
     'Teachers',
     nextId,
-    'Created teacher record',
+    appendAcademicYearOverrideAuditDetails('Created teacher record', teacherYearGuard),
     null,
-    buildAuditSnapshot({
-      teacherId: nextId,
-      firstName: teacherData.firstName,
-      lastName: teacherData.lastName,
-      class: teacherData.class,
-      academicYear: teacherData.academicYear
-    })
+    teacherSnapshot
   );
 
   return { success: true, teacherId: nextId };
@@ -2885,6 +2927,28 @@ function addPerformance(perfData) {
 
     const targetRow = lastRow + 1;
     const performanceId = `ROW-${targetRow}`;
+    const pendingPerformanceSnapshot = buildPerformanceAuditSnapshot({
+      performanceId: performanceId,
+      studentId: perfData.studentId || perfData.studentName || '',
+      studentName: perfData.studentName,
+      studentClass: perfData.studentClass,
+      term: perfData.term,
+      academicYear: perfData.academicYear,
+      classScore: perfData.classScore,
+      examScore100: perfData.examScore100,
+      examScore60: perfData.examScore50 || perfData.examScore60 || 0,
+      total: perfData.total,
+      course: perfData.course
+    });
+    const createPerformanceYearGuard = enforceAcademicYearCrudSecurity({
+      action: 'Create',
+      module: 'Performance',
+      recordId: performanceId,
+      academicYear: perfData.academicYear,
+      newValue: pendingPerformanceSnapshot,
+      overrideConfirmed: perfData && perfData.__adminAcademicYearOverride === true
+    });
+    if (!createPerformanceYearGuard.allowed) return createPerformanceYearGuard;
 
     // Write values to their respective columns
     if (colName !== -1)
@@ -2939,7 +3003,7 @@ function addPerformance(perfData) {
       'Create',
       'Performance',
       performanceId,
-      'Created performance record for ' + String(perfData.studentName || performanceId).trim(),
+      appendAcademicYearOverrideAuditDetails('Created performance record for ' + String(perfData.studentName || performanceId).trim(), createPerformanceYearGuard),
       null,
       buildPerformanceAuditSnapshot(createdPerformance)
     );
@@ -3040,6 +3104,31 @@ function updatePerformance(performanceId, perfData) {
   const colTotal = findColNumLocal(["total"]);
   const colRank = findColNumLocal(["rank"]);
   const colCourse = findColNumLocal(["course"]);
+
+  const pendingUpdatedPerformance = buildPerformanceAuditSnapshot(Object.assign({}, existingPerformance || {}, {
+    performanceId: performanceId,
+    studentId: perfData.studentId || perfData.studentName || '',
+    studentName: perfData.studentName || '',
+    studentClass: perfData.studentClass || '',
+    term: perfData.term || '',
+    academicYear: perfData.academicYear || '',
+    classScore: perfData.classScore || 0,
+    examScore100: perfData.examScore100 || 0,
+    examScore60: perfData.examScore60 !== undefined ? perfData.examScore60 : perfData.examScore50 || 0,
+    total: perfData.total || 0,
+    rank: perfData.rank || '',
+    course: perfData.course || ''
+  }));
+  const updatePerformanceYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Update',
+    module: 'Performance',
+    recordId: performanceId,
+    academicYears: [existingPerformance && existingPerformance.academicYear, perfData.academicYear],
+    oldValue: buildPerformanceAuditSnapshot(existingPerformance),
+    newValue: pendingUpdatedPerformance,
+    overrideConfirmed: perfData && perfData.__adminAcademicYearOverride === true
+  });
+  if (!updatePerformanceYearGuard.allowed) return updatePerformanceYearGuard;
 
   // Check for duplicate before applying update (ignore current row)
   const dupRow = findPerformanceDuplicateLocal(perfData, row);
@@ -3151,7 +3240,7 @@ function updatePerformance(performanceId, perfData) {
     'Update',
     'Performance',
     performanceId,
-    'Updated performance record for ' + String((updatedPerformance && updatedPerformance.studentName) || performanceId).trim(),
+    appendAcademicYearOverrideAuditDetails('Updated performance record for ' + String((updatedPerformance && updatedPerformance.studentName) || performanceId).trim(), updatePerformanceYearGuard),
     buildPerformanceAuditSnapshot(existingPerformance),
     buildPerformanceAuditSnapshot(updatedPerformance)
   );
@@ -3173,6 +3262,15 @@ function deletePerformance(performanceId) {
   const existingPerformance = getPerformanceDataFromSheet().find((record) => String(record.performanceId).trim() === String(performanceId).trim()) || null;
   const row = findPerformanceRowById(sheet, performanceId);
   if (row === -1) return { success: false, message: "Record not found." };
+  const deletePerformanceYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Delete',
+    module: 'Performance',
+    recordId: performanceId,
+    academicYear: existingPerformance && existingPerformance.academicYear,
+    oldValue: buildPerformanceAuditSnapshot(existingPerformance),
+    overrideConfirmed: arguments[1] && arguments[1].adminAcademicYearOverride === true
+  });
+  if (!deletePerformanceYearGuard.allowed) return deletePerformanceYearGuard;
   sheet.deleteRow(row);
   try { invalidatePerformanceCache(); } catch (e) { /* fail silently */ }
 
@@ -3180,7 +3278,7 @@ function deletePerformance(performanceId) {
     'Delete',
     'Performance',
     performanceId,
-    'Deleted performance record for ' + String(((existingPerformance && existingPerformance.studentName) || performanceId)).trim(),
+    appendAcademicYearOverrideAuditDetails('Deleted performance record for ' + String(((existingPerformance && existingPerformance.studentName) || performanceId)).trim(), deletePerformanceYearGuard),
     buildPerformanceAuditSnapshot(existingPerformance),
     null
   );

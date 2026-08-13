@@ -180,4 +180,150 @@ function checkPasswordSecurityStatus() {
       : "All passwords are securely hashed"
   };
 }
+
+function normalizeAcademicYearValue(value) {
+  return String(value || '').trim();
+}
+
+function getActiveAcademicYearRecord() {
+  const years = typeof getAcademicYearsData === 'function' ? getAcademicYearsData() : [];
+  for (let i = 0; i < years.length; i++) {
+    if (String(years[i].status || '').trim().toLowerCase() === 'active') {
+      return years[i];
+    }
+  }
+  return null;
+}
+
+function getActiveAcademicYearValue() {
+  const activeYear = getActiveAcademicYearRecord();
+  return activeYear ? normalizeAcademicYearValue(activeYear.academicYear) : '';
+}
+
+function isCurrentUserAdmin() {
+  requireLogin();
+  const user = getLoggedInUser();
+  return !!(user && String(user.role || '').trim().toLowerCase() === 'admin');
+}
+
+function appendAcademicYearOverrideAuditDetails(details, guard) {
+  if (!guard || !guard.adminOverride) return details;
+  const base = String(details || '').trim();
+  const note = `Admin override outside active academic year (record: ${guard.recordAcademicYear}, active: ${guard.activeAcademicYear})`;
+  return base ? `${base} | ${note}` : note;
+}
+
+function enforceAcademicYearCrudSecurity(options) {
+  requireLogin();
+  const config = options || {};
+  const action = String(config.action || 'Modify').trim();
+  const module = String(config.module || 'Records').trim();
+  const recordId = String(config.recordId || '').trim();
+  const rawYears = Array.isArray(config.academicYears)
+    ? config.academicYears
+    : [config.academicYear];
+  const normalizedYears = rawYears
+    .map(normalizeAcademicYearValue)
+    .filter(function(year, index, arr) {
+      return arr.indexOf(year) === index;
+    });
+  const activeAcademicYear = getActiveAcademicYearValue();
+  const displayAcademicYear = normalizedYears.length
+    ? normalizedYears.map(function(year) { return year || 'Not set'; }).join(' / ')
+    : 'Not set';
+  const hasBlankYear = normalizedYears.some(function(year) { return !year; });
+  const hasNonActiveYear = normalizedYears.some(function(year) {
+    return !!year && year !== activeAcademicYear;
+  });
+  const oldValue = config.oldValue || null;
+  const newValue = config.newValue || null;
+  const actionLower = action.toLowerCase();
+
+  if (!activeAcademicYear) {
+    safeLogAuditEvent(
+      'Denied',
+      module,
+      recordId,
+      `Blocked ${actionLower} because no active academic year is configured.`,
+      oldValue,
+      newValue
+    );
+
+    return {
+      success: false,
+      allowed: false,
+      message: 'No active academic year is configured. Please set one active academic year before continuing.',
+      requiresAdminOverride: false,
+      recordAcademicYear: displayAcademicYear,
+      activeAcademicYear: '',
+      adminOverride: false,
+      code: 'NO_ACTIVE_ACADEMIC_YEAR'
+    };
+  }
+
+  if (!hasBlankYear && !hasNonActiveYear) {
+    return {
+      success: true,
+      allowed: true,
+      recordAcademicYear: displayAcademicYear,
+      activeAcademicYear: activeAcademicYear,
+      adminOverride: false
+    };
+  }
+
+  const isAdmin = isCurrentUserAdmin();
+  const mismatchMessage = `Affected year(s): ${displayAcademicYear}; active year: ${activeAcademicYear}.`;
+
+  if (!isAdmin) {
+    safeLogAuditEvent(
+      'Denied',
+      module,
+      recordId,
+      `Blocked ${actionLower} outside active academic year. ${mismatchMessage} Admin account required.`,
+      oldValue,
+      newValue
+    );
+
+    return {
+      success: false,
+      allowed: false,
+      message: `You cannot ${actionLower} records outside the active academic year. Affected year(s): ${displayAcademicYear}. Active academic year: ${activeAcademicYear}. Only Admin can continue.`,
+      requiresAdminOverride: false,
+      recordAcademicYear: displayAcademicYear,
+      activeAcademicYear: activeAcademicYear,
+      adminOverride: false,
+      code: 'ACADEMIC_YEAR_RESTRICTED'
+    };
+  }
+
+  if (config.overrideConfirmed === true) {
+    return {
+      success: true,
+      allowed: true,
+      recordAcademicYear: displayAcademicYear,
+      activeAcademicYear: activeAcademicYear,
+      adminOverride: true
+    };
+  }
+
+  safeLogAuditEvent(
+    'Warning',
+    module,
+    recordId,
+    `Admin confirmation required before ${actionLower} outside active academic year. ${mismatchMessage}`,
+    oldValue,
+    newValue
+  );
+
+  return {
+    success: false,
+    allowed: false,
+    requiresAdminOverride: true,
+    message: `Affected year(s): ${displayAcademicYear}. The active academic year is ${activeAcademicYear}. Only an Admin can continue. Please confirm the warning to proceed.`,
+    recordAcademicYear: displayAcademicYear,
+    activeAcademicYear: activeAcademicYear,
+    adminOverride: false,
+    code: 'ACADEMIC_YEAR_ADMIN_CONFIRM'
+  };
+}
  

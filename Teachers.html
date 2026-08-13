@@ -89,6 +89,9 @@
     .toast-error {
       border-left-color: #ef4444;
     }
+    .toast-warning {
+      border-left-color: #f59e0b;
+    }
     .toast-icon {
       width: 26px;
       height: 26px;
@@ -105,6 +108,10 @@
     .toast-error .toast-icon {
       background: #fee2e2;
       color: #991b1b;
+    }
+    .toast-warning .toast-icon {
+      background: #fef3c7;
+      color: #92400e;
     }
     .toast-message {
       font-size: 14px;
@@ -257,9 +264,9 @@
     function showToast(message, type = 'success') {
       const container = document.getElementById('toastContainer');
       const toast = document.createElement('div');
-      toast.className = `toast ${type === 'error' ? 'toast-error' : ''}`;
+      toast.className = `toast ${type === 'error' ? 'toast-error' : type === 'warning' ? 'toast-warning' : ''}`;
       
-      const icon = type === 'error' ? '✕' : '✓';
+      const icon = type === 'error' ? '✕' : type === 'warning' ? '⚠' : '✓';
       
       toast.innerHTML = `
         <div class="toast-icon">${icon}</div>
@@ -372,23 +379,38 @@
         academicYear: document.getElementById('yearSelect').value
       };
 
-      google.script.run
-        .withSuccessHandler(function(res) {
-          btn.disabled = false; btn.innerText = 'Save Teacher';
-          if(res.success) {
-            closeModal(); 
-            document.getElementById('teacherForm').reset();
-            refreshData();
-            showToast(`Teacher added successfully! ID: ${res.teacherId}`, 'success');
-          } else {
-            showToast('Error saving teacher record.', 'error');
-          }
-        })
-        .withFailureHandler(function(err) {
-          btn.disabled = false; btn.innerText = 'Save Teacher';
-          showToast('Error: ' + (err ? err.message : 'Could not save teacher.'), 'error');
-        })
-        .addTeacher(data);
+      function submitTeacher(payload) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.requiresAdminOverride && !payload.__adminAcademicYearOverride) {
+              const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+              if (!proceed) {
+                btn.disabled = false; btn.innerText = 'Save Teacher';
+                showToast('Teacher save cancelled.', 'warning');
+                return;
+              }
+              payload.__adminAcademicYearOverride = true;
+              submitTeacher(payload);
+              return;
+            }
+            btn.disabled = false; btn.innerText = 'Save Teacher';
+            if(res.success) {
+              closeModal(); 
+              document.getElementById('teacherForm').reset();
+              refreshData();
+              showToast(`Teacher added successfully! ID: ${res.teacherId}`, 'success');
+            } else {
+              showToast(res && res.message ? res.message : 'Error saving teacher record.', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false; btn.innerText = 'Save Teacher';
+            showToast('Error: ' + (err ? err.message : 'Could not save teacher.'), 'error');
+          })
+          .addTeacher(payload);
+      }
+
+      submitTeacher(data);
     }
   </script>
 </body>

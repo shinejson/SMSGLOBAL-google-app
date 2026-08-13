@@ -976,6 +976,20 @@
         }
         google.script.run
           .withSuccessHandler(function(res) {
+            if (res && res.requiresAdminOverride && !records[idx].__adminAcademicYearOverride) {
+              const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+              if (!proceed) {
+                btn.disabled = false;
+                btn.innerText = 'Save Attendance';
+                showToast('Attendance save cancelled.', 'warning');
+                return;
+              }
+              records.forEach(function(record) {
+                record.__adminAcademicYearOverride = true;
+              });
+              saveNext(idx);
+              return;
+            }
             if (res && res.success) saved++;
             else errors.push(records[idx].studentId + ': ' + (res && res.message ? res.message : 'failed'));
             saveNext(idx + 1);
@@ -1039,28 +1053,57 @@
       const record = attendanceList.find(r => r.attendanceId === attendanceId);
       if (record) { data.studentId = record.studentId; data.studentName = record.studentName; }
 
-      google.script.run
-        .withSuccessHandler(function(res) {
-          btn.disabled = false; btn.innerText = 'Update Record';
-          if (res && res.success) { closeEditModal(); refreshData(); showToast('Attendance updated successfully!', 'success'); }
-          else { showToast(res && res.message ? res.message : 'Update failed.', 'error'); }
-        })
-        .withFailureHandler(function(err) {
-          btn.disabled = false; btn.innerText = 'Update Record';
-          showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error');
-        })
-        .updateAttendance(attendanceId, data);
+      function submitEdit(payload) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.requiresAdminOverride && !payload.__adminAcademicYearOverride) {
+              const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+              if (!proceed) {
+                btn.disabled = false; btn.innerText = 'Update Record';
+                showToast('Attendance update cancelled.', 'warning');
+                return;
+              }
+              payload.__adminAcademicYearOverride = true;
+              submitEdit(payload);
+              return;
+            }
+            btn.disabled = false; btn.innerText = 'Update Record';
+            if (res && res.success) { closeEditModal(); refreshData(); showToast('Attendance updated successfully!', 'success'); }
+            else { showToast(res && res.message ? res.message : 'Update failed.', 'error'); }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false; btn.innerText = 'Update Record';
+            showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error');
+          })
+          .updateAttendance(attendanceId, payload);
+      }
+
+      submitEdit(data);
     }
 
     function deleteAttendanceRecord(attendanceId) {
       if (!confirm('Are you sure you want to delete this attendance record?')) return;
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res.success) { refreshData(); showToast('Attendance record deleted.', 'success'); }
-          else { showToast(res.message || 'Could not delete record.', 'error'); }
-        })
-        .withFailureHandler(function(err) { showToast('Error: ' + err.message, 'error'); })
-        .deleteAttendance(attendanceId);
+
+      function submitDelete(options) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.requiresAdminOverride && !(options && options.adminAcademicYearOverride)) {
+              const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+              if (!proceed) {
+                showToast('Attendance delete cancelled.', 'warning');
+                return;
+              }
+              submitDelete({ adminAcademicYearOverride: true });
+              return;
+            }
+            if (res.success) { refreshData(); showToast('Attendance record deleted.', 'success'); }
+            else { showToast(res.message || 'Could not delete record.', 'error'); }
+          })
+          .withFailureHandler(function(err) { showToast('Error: ' + err.message, 'error'); })
+          .deleteAttendance(attendanceId, options || null);
+      }
+
+      submitDelete(null);
     }
   </script>
 </body>

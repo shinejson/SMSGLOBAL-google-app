@@ -105,6 +105,28 @@ function addPayment(payData) {
   if (!sheet) throw new Error("Payments worksheet not found.");
 
   const nextId = generateNextPaymentId(sheet);
+  const pendingPaymentSnapshot = buildAuditSnapshot({
+    transactionId: nextId,
+    invoiceId: payData.invoiceId,
+    studentId: payData.studentId,
+    paymentDate: payData.paymentDate,
+    amountPaid: Number(payData.amountPaid) || 0,
+    paymentMethod: payData.paymentMethod,
+    referenceNo: payData.referenceNo,
+    studentName: payData.studentName,
+    academicYear: payData.academicYear,
+    term: payData.term,
+    studentClass: payData.studentClass
+  });
+  const createPaymentYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Create',
+    module: 'Payments',
+    recordId: nextId,
+    academicYear: payData.academicYear,
+    newValue: pendingPaymentSnapshot,
+    overrideConfirmed: payData && payData.__adminAcademicYearOverride === true
+  });
+  if (!createPaymentYearGuard.allowed) return createPaymentYearGuard;
   const lastRow = sheet.getLastRow();
   const targetRow = lastRow + 1;
 
@@ -149,7 +171,7 @@ function addPayment(payData) {
     'Create',
     'Payments',
     nextId,
-    'Created payment for ' + String(createdPayment.studentName || createdPayment.studentId || nextId).trim(),
+    appendAcademicYearOverrideAuditDetails('Created payment for ' + String(createdPayment.studentName || createdPayment.studentId || nextId).trim(), createPaymentYearGuard),
     null,
     createdPayment
   );
@@ -164,6 +186,17 @@ function updatePayment(transactionId, payData) {
   if (!sheet) throw new Error("Payments worksheet not found.");
 
   const existingPayment = getPaymentsDataFromSheet().find((payment) => String(payment.transactionId).trim() === String(transactionId).trim()) || null;
+  const pendingUpdatedPayment = buildAuditSnapshot(Object.assign({}, existingPayment || {}, payData, { transactionId: transactionId }));
+  const updatePaymentYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Update',
+    module: 'Payments',
+    recordId: transactionId,
+    academicYears: [existingPayment && existingPayment.academicYear, payData.academicYear],
+    oldValue: existingPayment,
+    newValue: pendingUpdatedPayment,
+    overrideConfirmed: payData && payData.__adminAcademicYearOverride === true
+  });
+  if (!updatePaymentYearGuard.allowed) return updatePaymentYearGuard;
   const row = findPaymentRowById(sheet, transactionId);
   if (row === -1) throw new Error("Payment record not found.");
 
@@ -195,7 +228,7 @@ function updatePayment(transactionId, payData) {
     'Update',
     'Payments',
     transactionId,
-    'Updated payment for ' + String((updatedPayment && (updatedPayment.studentName || updatedPayment.studentId)) || transactionId).trim(),
+    appendAcademicYearOverrideAuditDetails('Updated payment for ' + String((updatedPayment && (updatedPayment.studentName || updatedPayment.studentId)) || transactionId).trim(), updatePaymentYearGuard),
     existingPayment,
     updatedPayment
   );
@@ -210,6 +243,15 @@ function deletePayment(transactionId) {
   if (!sheet) throw new Error("Payments worksheet not found.");
 
   const existingPayment = getPaymentsDataFromSheet().find((payment) => String(payment.transactionId).trim() === String(transactionId).trim()) || null;
+  const deletePaymentYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Delete',
+    module: 'Payments',
+    recordId: transactionId,
+    academicYear: existingPayment && existingPayment.academicYear,
+    oldValue: existingPayment,
+    overrideConfirmed: arguments[1] && arguments[1].adminAcademicYearOverride === true
+  });
+  if (!deletePaymentYearGuard.allowed) return deletePaymentYearGuard;
   const row = findPaymentRowById(sheet, transactionId);
   if (row === -1) throw new Error("Payment record not found.");
 
@@ -222,7 +264,7 @@ function deletePayment(transactionId) {
     'Delete',
     'Payments',
     transactionId,
-    'Deleted payment for ' + String(((existingPayment && (existingPayment.studentName || existingPayment.studentId)) || transactionId)).trim(),
+    appendAcademicYearOverrideAuditDetails('Deleted payment for ' + String(((existingPayment && (existingPayment.studentName || existingPayment.studentId)) || transactionId)).trim(), deletePaymentYearGuard),
     existingPayment,
     null
   );

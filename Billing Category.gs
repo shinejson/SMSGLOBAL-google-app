@@ -106,6 +106,26 @@ function addBillingCategory(catData) {
   if (!sheet) throw new Error("Billing Categories worksheet not found.");
 
   const nextId = generateNextBillingCategoryId(sheet);
+  const pendingCategorySnapshot = buildBillingCategoryAuditSnapshot({
+    id: nextId,
+    academicYear: catData.academicYear,
+    terms: catData.terms,
+    category: catData.category,
+    items: catData.items,
+    totalAmount: catData.totalAmount,
+    nursery: catData.nursery || 0,
+    date: catData.date,
+    descriptions: catData.descriptions
+  });
+  const createBillingCategoryYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Create',
+    module: 'Billing Categories',
+    recordId: nextId,
+    academicYear: catData.academicYear,
+    newValue: pendingCategorySnapshot,
+    overrideConfirmed: catData && catData.__adminAcademicYearOverride === true
+  });
+  if (!createBillingCategoryYearGuard.allowed) return createBillingCategoryYearGuard;
   const lastRow = sheet.getLastRow();
   const targetRow = lastRow + 1;
 
@@ -124,23 +144,13 @@ function addBillingCategory(catData) {
     ]
   ]);
 
-  const createdCategory = buildBillingCategoryAuditSnapshot({
-    id: nextId,
-    academicYear: catData.academicYear,
-    terms: catData.terms,
-    category: catData.category,
-    items: catData.items,
-    totalAmount: catData.totalAmount,
-    nursery: catData.nursery || 0,
-    date: catData.date,
-    descriptions: catData.descriptions
-  });
+  const createdCategory = pendingCategorySnapshot;
 
   safeLogAuditEvent(
     'Create',
     'Billing Categories',
     nextId,
-    'Created billing category ' + String(catData.category || nextId).trim(),
+    appendAcademicYearOverrideAuditDetails('Created billing category ' + String(catData.category || nextId).trim(), createBillingCategoryYearGuard),
     null,
     createdCategory
   );
@@ -155,6 +165,17 @@ function updateBillingCategory(id, catData) {
   if (!sheet) throw new Error("Billing Categories worksheet not found.");
 
   const existingCategory = getBillingCategoriesData().find((category) => String(category.id).trim() === String(id).trim()) || null;
+  const pendingUpdatedCategory = buildBillingCategoryAuditSnapshot(Object.assign({}, existingCategory || {}, catData, { id: id }));
+  const updateBillingCategoryYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Update',
+    module: 'Billing Categories',
+    recordId: id,
+    academicYears: [existingCategory && existingCategory.academicYear, catData.academicYear],
+    oldValue: buildBillingCategoryAuditSnapshot(existingCategory),
+    newValue: pendingUpdatedCategory,
+    overrideConfirmed: catData && catData.__adminAcademicYearOverride === true
+  });
+  if (!updateBillingCategoryYearGuard.allowed) return updateBillingCategoryYearGuard;
   const row = findBillingCategoryRowById(sheet, id);
   if (row === -1) throw new Error("Billing Category record not found.");
 
@@ -172,13 +193,13 @@ function updateBillingCategory(id, catData) {
     ]
   ]);
 
-  const updatedCategory = buildBillingCategoryAuditSnapshot(Object.assign({}, existingCategory || {}, catData, { id: id }));
+  const updatedCategory = pendingUpdatedCategory;
 
   safeLogAuditEvent(
     'Update',
     'Billing Categories',
     id,
-    'Updated billing category ' + String((updatedCategory && updatedCategory.category) || id).trim(),
+    appendAcademicYearOverrideAuditDetails('Updated billing category ' + String((updatedCategory && updatedCategory.category) || id).trim(), updateBillingCategoryYearGuard),
     buildBillingCategoryAuditSnapshot(existingCategory),
     updatedCategory
   );
@@ -193,6 +214,15 @@ function deleteBillingCategory(id) {
   if (!sheet) throw new Error("Billing Categories worksheet not found.");
 
   const existingCategory = getBillingCategoriesData().find((category) => String(category.id).trim() === String(id).trim()) || null;
+  const deleteBillingCategoryYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Delete',
+    module: 'Billing Categories',
+    recordId: id,
+    academicYear: existingCategory && existingCategory.academicYear,
+    oldValue: buildBillingCategoryAuditSnapshot(existingCategory),
+    overrideConfirmed: arguments[1] && arguments[1].adminAcademicYearOverride === true
+  });
+  if (!deleteBillingCategoryYearGuard.allowed) return deleteBillingCategoryYearGuard;
   const row = findBillingCategoryRowById(sheet, id);
   if (row === -1) throw new Error("Billing Category record not found.");
 
@@ -202,7 +232,7 @@ function deleteBillingCategory(id) {
     'Delete',
     'Billing Categories',
     id,
-    'Deleted billing category ' + String(((existingCategory && existingCategory.category) || id)).trim(),
+    appendAcademicYearOverrideAuditDetails('Deleted billing category ' + String(((existingCategory && existingCategory.category) || id)).trim(), deleteBillingCategoryYearGuard),
     buildBillingCategoryAuditSnapshot(existingCategory),
     null
   );
@@ -216,6 +246,23 @@ function generateStudentBillings(data) {
   try {
     Logger.log('generateStudentBillings called with: ' + JSON.stringify(data));
     
+    const generationYearGuard = enforceAcademicYearCrudSecurity({
+      action: 'Create',
+      module: 'Invoices',
+      recordId: String(data.billingCategoryId || data.category || '').trim(),
+      academicYear: data.academicYear,
+      newValue: buildAuditSnapshot({
+        billingCategoryId: data.billingCategoryId,
+        academicYear: data.academicYear,
+        term: data.term,
+        category: data.category,
+        studentClass: data.studentClass,
+        selectedStudents: (data.studentIds || []).length
+      }),
+      overrideConfirmed: data && data.__adminAcademicYearOverride === true
+    });
+    if (!generationYearGuard.allowed) return generationYearGuard;
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const invoicesSheet = ss.getSheetByName("Invoices");
     
@@ -321,7 +368,7 @@ function generateStudentBillings(data) {
           'Create',
           'Invoices',
           nextInvoiceId,
-          'Generated invoice from billing category ' + String(data.category || '').trim() + ' for ' + studentName,
+          appendAcademicYearOverrideAuditDetails('Generated invoice from billing category ' + String(data.category || '').trim() + ' for ' + studentName, generationYearGuard),
           null,
           createdInvoice
         );
@@ -343,7 +390,7 @@ function generateStudentBillings(data) {
       'Generate',
       'Billing Categories',
       String(data.category || '').trim(),
-      'Generated ' + successCount + ' invoice(s) from billing category ' + String(data.category || '').trim(),
+      appendAcademicYearOverrideAuditDetails('Generated ' + successCount + ' invoice(s) from billing category ' + String(data.category || '').trim(), generationYearGuard),
       null,
       buildAuditSnapshot({
         academicYear: data.academicYear,
