@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>Audit Logs - SMS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      background: #f4f7fc;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #475569;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e1;
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .stat-icon {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    /* Filters */
+    .filters-card {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .filters-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 15px;
+    }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .filter-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+    }
+
+    .filter-input,
+    .filter-select {
+      padding: 10px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1e293b;
+      background: white;
+    }
+
+    .filter-input:focus,
+    .filter-select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+    }
+
+    .search-bar {
+      grid-column: 1 / -1;
+    }
+
+    /* Logs Table */
+    .table-card {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .table-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .log-count {
+      font-size: 14px;
+      color: #64748b;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      background: #f8fafc;
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    tbody td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 14px;
+      color: #1e293b;
+    }
+
+    tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    /* Badges */
+    .badge {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-block;
+    }
+
+    .badge-create {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-update {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .badge-delete {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .badge-view {
+      background: #f3e8ff;
+      color: #6b21a8;
+    }
+
+    .badge-login {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-logout {
+      background: #ede9fe;
+      color: #5b21b6;
+    }
+
+    .badge-export {
+      background: #ffedd5;
+      color: #9a3412;
+    }
+
+    .badge-import {
+      background: #cffafe;
+      color: #155e75;
+    }
+
+    .badge-other {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    /* Timeline Indicators */
+    .timeline-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .timeline-create {
+      background: #10b981;
+    }
+
+    .timeline-update {
+      background: #3b82f6;
+    }
+
+    .timeline-delete {
+      background: #ef4444;
+    }
+
+    .timeline-view {
+      background: #8b5cf6;
+    }
+
+    .timeline-other {
+      background: #94a3b8;
+    }
+
+    /* User Badge */
+    .user-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Loading State */
+    #loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: #64748b;
+    }
+
+    .spinner {
+      border: 4px solid #f3f4f6;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+
+    .empty-state h4 {
+      font-size: 18px;
+      color: #1e293b;
+      margin-bottom: 8px;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+      color: #64748b;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-content {
+      background: white;
+      width: 90%;
+      max-width: 600px;
+      max-height: 80vh;
+      border-radius: 12px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+      transform: scale(0.95);
+      transition: transform 0.25s ease;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-backdrop.active .modal-content {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+
+    .modal-close:hover {
+      color: #475569;
+    }
+
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #f1f5f9;
+      background: #f8fafc;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .detail-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+    }
+
+    .detail-value {
+      font-size: 14px;
+      color: #1e293b;
+      word-wrap: break-word;
+    }
+
+    .detail-value pre {
+      background: #f8fafc;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      overflow-x: auto;
+      margin: 0;
+    }
+
+    /* Toast Notifications */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding: 16px 20px;
+      min-width: 300px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      transform: translateX(400px);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+
+    .toast.active {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .toast-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    .toast-icon.success {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .toast-icon.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .toast-body {
+      flex: 1;
+    }
+
+    .toast-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+
+    .toast-message {
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .filters-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 10px;
+      }
+
+      .header {
+        padding: 20px;
+      }
+
+      .page-title {
+        font-size: 22px;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stat-card {
+        padding: 15px;
+      }
+
+      .table-card {
+        padding: 15px;
+      }
+
+      .detail-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-top">
+        <h1 class="page-title">
+          🔍 Audit Trail
+        </h1>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-secondary" onclick="refreshLogs()">
+            🔄 Refresh
+          </button>
+          <button class="btn btn-primary" onclick="exportLogs()">
+            📥 Export to Excel
+          </button>
+          <button class="btn btn-danger" onclick="openClearModal()">
+            🗑️ Clear Old Logs
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">📊</div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">Total Actions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📅</div>
+          <div class="stat-value" id="statToday">0</div>
+          <div class="stat-label">Today's Activity</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-value" id="statUsers">0</div>
+          <div class="stat-label">Active Users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🗑️</div>
+          <div class="stat-value" id="statDeletions">0</div>
+          <div class="stat-label">Deletions</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-card">
+      <div class="filters-title">Advanced Filters</div>
+      <div class="filters-grid">
+        <div class="filter-group search-bar">
+          <label class="filter-label">Search</label>
+          <input type="text" class="filter-input" id="searchInput" placeholder="Search by user, action, module, details..." oninput="filterLogs()">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Date From</label>
+          <input type="date" class="filter-input" id="filterDateFrom" onchange="filterLogs()">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Date To</label>
+          <input type="date" class="filter-input" id="filterDateTo" onchange="filterLogs()">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Action</label>
+          <select class="filter-select" id="filterAction" onchange="filterLogs()">
+            <option value="">All Actions</option>
+            <option value="Create">Create</option>
+            <option value="Update">Update</option>
+            <option value="Delete">Delete</option>
+            <option value="View">View</option>
+            <option value="Login">Login</option>
+            <option value="Logout">Logout</option>
+            <option value="Export">Export</option>
+            <option value="Import">Import</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">User</label>
+          <select class="filter-select" id="filterUser" onchange="filterLogs()">
+            <option value="">All Users</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Module</label>
+          <select class="filter-select" id="filterModule" onchange="filterLogs()">
+            <option value="">All Modules</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Audit Logs</div>
+        <div class="log-count">
+          Showing <strong id="logCount">0</strong> logs
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loading">
+        <div class="spinner"></div>
+        <p>Loading audit logs...</p>
+      </div>
+
+      <!-- Table -->
+      <div class="table-container">
+        <table id="logsTable" style="display:none;">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>Module</th>
+              <th>Details</th>
+              <th>IP Address</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-backdrop" id="detailModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Audit Log Details</h3>
+        <button class="modal-close" onclick="closeDetailModal()">×</button>
+      </div>
+      <div class="modal-body" id="detailContent">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeDetailModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clear Logs Modal -->
+  <div class="modal-backdrop" id="clearModal">
+    <div class="modal-content" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Clear Old Audit Logs</h3>
+        <button class="modal-close" onclick="closeClearModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 20px; color: #64748b; font-size: 14px;">
+          Delete audit logs older than a specified number of days. This action cannot be undone.
+        </p>
+        <div class="filter-group">
+          <label class="filter-label">Delete logs older than (days)</label>
+          <input type="number" class="filter-input" id="clearDays" placeholder="Enter number of days (e.g., 90)" min="1" value="90">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeClearModal()">Cancel</button>
+        <button class="btn btn-danger" onclick="clearOldLogs()">Delete Logs</button>
+      </div>
+    </div>
+  </div>
+
+ 
+  <script>
+  <?!= HtmlService.createHtmlOutputFromFile('AuditLogs').getContent(); ?>
+  </script>
+</body>
+</html>

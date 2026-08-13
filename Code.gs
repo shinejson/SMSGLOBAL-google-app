@@ -37,6 +37,7 @@ function doGet(e) {
     "Reports",
     "Billings",
     "Billing Categories",
+    "AuditTrials",
   ];
 
   // Special download endpoint: stream a Drive PDF to the browser
@@ -113,6 +114,39 @@ function doGet(e) {
     )
     .addMetaTag("viewport", "width=device-width, initial-scale=1")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Get audit logs statistics for dashboard display
+ * Returns key metrics about audit log activity
+ */
+function getAuditStats() {
+  try {
+    const stats = getAuditStatistics();
+    
+    if (!stats) {
+      return {
+        error: true,
+        message: 'Failed to retrieve audit statistics'
+      };
+    }
+    
+    // Calculate deletions from action breakdown
+    const deletions = stats.actionBreakdown['Delete'] || 0;
+    
+    return {
+      totalActions: stats.totalLogs || 0,
+      todayActions: stats.todayLogs || 0,
+      activeUsers: stats.uniqueUsers || 0,
+      deletions: deletions
+    };
+  } catch (error) {
+    Logger.log('Error in getAuditStats: ' + error.message);
+    return {
+      error: true,
+      message: error.message
+    };
+  }
 }
 
 function getScriptUrl() {
@@ -1012,6 +1046,25 @@ function addStudent(studentData) {
   invalidateStudentsCache();
   invalidateIndex('Students');
 
+  safeLogAuditEvent(
+    'Create',
+    'Students',
+    nextId,
+    'Created student record',
+    null,
+    buildAuditSnapshot({
+      studentId: nextId,
+      firstName: studentData.firstName,
+      lastName: studentData.lastName,
+      email: studentData.email,
+      dob: studentData.dob || '',
+      gender: studentData.gender || '',
+      enrollmentDate: studentData.enrollmentDate || '',
+      status: studentData.status || 'Active',
+      class: studentData.class || ''
+    })
+  );
+
   return { success: true, studentId: nextId };
 }
 
@@ -1044,6 +1097,18 @@ function updateStudent(studentId, studentData) {
     };
   }
 
+  const oldSnapshot = buildAuditSnapshot({
+    studentId: String(currentRow[1] || '').trim(),
+    firstName: String(currentRow[2] || '').trim(),
+    lastName: String(currentRow[3] || '').trim(),
+    email: String(currentRow[4] || '').trim(),
+    dob: currentRow[5] instanceof Date ? currentRow[5].toISOString() : String(currentRow[5] || '').trim(),
+    gender: String(currentRow[6] || '').trim(),
+    enrollmentDate: currentRow[7] instanceof Date ? currentRow[7].toISOString() : String(currentRow[7] || '').trim(),
+    status: String(currentRow[8] || '').trim(),
+    class: String(currentRow[9] || '').trim()
+  });
+
   // Update details in sheet spanning Column 3 (C) to Column 10 (J) -> 8 columns total (includes Class)
   sheet
     .getRange(row, 3, 1, 8)
@@ -1064,6 +1129,25 @@ function updateStudent(studentId, studentData) {
   invalidateStudentsCache();
   invalidateIndex('Students');
 
+  safeLogAuditEvent(
+    'Update',
+    'Students',
+    studentId,
+    'Updated student record',
+    oldSnapshot,
+    buildAuditSnapshot({
+      studentId: studentId,
+      firstName: studentData.firstName,
+      lastName: studentData.lastName,
+      email: studentData.email,
+      dob: studentData.dob || '',
+      gender: studentData.gender || '',
+      enrollmentDate: studentData.enrollmentDate || '',
+      status: studentData.status || 'Active',
+      class: studentData.class || ''
+    })
+  );
+
   return { success: true };
 }
 
@@ -1076,11 +1160,33 @@ function deleteStudent(studentId) {
   const row = findRowById(sheet, studentId);
   if (row === -1) throw new Error("Student record not found.");
 
+  const currentRow = sheet.getRange(row, 1, 1, 10).getValues()[0];
+  const deletedSnapshot = buildAuditSnapshot({
+    studentId: String(currentRow[1] || '').trim(),
+    firstName: String(currentRow[2] || '').trim(),
+    lastName: String(currentRow[3] || '').trim(),
+    email: String(currentRow[4] || '').trim(),
+    dob: currentRow[5] instanceof Date ? currentRow[5].toISOString() : String(currentRow[5] || '').trim(),
+    gender: String(currentRow[6] || '').trim(),
+    enrollmentDate: currentRow[7] instanceof Date ? currentRow[7].toISOString() : String(currentRow[7] || '').trim(),
+    status: String(currentRow[8] || '').trim(),
+    class: String(currentRow[9] || '').trim()
+  });
+
   sheet.deleteRow(row);
   
   // Invalidate cache and index after modification
   invalidateStudentsCache();
   invalidateIndex('Students');
+
+  safeLogAuditEvent(
+    'Delete',
+    'Students',
+    studentId,
+    'Deleted student record',
+    deletedSnapshot,
+    null
+  );
   
   return { success: true };
 }
@@ -1214,6 +1320,19 @@ function importStudents(studentsArray) {
     if (imported > 0) {
       invalidateStudentsCache();
       invalidateIndex('Students');
+      safeLogAuditEvent(
+        'Import',
+        'Students',
+        null,
+        'Imported students in bulk',
+        null,
+        buildAuditSnapshot({
+          imported: imported,
+          failed: failed,
+          duplicates: duplicates,
+          totalRows: studentsArray.length
+        })
+      );
     }
 
     return {
@@ -1240,6 +1359,36 @@ function importStudents(studentsArray) {
   }
 }
 
+// Robust helper to format attendance dates as YYYY-MM-DD
+function formatAttendanceDate(rawD, ss) {
+  if (!rawD) return "";
+  if (rawD instanceof Date && !isNaN(rawD.getTime())) {
+    try {
+      const tz = ss ? ss.getSpreadsheetTimeZone() : Session.getScriptTimeZone();
+      return Utilities.formatDate(rawD, tz, "yyyy-MM-dd");
+    } catch (e) {
+      const yyyy = rawD.getFullYear();
+      const mm = String(rawD.getMonth() + 1).padStart(2, "0");
+      const dd = String(rawD.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+  }
+  const str = String(rawD).trim();
+  if (!str) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const parts = str.split(/[\/\-\.]/);
+  if (parts.length === 3) {
+    let m, d, y;
+    if (parts[0].length === 4) {
+      y = parts[0]; m = parts[1].padStart(2, "0"); d = parts[2].padStart(2, "0");
+    } else {
+      m = parts[0].padStart(2, "0"); d = parts[1].padStart(2, "0"); y = parts[2];
+    }
+    if (y && m && d && y.length === 4) return `${y}-${m}-${d}`;
+  }
+  return str;
+}
+
 // Helper to inspect Row 2 headers in the Attendance sheet and return column index maps (0-based offset relative to Column B)
 function getAttendanceHeaderMap(sheet) {
   const lastCol = Math.max(sheet.getLastColumn(), 10);
@@ -1252,16 +1401,18 @@ function getAttendanceHeaderMap(sheet) {
     .map((h) => String(h || "").trim().toLowerCase());
 
   function findIndex(aliases, fallbackIdx) {
-    for (let i = 0; i < headers.length; i++) {
-      const h = headers[i];
-      for (let a = 0; a < aliases.length; a++) {
-        if (h === aliases[a]) return i;
+    // 1. Exact match pass
+    for (let a = 0; a < aliases.length; a++) {
+      for (let i = 0; i < headers.length; i++) {
+        if (headers[i] === aliases[a]) return i;
       }
     }
-    for (let i = 0; i < headers.length; i++) {
-      const h = headers[i];
-      for (let a = 0; a < aliases.length; a++) {
-        if (h.indexOf(aliases[a]) !== -1) return i;
+    // 2. Partial match pass (skip short aliases to avoid false positives)
+    for (let a = 0; a < aliases.length; a++) {
+      const alias = aliases[a];
+      if (alias.length < 4) continue;
+      for (let i = 0; i < headers.length; i++) {
+        if (headers[i].indexOf(alias) !== -1) return i;
       }
     }
     return fallbackIdx;
@@ -1271,21 +1422,43 @@ function getAttendanceHeaderMap(sheet) {
     numCols: numCols,
     idxId: findIndex(["attendance id", "attendanceid", "id"], 0),
     idxDate: findIndex(["date", "attendance date"], 1),
-    idxYear: findIndex(["academic year", "year", "academicyear"], 2),
-    idxClass: findIndex(["class", "class name", "classname", "student class"], 3),
+    idxYear: findIndex(["academic year", "academicyear", "year"], 2),
+    idxClass: findIndex(["class name", "classname", "student class", "class"], 3),
     idxStudentId: findIndex(["student id", "studentid", "student_id", "sid"], 4),
-    idxStudentName: findIndex(["student name", "name", "student"], 5),
+    idxStudentName: findIndex(["student name", "studentname", "full name", "name"], 5),
     idxCourse: findIndex(["course id", "courseid", "course"], 6),
     idxStatus: findIndex(["status", "attendance status"], 7),
     idxTerm: findIndex(["term"], 8),
   };
 }
 
-// 9. Fetch Attendance Data
-function getAttendanceData() {
+// 9. Fetch Attendance Data (authoritative sheet reader — used by IndexingLayer cache wrapper)
+function getAttendanceDataFromSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Attendance");
   if (!sheet) return [];
+
+  // Auto-verify and enforce Row 2 headers match canonical order
+  try {
+    const headerCheck = sheet.getRange(2, 2, 1, 9).getValues()[0];
+    const expected = ["Attendance ID", "Date", "Academic Year", "Class", "Student ID", "Student Name", "Course ID", "Status", "Term"];
+    let needsFix = false;
+    for (let i = 0; i < expected.length; i++) {
+      if (String(headerCheck[i] || "").trim().toLowerCase() !== expected[i].toLowerCase()) {
+        needsFix = true;
+        break;
+      }
+    }
+    if (needsFix) {
+      const hRange = sheet.getRange(2, 2, 1, expected.length);
+      hRange.setValues([expected]);
+      hRange.setFontWeight("bold");
+      hRange.setBackground("#4A90E2");
+      hRange.setFontColor("#FFFFFF");
+    }
+  } catch (e) {
+    Logger.log("Error checking/fixing headers: " + e.message);
+  }
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 3) return [];
@@ -1296,44 +1469,47 @@ function getAttendanceData() {
   const dataRange = sheet.getRange(3, 2, lastRow - 2, hMap.numCols);
   const data = dataRange.getValues();
 
+  const statusesList = typeof getAttendanceStatuses === "function" ? getAttendanceStatuses() : [];
+  const defaultStatus = statusesList.length > 0 ? statusesList[0].value : "Present";
+
   return data
     .filter((row) => {
       const idVal = row[hMap.idxId] !== undefined ? String(row[hMap.idxId] || "").trim() : "";
+      const stuIdVal = row[hMap.idxStudentId] !== undefined ? String(row[hMap.idxStudentId] || "").trim() : "";
       const nameVal = row[hMap.idxStudentName] !== undefined ? String(row[hMap.idxStudentName] || "").trim() : "";
-      return idVal !== "" || nameVal !== "";
+      const classVal = row[hMap.idxClass] !== undefined ? String(row[hMap.idxClass] || "").trim() : "";
+      return idVal !== "" || stuIdVal !== "" || nameVal !== "" || classVal !== "";
     })
     .map((row) => {
       const getVal = (idx) => {
         return idx >= 0 && idx < row.length ? String(row[idx] || "").trim() : "";
       };
 
-      let dateVal = "";
-      if (hMap.idxDate >= 0 && hMap.idxDate < row.length && row[hMap.idxDate]) {
-        const rawD = row[hMap.idxDate];
-        if (rawD instanceof Date && !isNaN(rawD.getTime())) {
-          dateVal = rawD.toISOString().split("T")[0];
-        } else {
-          dateVal = String(rawD).trim();
-        }
-      }
+      const rawId = getVal(hMap.idxId);
+      let dateVal = hMap.idxDate >= 0 && hMap.idxDate < row.length ? formatAttendanceDate(row[hMap.idxDate], ss) : "";
+      const rawYear = getVal(hMap.idxYear);
+      const rawClass = getVal(hMap.idxClass);
+      const rawStuId = getVal(hMap.idxStudentId);
+      const rawStuName = getVal(hMap.idxStudentName);
+      const rawCourse = getVal(hMap.idxCourse);
+      const rawStatus = getVal(hMap.idxStatus);
+      const rawTerm = getVal(hMap.idxTerm);
 
-      let statusVal = getVal(hMap.idxStatus);
-      if (!statusVal || statusVal.toLowerCase() === "undefined" || statusVal.toLowerCase() === "null") {
-        // Use first status from settings as default
-        const statuses = getAttendanceStatuses();
-        statusVal = statuses.length > 0 ? statuses[0].value : "Present";
+      let finalStatus = rawStatus;
+      if (!finalStatus || finalStatus.toLowerCase() === "undefined" || finalStatus.toLowerCase() === "null") {
+        finalStatus = defaultStatus;
       }
 
       return {
-        attendanceId: getVal(hMap.idxId),
+        attendanceId: rawId,
         date: dateVal,
-        academicYear: getVal(hMap.idxYear),
-        className: getVal(hMap.idxClass),
-        studentId: getVal(hMap.idxStudentId),
-        studentName: getVal(hMap.idxStudentName),
-        courseId: getVal(hMap.idxCourse),
-        status: statusVal,
-        term: getVal(hMap.idxTerm),
+        academicYear: rawYear,
+        className: rawClass,
+        studentId: rawStuId,
+        studentName: rawStuName,
+        courseId: rawCourse,
+        status: finalStatus,
+        term: rawTerm,
       };
     });
 }
@@ -1442,6 +1618,29 @@ function addAttendance(attendanceData) {
     ]]);
   }
 
+  if (typeof invalidateAttendanceCache === "function") {
+    invalidateAttendanceCache();
+  }
+
+  safeLogAuditEvent(
+    'Create',
+    'Attendance',
+    nextId,
+    'Created attendance record',
+    null,
+    buildAuditSnapshot({
+      attendanceId: nextId,
+      studentId: studentId,
+      studentName: attendanceData.studentName || '',
+      date: dateString,
+      academicYear: attendanceData.academicYear || '',
+      className: attendanceData.className || '',
+      courseId: attendanceData.courseId || '',
+      status: rawStatus,
+      term: attendanceData.term || ''
+    })
+  );
+
   return { success: true, attendanceId: nextId };
 }
 
@@ -1471,6 +1670,19 @@ function updateAttendance(attendanceId, attendanceData) {
   const hMap = getAttendanceHeaderMap(sheet);
   if (!hMap) return { success: false, message: "Could not read sheet headers." };
 
+  const currentValues = sheet.getRange(row, 2, 1, 9).getValues()[0];
+  const oldSnapshot = buildAuditSnapshot({
+    attendanceId: String(currentValues[0] || '').trim(),
+    date: currentValues[1] instanceof Date ? currentValues[1].toISOString() : String(currentValues[1] || '').trim(),
+    academicYear: String(currentValues[2] || '').trim(),
+    className: String(currentValues[3] || '').trim(),
+    studentId: String(currentValues[4] || '').trim(),
+    studentName: String(currentValues[5] || '').trim(),
+    courseId: String(currentValues[6] || '').trim(),
+    status: String(currentValues[7] || '').trim(),
+    term: String(currentValues[8] || '').trim()
+  });
+
   let rawStatus = String(attendanceData.status || "").trim();
   if (!rawStatus || rawStatus.toLowerCase() === "undefined" || rawStatus.toLowerCase() === "null") {
     // Use first status from settings as default
@@ -1493,6 +1705,29 @@ function updateAttendance(attendanceId, attendanceData) {
   setCellVal(hMap.idxStatus, rawStatus);
   setCellVal(hMap.idxTerm, attendanceData.term || "");
 
+  if (typeof invalidateAttendanceCache === "function") {
+    invalidateAttendanceCache();
+  }
+
+  safeLogAuditEvent(
+    'Update',
+    'Attendance',
+    attendanceId,
+    'Updated attendance record',
+    oldSnapshot,
+    buildAuditSnapshot({
+      attendanceId: attendanceId,
+      date: attendanceData.date || '',
+      academicYear: attendanceData.academicYear || '',
+      className: attendanceData.className || '',
+      studentId: attendanceData.studentId || '',
+      studentName: attendanceData.studentName || '',
+      courseId: attendanceData.courseId || '',
+      status: rawStatus,
+      term: attendanceData.term || ''
+    })
+  );
+
   return { success: true, message: "Attendance record updated." };
 }
 
@@ -1506,8 +1741,57 @@ function deleteAttendance(attendanceId) {
   if (row === -1)
     return { success: false, message: "Attendance record not found." };
 
+  const currentValues = sheet.getRange(row, 2, 1, 9).getValues()[0];
+  const deletedSnapshot = buildAuditSnapshot({
+    attendanceId: String(currentValues[0] || '').trim(),
+    date: currentValues[1] instanceof Date ? currentValues[1].toISOString() : String(currentValues[1] || '').trim(),
+    academicYear: String(currentValues[2] || '').trim(),
+    className: String(currentValues[3] || '').trim(),
+    studentId: String(currentValues[4] || '').trim(),
+    studentName: String(currentValues[5] || '').trim(),
+    courseId: String(currentValues[6] || '').trim(),
+    status: String(currentValues[7] || '').trim(),
+    term: String(currentValues[8] || '').trim()
+  });
+
   sheet.deleteRow(row);
+  if (typeof invalidateAttendanceCache === "function") {
+    invalidateAttendanceCache();
+  }
+
+  safeLogAuditEvent(
+    'Delete',
+    'Attendance',
+    attendanceId,
+    'Deleted attendance record',
+    deletedSnapshot,
+    null
+  );
+
   return { success: true, message: "Attendance record deleted." };
+}
+
+// 12c-2. Check and Fix Attendance Sheet Headers
+function checkAndFixAttendanceHeaders() {
+  requireLogin();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Attendance");
+  if (!sheet) return { success: false, message: "Attendance sheet not found!" };
+
+  const expectedHeaders = [
+    "Attendance ID", "Date", "Academic Year", "Class",
+    "Student ID", "Student Name", "Course ID", "Status", "Term"
+  ];
+  try {
+    sheet.getRange(2, 2, 1, expectedHeaders.length).setValues([expectedHeaders]);
+    const headerRange = sheet.getRange(2, 2, 1, expectedHeaders.length);
+    headerRange.setFontWeight("bold");
+    headerRange.setBackground("#4A90E2");
+    headerRange.setFontColor("#FFFFFF");
+    return { success: true, message: "Headers verified and fixed successfully!" };
+  } catch (e) {
+    return { success: false, message: "Error fixing headers: " + e.message };
+  }
 }
 
 // 12d. Helper: Get just Student IDs and Names for dropdowns (includes Class field for dynamic filtering)
@@ -1698,6 +1982,22 @@ function addCourse(courseData) {
       ],
     ]);
 
+  safeLogAuditEvent(
+    'Create',
+    'Courses',
+    nextId,
+    'Created course record',
+    null,
+    buildAuditSnapshot({
+      courseId: nextId,
+      courseName: courseData.courseName,
+      instructor: courseData.instructor,
+      credits: courseData.credits,
+      semester: courseData.semester,
+      status: courseData.status || 'Active'
+    })
+  );
+
   return { success: true, courseId: nextId };
 }
 
@@ -1782,6 +2082,22 @@ function addEnrollment(enrollmentData) {
       ],
     ]);
 
+  safeLogAuditEvent(
+    'Create',
+    'Enrollments',
+    nextId,
+    'Created enrollment record',
+    null,
+    buildAuditSnapshot({
+      enrollmentId: nextId,
+      studentId: enrollmentData.studentId,
+      courseId: enrollmentData.courseId,
+      enrollmentDate: enrollmentData.enrollmentDate,
+      grade: enrollmentData.grade,
+      status: enrollmentData.status
+    })
+  );
+
   return { success: true, enrollmentId: nextId };
 }
 
@@ -1838,6 +2154,15 @@ function addClass(className) {
   // Set value in Column A
   sheet.getRange(targetRow, 1, 1, 1).setValue([className]);
 
+  safeLogAuditEvent(
+    'Create',
+    'Classes',
+    className,
+    'Created class record',
+    null,
+    buildAuditSnapshot({ className: className })
+  );
+
   return { success: true };
 }
 
@@ -1850,8 +2175,19 @@ function updateClass(id, className) {
   // id is the row number in the sheet
   if (id < 2) throw new Error("Invalid class ID.");
 
+  const oldClassName = String(sheet.getRange(id, 1).getValue() || '').trim();
+
   // Update Column A with the new class name
   sheet.getRange(id, 1).setValue(className);
+
+  safeLogAuditEvent(
+    'Update',
+    'Classes',
+    String(id),
+    'Updated class record',
+    buildAuditSnapshot({ className: oldClassName, rowId: id }),
+    buildAuditSnapshot({ className: className, rowId: id })
+  );
 
   return { success: true };
 }
@@ -1865,8 +2201,19 @@ function deleteClass(id) {
   // id is the row number in the sheet
   if (id < 2) throw new Error("Invalid class ID.");
 
+  const className = String(sheet.getRange(id, 1).getValue() || '').trim();
+
   // Delete the entire row
   sheet.deleteRow(id);
+
+  safeLogAuditEvent(
+    'Delete',
+    'Classes',
+    String(id),
+    'Deleted class record',
+    buildAuditSnapshot({ className: className, rowId: id }),
+    null
+  );
 
   return { success: true };
 }
@@ -1907,6 +2254,18 @@ function addAcademicYear(yearData) {
   sheet
     .getRange(targetRow, 2, 1, 2)
     .setValues([[yearData.academicYear, yearData.status || "Active"]]);
+
+  safeLogAuditEvent(
+    'Create',
+    'Academic Years',
+    yearData.academicYear,
+    'Created academic year record',
+    null,
+    buildAuditSnapshot({
+      academicYear: yearData.academicYear,
+      status: yearData.status || 'Active'
+    })
+  );
 
   return { success: true };
 }
@@ -1976,6 +2335,21 @@ function addTeacher(teacherData) {
         teacherData.academicYear,
       ],
     ]);
+
+  safeLogAuditEvent(
+    'Create',
+    'Teachers',
+    nextId,
+    'Created teacher record',
+    null,
+    buildAuditSnapshot({
+      teacherId: nextId,
+      firstName: teacherData.firstName,
+      lastName: teacherData.lastName,
+      class: teacherData.class,
+      academicYear: teacherData.academicYear
+    })
+  );
 
   return { success: true, teacherId: nextId };
 }

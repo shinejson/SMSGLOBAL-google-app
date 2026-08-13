@@ -1,221 +1,2583 @@
-// --- SETTINGS FUNCTIONS ---
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body { background-color: #f4f7fc; padding: 40px; height: 100vh; overflow-y: auto; overflow-x: hidden; }
 
-/**
- * Convert a Google Drive share/view URL to a direct image URL for <img> tags
- * Handles formats like:
- * - https://drive.google.com/file/d/FILE_ID/view?usp=drive_link
- * - https://drive.google.com/open?id=FILE_ID
- * - https://drive.google.com/uc?id=FILE_ID
- */
-function convertDriveUrlToDirectImage(url) {
-  if (!url) return '';
-  const strUrl = String(url).trim();
-  
-  // Extract File ID from various Google Drive URL patterns
-  let fileId = '';
-  const fileDMatch = strUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  const idParamMatch = strUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-  
-  if (fileDMatch && fileDMatch[1]) {
-    fileId = fileDMatch[1];
-  } else if (idParamMatch && idParamMatch[1]) {
-    fileId = idParamMatch[1];
-  }
-  
-  if (fileId) {
-    // Return high-reliability direct thumbnail / Google CDN image link
-    return 'https://lh3.googleusercontent.com/d/' + fileId;
-  }
-  
-  return strUrl;
-}
+    /* --- PAGE HEADER --- */
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+    .page-title { font-size: 24px; color: #0f172a; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .page-subtitle { font-size: 14px; color: #64748b; font-weight: 400; margin-top: 5px; }
 
-// 1. Fetch Main System Parameters (Left side of Settings Sheet)
-function getSystemParameters() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Settings");
-  if (!sheet) return [];
+    /* --- SETTINGS LAYOUT --- */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 25px;
+    }
 
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
+    .tabs-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
 
-  // Read from Row 2 downward (Header is Row 1), Column B (Parameter) and C (Value)
-  const dataRange = sheet.getRange(2, 2, lastRow - 1, 2);
-  const data = dataRange.getValues();
+    .tabs-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 8px;
+      background: rgba(226, 232, 240, 0.92);
+      border-radius: 14px;
+      border: 1px solid #cbd5e1;
+      position: sticky;
+      top: 16px;
+      z-index: 50;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    }
 
-  return data
-    .map((row) => {
-      const paramName = String(row[0]).trim();
-      const rawValue  = String(row[1]).trim();
-      let displayValue = rawValue;
+    .tab-btn {
+      border: none;
+      background: transparent;
+      color: #475569;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 48px;
+    }
 
-      if (/password/i.test(paramName)) {
-        displayValue = '••••••';
+    .tab-btn:focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 2px;
+    }
+
+    .tab-btn-icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .tab-btn-label {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      text-align: left;
+    }
+
+    .tab-btn-title {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .tab-btn-subtitle {
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      line-height: 1.2;
+    }
+
+    .tab-badge {
+      margin-left: auto;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.18);
+      color: #334155;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .tab-btn:hover {
+      background: rgba(255,255,255,0.55);
+      color: #0f172a;
+    }
+
+    .tab-btn.active {
+      background: white;
+      color: #2563eb;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    }
+
+    .tab-btn.active .tab-btn-subtitle {
+      color: #2563eb;
+    }
+
+    .tab-btn.active .tab-badge {
+      background: rgba(37, 99, 235, 0.12);
+      color: #2563eb;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .tab-intro {
+      margin-bottom: 20px;
+      padding: 16px 18px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+    }
+
+    .tab-intro-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .tab-intro-text {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    /* --- CARDS --- */
+    .card {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow: hidden;
+      padding: 20px;
+    }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; }
+    .card-title { font-size: 16px; font-weight: 600; color: #0f172a; }
+    
+    /* --- PARAMETER LIST --- */
+    .param-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f8fafc;
+    }
+    .param-row:last-child { border-bottom: none; }
+    .param-label { font-size: 14px; font-weight: 500; color: #475569; }
+    .param-value { font-size: 14px; color: #0f172a; display: flex; align-items: center; gap: 10px; }
+    
+    .edit-trigger {
+      color: #3b82f6;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 12px;
+      transition: color 0.2s;
+    }
+    .edit-trigger:hover { color: #2563eb; text-decoration: underline; }
+
+    /* --- LIST DISPLAY --- */
+    .tag-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .tag {
+      background: #f1f5f9;
+      color: #1e293b;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tag-edit-btn {
+      background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 14px; padding: 0 2px; transition: color 0.2s;
+    }
+    .tag-edit-btn:hover { color: #3b82f6; }
+
+    /* --- MODALS --- */
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+    .modal-backdrop.active { opacity: 1; pointer-events: auto; }
+    .modal-content { background: white; width: 90%; max-width: 450px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); transform: scale(0.95); transition: transform 0.25s ease; overflow: hidden; display: flex; flex-direction: column; }
+    .modal-backdrop.active .modal-content { transform: scale(1); }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 18px; color: #0f172a; font-weight: 600; }
+    .modal-close { color: #94a3b8; font-size: 24px; background: none; border: none; cursor: pointer; }
+    .modal-close:hover { color: #334155; }
+    .modal-body { padding: 24px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid #f1f5f9; background: #f8fafc; display: flex; justify-content: flex-end; gap: 12px; }
+
+    .system-error-hero {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      margin-bottom: 18px;
+    }
+
+    .system-error-icon {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .system-error-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #991b1b;
+      margin-bottom: 4px;
+    }
+
+    .system-error-text {
+      font-size: 13px;
+      color: #7f1d1d;
+      line-height: 1.5;
+    }
+
+    .system-error-help {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .system-error-help-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+
+    .system-error-help ul {
+      margin-left: 18px;
+      color: #475569;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .system-error-detail {
+      margin-top: 16px;
+      padding: 10px 12px;
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; margin-bottom: 6px; }
+    .form-input { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; }
+    .form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+
+    .btn { padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn-secondary { background: #e2e8f0; color: #475569; }
+    .btn-secondary:hover { background: #cbd5e1; color: #1e293b; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+
+    /* Loading animation for confirm buttons */
+    .btn-loading {
+      position: relative;
+      overflow: hidden;
+      padding-right: 44px;
+      transition: transform 0.15s ease;
+    }
+    .btn-loading::after {
+      content: "";
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.7);
+      border-top-color: rgba(255,255,255,1);
+      border-radius: 50%;
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%) rotate(0deg);
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: translateY(-50%) rotate(360deg); }
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+    .btn-loading.animate { animation: pulse 1s ease-in-out infinite; }
+
+    /* --- BACKUP SECTION --- */
+    .backup-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+    .btn-backup { background: #10b981; color: white; }
+    .btn-backup:hover { background: #059669; }
+    .btn-restore { background: #f59e0b; color: white; }
+    .btn-restore:hover { background: #d97706; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    
+    .backup-list { max-height: 300px; overflow-y: auto; margin-top: 15px; }
+    .backup-item {
+      padding: 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .backup-info { flex: 1; }
+    .backup-name { font-weight: 600; font-size: 14px; color: #0f172a; }
+    .backup-meta { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .backup-actions-btn { display: flex; gap: 8px; }
+    .btn-small { padding: 6px 12px; font-size: 12px; border-radius: 6px; cursor: pointer; border: none; font-weight: 500; }
+    .btn-download { background: #3b82f6; color: white; }
+    .btn-download:hover { background: #2563eb; }
+    .btn-delete { background: #ef4444; color: white; }
+    .btn-delete:hover { background: #dc2626; }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
+    .stat-card { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .stat-label { font-size: 12px; color: #64748b; font-weight: 500; }
+    .stat-value { font-size: 20px; font-weight: 700; color: #0f172a; margin-top: 5px; }
+    
+    .checkbox-group { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+    .checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #475569; cursor: pointer; }
+    .checkbox-label input { cursor: pointer; }
+    
+    /* --- TOAST NOTIFICATIONS --- */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    
+    .toast {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding: 16px 20px;
+      min-width: 300px;
+      max-width: 400px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      pointer-events: auto;
+      transform: translateX(400px);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+    
+    .toast.show {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    
+    .toast-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    
+    .toast-content {
+      flex: 1;
+    }
+    
+    .toast-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 4px;
+      color: #0f172a;
+    }
+    
+    .toast-message {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.4;
+    }
+    
+    .toast-close {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0;
+      margin-left: 8px;
+    }
+    
+    .toast-close:hover {
+      color: #475569;
+    }
+    
+    .toast.success { border-left: 4px solid #10b981; }
+    .toast.error { border-left: 4px solid #ef4444; }
+    .toast.warning { border-left: 4px solid #f59e0b; }
+    .toast.info { border-left: 4px solid #3b82f6; }
+    
+    .toast-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+    }
+    
+    .toast-link {
+      font-size: 12px;
+      color: #3b82f6;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+    
+    .toast-link:hover {
+      background: #eff6ff;
+    }
+    
+    /* --- AUTH BANNER (non-overlapping) --- */
+    .auth-required-banner {
+      width: 100%;
+      box-sizing: border-box;
+      background: #fef3c7;
+      border: 2px solid #f59e0b;
+      padding: 15px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .auth-required-banner .auth-content { color: #92400e; }
+    .auth-required-banner .auth-title { font-weight: 700; margin-bottom: 6px; }
+    .auth-required-banner .auth-actions { white-space: nowrap; }
+    
+    /* --- RESPONSIVE --- */
+    @media (max-width: 900px) {
+      .settings-grid { grid-template-columns: 1fr; }
+      body { padding: 20px; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .toast-container { right: 10px; left: 10px; }
+      .toast { min-width: auto; max-width: none; }
+      .tabs-nav {
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+      }
+      .tab-btn {
+        width: 100%;
+        text-align: left;
+        justify-content: flex-start;
+        padding: 14px 16px;
+      }
+      .tab-btn-label {
+        flex: 1;
+      }
+      .tab-btn-subtitle {
+        font-size: 12px;
+      }
+    }
+
+    /* --- DARK MODE STYLES --- */
+    body.dark-mode {
+      background-color: #0f172a;
+      color: #f1f5f9;
+    }
+    body.dark-mode .page-title {
+      color: #f1f5f9;
+    }
+    body.dark-mode .page-subtitle {
+      color: #94a3b8;
+    }
+    body.dark-mode .card {
+      background: #1e293b;
+      border-color: #334155;
+    }
+    body.dark-mode .card-header {
+      border-bottom-color: #334155;
+    }
+    body.dark-mode .card-title {
+      color: #f1f5f9;
+    }
+    body.dark-mode .param-row {
+      border-bottom-color: #334155;
+    }
+    body.dark-mode .param-label {
+      color: #94a3b8;
+    }
+    body.dark-mode .param-value {
+      color: #f1f5f9;
+    }
+    body.dark-mode .edit-trigger {
+      color: #60a5fa;
+    }
+    body.dark-mode .edit-trigger:hover {
+      color: #3b82f6;
+    }
+    body.dark-mode .tag {
+      background: #0f172a;
+      color: #f1f5f9;
+      border: 1px solid #334155;
+    }
+    body.dark-mode .tag-edit-btn {
+      color: #94a3b8;
+    }
+    body.dark-mode .tag-edit-btn:hover {
+      color: #60a5fa;
+    }
+    body.dark-mode .modal-content {
+      background: #1e293b;
+    }
+    body.dark-mode .modal-header {
+      border-bottom-color: #334155;
+    }
+    body.dark-mode .modal-header h3 {
+      color: #f1f5f9;
+    }
+    body.dark-mode .modal-close {
+      color: #94a3b8;
+    }
+    body.dark-mode .modal-close:hover {
+      color: #f1f5f9;
+    }
+    body.dark-mode .modal-footer {
+      background: #0f172a;
+      border-top-color: #334155;
+    }
+    body.dark-mode .form-label {
+      color: #94a3b8;
+    }
+    body.dark-mode .form-input {
+      background: #0f172a;
+      border-color: #334155;
+      color: #f1f5f9;
+    }
+    body.dark-mode .form-input:focus {
+      border-color: #3b82f6;
+    }
+    body.dark-mode .btn-secondary {
+      background: #334155;
+      color: #f1f5f9;
+    }
+    body.dark-mode .btn-secondary:hover {
+      background: #475569;
+    }
+    body.dark-mode .tabs-nav {
+      background: rgba(30, 41, 59, 0.92);
+      border: 1px solid #334155;
+      box-shadow: 0 8px 20px rgba(2, 6, 23, 0.35);
+    }
+    body.dark-mode .tab-btn {
+      color: #94a3b8;
+    }
+    body.dark-mode .tab-btn:hover {
+      background: rgba(51, 65, 85, 0.85);
+      color: #f1f5f9;
+    }
+    body.dark-mode .tab-btn.active {
+      background: #0f172a;
+      color: #60a5fa;
+      box-shadow: none;
+    }
+    body.dark-mode .tab-btn-subtitle {
+      color: #94a3b8;
+    }
+    body.dark-mode .tab-btn.active .tab-btn-subtitle {
+      color: #60a5fa;
+    }
+    body.dark-mode .tab-badge {
+      background: rgba(148, 163, 184, 0.14);
+      color: #e2e8f0;
+    }
+    body.dark-mode .tab-btn.active .tab-badge {
+      background: rgba(96, 165, 250, 0.16);
+      color: #60a5fa;
+    }
+    body.dark-mode .tab-intro {
+      background: #0f172a;
+      border-color: #334155;
+    }
+    body.dark-mode .system-error-hero {
+      background: rgba(127, 29, 29, 0.2);
+      border-color: rgba(248, 113, 113, 0.3);
+    }
+    body.dark-mode .system-error-title {
+      color: #fca5a5;
+    }
+    body.dark-mode .system-error-text {
+      color: #fecaca;
+    }
+    body.dark-mode .system-error-help {
+      background: #0f172a;
+      border-color: #334155;
+    }
+    body.dark-mode .system-error-help-title {
+      color: #f1f5f9;
+    }
+    body.dark-mode .system-error-help ul {
+      color: #cbd5e1;
+    }
+    body.dark-mode .system-error-detail {
+      background: #020617;
+      color: #e2e8f0;
+    }
+    body.dark-mode .tab-intro-title {
+      color: #f1f5f9;
+    }
+    body.dark-mode .tab-intro-text {
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div>
+      <div class="page-title">⚙️ System Configuration</div>
+      <div class="page-subtitle">Manage your global system parameters, lists, and dropdown options.</div>
+    </div>
+  </div>
+
+  <div class="tabs-shell">
+    <div class="tabs-nav" role="tablist" aria-label="Settings sections">
+      <button class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="tab-general" id="tabBtn-general" data-tab="general">
+        <span class="tab-btn-icon" aria-hidden="true">⚙️</span>
+        <span class="tab-btn-label">
+          <span class="tab-btn-title">General Settings</span>
+          <span class="tab-btn-subtitle">Parameters and system lists</span>
+        </span>
+        <span class="tab-badge" id="tabBadge-general">0</span>
+      </button>
+      <button class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-grading" id="tabBtn-grading" data-tab="grading">
+        <span class="tab-btn-icon" aria-hidden="true">📊</span>
+        <span class="tab-btn-label">
+          <span class="tab-btn-title">Grading</span>
+          <span class="tab-btn-subtitle">Score percentage setup</span>
+        </span>
+        <span class="tab-badge" id="tabBadge-grading">0</span>
+      </button>
+      <button class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-backups" id="tabBtn-backups" data-tab="backups">
+        <span class="tab-btn-icon" aria-hidden="true">🔒</span>
+        <span class="tab-btn-label">
+          <span class="tab-btn-title">Backup & Restore</span>
+          <span class="tab-btn-subtitle">Recovery and file management</span>
+        </span>
+        <span class="tab-badge" id="tabBadge-backups">0</span>
+      </button>
+      <button class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-auditlogs" id="tabBtn-auditlogs" data-tab="auditlogs">
+        <span class="tab-btn-icon" aria-hidden="true">🔍</span>
+        <span class="tab-btn-label">
+          <span class="tab-btn-title">Audit Logs</span>
+          <span class="tab-btn-subtitle">Track user actions and changes</span>
+        </span>
+        <span class="tab-badge" id="tabBadge-auditlogs">0</span>
+      </button>
+    </div>
+
+    <div class="tab-panel active" id="tab-general" role="tabpanel" aria-labelledby="tabBtn-general">
+      <div class="tab-intro">
+        <div class="tab-intro-title">General system settings</div>
+        <div class="tab-intro-text">Manage editable parameters, license-related controls, and dropdown list values used across the system.</div>
+      </div>
+
+      <div class="settings-grid">
+        <!-- CARD 1: SYSTEM PARAMETERS -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Parameters</span>
+          </div>
+          <div id="paramsContainer">
+            <div style="text-align:center; color: #64748b; padding: 20px;">Loading parameters...</div>
+          </div>
+        </div>
+
+        <!-- CARD 2: DROPDOWN LISTS -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">System Lists (Dropdown Options)</span>
+          </div>
+          <div>
+            <div style="margin-bottom: 20px;">
+              <span style="font-size: 14px; font-weight: 600; color: #475569;">Fee Categories</span>
+              <div class="tag-container" id="categoriesContainer"><span style="color:#94a3b8;">Loading...</span></div>
+            </div>
+            <div style="margin-bottom: 20px;">
+              <span style="font-size: 14px; font-weight: 600; color: #475569;">Payment Methods</span>
+              <div class="tag-container" id="methodsContainer"><span style="color:#94a3b8;">Loading...</span></div>
+            </div>
+            <div></div>
+              <span style="font-size: 14px; font-weight: 600; color: #475569;">Invoice Statuses</span>
+              <div class="tag-container" id="statusesContainer"><span style="color:#94a3b8;">Loading...</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-grading" role="tabpanel" aria-labelledby="tabBtn-grading">
+      <div class="tab-intro">
+        <div class="tab-intro-title">Grading configuration</div>
+        <div class="tab-intro-text">Adjust the weight assigned to class scores and exam scores for overall performance calculations.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">📊 Performance Score Percentages</span>
+        </div>
+        <div></div>
+          <div style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-size: 14px; font-weight: 600; color: #475569;">Class Score Percentage</span>
+              <span class="edit-trigger" onclick="openScorePercentageModal('Class Score')">Edit</span>
+            </div>
+            <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 8px;">
+              <span id="classScorePercentageDisplay" style="font-size: 20px; font-weight: 700; color: #0f172a;">50%</span>
+              <span style="font-size: 13px; color: #64748b; margin-left: 8px;">of total grade</span>
+            </div>
+          </div>
+          <div></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-size: 14px; font-weight: 600; color: #475569;">Exam Score Percentage</span>
+              <span class="edit-trigger" onclick="openScorePercentageModal('Exams Score')">Edit</span>
+            </div>
+            <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 8px;">
+              <span id="examScorePercentageDisplay" style="font-size: 20px; font-weight: 700; color: #0f172a;">50%</span>
+              <span style="font-size: 13px; color: #64748b; margin-left: 8px;">of total grade</span>
+            </div>
+          </div>
+          <div style="margin-top: 15px; padding: 12px; background: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+            <div style="display: flex; align-items: start; gap: 8px;">
+              <span style="font-size: 18px;">⚠️</span>
+              <div></div>
+                <div style="font-size: 13px; font-weight: 600; color: #92400e; margin-bottom: 4px;">Note</div>
+                <div style="font-size: 12px; color: #78350f; line-height: 1.4;">
+                  These percentages control how performance scores are calculated. Total should equal 100%.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-backups" role="tabpanel" aria-labelledby="tabBtn-backups">
+      <div class="tab-intro">
+        <div class="tab-intro-title">Backup and recovery tools</div>
+        <div class="tab-intro-text">Create backups, manage saved files, and restore system data when needed.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🔒 Backup & Restore</span>
+        </div>
+        
+        <!-- Backup Statistics -->
+        <div class="stats-grid" id="backupStats">
+          <div class="stat-card">
+            <div class="stat-label">Total Backups</div>
+            <div class="stat-value" id="totalBackups">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Size</div>
+            <div class="stat-value" id="totalSize">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Latest Backup</div>
+            <div class="stat-value" style="font-size: 14px;" id="newestBackup">-</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Auto-Backup</div>
+            <div class="stat-value" style="font-size: 16px;" id="autoBackupStatus">-</div>
+          </div>
+        </div>
+        
+        <!-- Backup Actions -->
+        <div class="backup-actions">
+          <button class="btn btn-backup" onclick="createBackup()">📦 Create Full Backup</button>
+          <button class="btn btn-backup" onclick="openSelectiveBackupModal()">📑 Selective Backup</button>
+          <button class="btn btn-restore" onclick="openRestoreModal()">♻️ Restore</button>
+          <button class="btn btn-secondary" onclick="toggleAutoBackup()" id="autoBackupBtn">⏰ Auto-Backup</button>
+          <button class="btn btn-secondary" onclick="loadBackups()">🔄 Refresh</button>
+        </div>
+        
+        <!-- Backups List -->
+        <div class="backup-list" id="backupsList">
+          <div style="text-align:center; color: #64748b; padding: 20px;">Click refresh to load backups</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUDIT LOGS TAB PANEL -->
+    <div class="tab-panel" id="tab-auditlogs" role="tabpanel" aria-labelledby="tabBtn-auditlogs">
+      <div class="tab-intro">
+        <div class="tab-intro-title">Audit Trail & Activity Monitoring</div>
+        <div class="tab-intro-text">Track all user actions, view system activity history, and maintain compliance with comprehensive audit logs.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">🔍 Audit Logs Interface</span>
+        </div>
+        
+        <!-- Embedded iframe for Audit Logs -->
+        <div style="margin-bottom: 15px; padding: 12px; background: #eff6ff; border-radius: 8px; border-left: 4px solid #3b82f6;">
+          <div style="display: flex; align-items: start; gap: 8px;">
+            <span style="font-size: 18px;">ℹ️</span>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; color: #1e40af; margin-bottom: 4px;">Full Audit Logs Interface</div>
+              <div style="font-size: 12px; color: #1e3a8a; line-height: 1.4;">
+                The complete audit log system is loaded below with advanced filtering, search, export, and management capabilities.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Stats Preview -->
+        <div class="stats-grid" style="margin-bottom: 20px;">
+          <div class="stat-card">
+            <div class="stat-label">Total Actions</div>
+            <div class="stat-value" id="auditTotalActions">Loading...</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Today's Activity</div>
+            <div class="stat-value" id="auditTodayActions">Loading...</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Users</div>
+            <div class="stat-value" id="auditActiveUsers">Loading...</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Recent Deletions</div>
+            <div class="stat-value" id="auditDeletions">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Iframe Container with Separate Scrolling -->
+        <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: white; max-height: 85vh; display: flex; flex-direction: column;">
+          <!-- Iframe header (optional) -->
+          <div style="padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 13px; font-weight: 600; color: #475569;">📋 Embedded Audit Logs Interface</div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary" onclick="refreshAuditLogsFrame()" style="padding: 6px 12px; font-size: 12px;">
+                🔄 Refresh
+              </button>
+              <button class="btn btn-primary" onclick="openAuditLogsInNewTab()" style="padding: 6px 12px; font-size: 12px;">
+                🔍 Open Full Page
+              </button>
+            </div>
+          </div>
+          
+          <!-- Iframe with separate scrolling -->
+          <div style="flex: 1; overflow: auto; min-height: 600px; max-height: calc(85vh - 100px);">
+            <iframe 
+              id="auditLogsFrame" 
+              src="" 
+              style="width: 100%; height: 100%; min-height: 600px; border: none; display: block;"
+              title="Audit Logs Interface"
+              scrolling="yes">
+            </iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT PARAMETER MODAL -->
+  <div class="modal-backdrop" id="paramModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="paramModalTitle">Edit Parameter</h3>
+        <button class="modal-close" onclick="closeParamModal()">&times;</button>
+      </div>
+      <form id="paramForm" onsubmit="handleParamSubmit(event)">
+        <input type="hidden" id="formParamName">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" id="paramModalLabel">New Value</label>
+            <input type="text" id="formParamValue" class="form-input" required>
+            <p id="paramPasswordHint" style="margin-top: 10px; font-size: 12px; color: #d97706; display: none;"></p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeParamModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="paramSaveBtn">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- LICENSE AUTHENTICATION MODAL (triggered from Master Password 'Request Code') -->
+  <div class="modal-backdrop" id="licenseAuthModal">
+    <div class="modal-content" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3>🔐 Email Verification Required</h3>
+        <button class="modal-close" onclick="closeLicenseAuthModal()">&#times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 20px; color: #475569;">A verification code has been sent to the <strong>Developer Email</strong> configured in settings. Enter it below to update the License Status and Student Limit.</p>
+        <div class="form-group">
+          <label class="form-label">Verification Code</label>
+          <input type="text" id="licenseMasterPassword" class="form-input" placeholder="Enter 6-digit code from email" maxlength="6">
+          <p style="margin-top: 10px; font-size: 12px; color: #64748b;">Code expires in 10 minutes</p>
+          <p id="licenseCodeStatus" style="margin-top: 10px; font-size: 12px; color: #60a5fa; display: none;"></p>
+          <div id="licenseEmailSetupAction" style="margin-top: 10px; font-size: 12px; display: none;"></div>
+        </div>
+        <div class="form-group">
+          <button type="button" id="licenseResendBtn" class="btn btn-secondary" onclick="resendVerificationCode(event)" style="width: 100%;">Resend Code</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeLicenseAuthModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="verifyLicenseBtn" onclick="verifyLicensePassword()">Verify &amp; Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LICENSE EDIT MODAL (shown after email verification is successful) -->
+  <div class="modal-backdrop" id="licenseEditModal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3>🛡️ Update License Settings</h3>
+        <button class="modal-close" onclick="closeLicenseEditModal()">&#times;</button>
+      </div>
+      <div style="background: #dcfce7; border-left: 4px solid #16a34a; padding: 10px 16px; font-size: 13px; color: #166534;">
+        ✅ Email verification successful. You may now update the license settings.
+      </div>
+      <form id="licenseEditForm" onsubmit="handleLicenseSubmit(event)">
+        <div class="modal-body">
+
+          <!-- License Status -->
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label" style="font-weight: 700; font-size: 13px; color: #334155; text-transform: uppercase; letter-spacing: 0.05em;">License Status</label>
+            <div style="display: flex; gap: 12px; margin-top: 8px;">
+              <label id="licenseStatusDemo" style="flex:1; border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s;">
+                <input type="radio" name="licenseStatus" value="Demo" id="radioDemo" style="accent-color:#f59e0b; width:16px; height:16px;">
+                <div>
+                  <div style="font-weight: 600; font-size: 14px; color: #92400e;">🔒 Demo</div>
+                  <div style="font-size: 11px; color: #78716c;">Trial / Limited mode</div>
+                </div>
+              </label>
+              <label id="licenseStatusFull" style="flex:1; border: 2px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s;">
+                <input type="radio" name="licenseStatus" value="Full Access" id="radioFull" style="accent-color:#16a34a; width:16px; height:16px;">
+                <div>
+                  <div style="font-weight: 600; font-size: 14px; color: #14532d;">✅ Full Access</div>
+                  <div style="font-size: 11px; color: #6b7280;">Unlimited features</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Student Limit Plans -->
+          <div class="form-group">
+            <label class="form-label" style="font-weight: 700; font-size: 13px; color: #334155; text-transform: uppercase; letter-spacing: 0.05em;">Student Limit — Choose a Plan</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+
+              <!-- Copper -->
+              <label class="plan-card" data-plan="copper" style="border: 2px solid #d97706; border-radius: 12px; padding: 14px; cursor: pointer; background: linear-gradient(135deg, #fffbeb, #fef3c7); display: flex; align-items: flex-start; gap: 10px; transition: all 0.2s;">
+                <input type="radio" name="studentPlan" value="50" id="planCopper" style="accent-color:#d97706; margin-top:3px; width:15px; height:15px;">
+                <div>
+                  <div style="font-weight: 700; font-size: 14px; color: #92400e;">🥉 Copper</div>
+                  <div style="font-size: 12px; color: #78716c; margin-top: 2px;">50 Students</div>
+                  <div style="font-size: 13px; font-weight: 700; color: #d97706; margin-top: 4px;">GHC 1,000.00</div>
+                </div>
+              </label>
+
+              <!-- Silver -->
+              <label class="plan-card" data-plan="silver" style="border: 2px solid #94a3b8; border-radius: 12px; padding: 14px; cursor: pointer; background: linear-gradient(135deg, #f8fafc, #e2e8f0); display: flex; align-items: flex-start; gap: 10px; transition: all 0.2s;">
+                <input type="radio" name="studentPlan" value="100" id="planSilver" style="accent-color:#64748b; margin-top:3px; width:15px; height:15px;">
+                <div>
+                  <div style="font-weight: 700; font-size: 14px; color: #334155;">🥈 Silver</div>
+                  <div style="font-size: 12px; color: #64748b; margin-top: 2px;">100 Students</div>
+                  <div style="font-size: 13px; font-weight: 700; color: #475569; margin-top: 4px;">GHC 1,500.00</div>
+                </div>
+              </label>
+
+              <!-- Diamond -->
+              <label class="plan-card" data-plan="diamond" style="border: 2px solid #6366f1; border-radius: 12px; padding: 14px; cursor: pointer; background: linear-gradient(135deg, #eef2ff, #e0e7ff); display: flex; align-items: flex-start; gap: 10px; transition: all 0.2s;">
+                <input type="radio" name="studentPlan" value="150" id="planDiamond" style="accent-color:#6366f1; margin-top:3px; width:15px; height:15px;">
+                <div>
+                  <div style="font-weight: 700; font-size: 14px; color: #3730a3;">💎 Diamond</div>
+                  <div style="font-size: 12px; color: #6366f1; margin-top: 2px;">150 Students</div>
+                  <div style="font-size: 13px; font-weight: 700; color: #4f46e5; margin-top: 4px;">GHC 2,000.00</div>
+                </div>
+              </label>
+
+              <!-- Gold -->
+              <label class="plan-card" data-plan="gold" style="border: 2px solid #eab308; border-radius: 12px; padding: 14px; cursor: pointer; background: linear-gradient(135deg, #fefce8, #fef9c3); display: flex; align-items: flex-start; gap: 10px; transition: all 0.2s; position: relative;">
+                <input type="radio" name="studentPlan" value="200" id="planGold" style="accent-color:#ca8a04; margin-top:3px; width:15px; height:15px;">
+                <div>
+                  <div style="font-weight: 700; font-size: 14px; color: #713f12;">🏆 Gold</div>
+                  <div style="font-size: 12px; color: #a16207; margin-top: 2px;">200+ Students</div>
+                  <div style="font-size: 13px; font-weight: 700; color: #ca8a04; margin-top: 4px;">GHC 3,000.00</div>
+                  <div style="position: absolute; top: 8px; right: 8px; background: #ca8a04; color: white; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 20px; text-transform: uppercase;">Best</div>
+                </div>
+              </label>
+
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeLicenseEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="licenseSaveBtn">💾 Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <style>
+    .plan-card:has(input:checked) {
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.3);
+      transform: scale(1.02);
+    }
+    .plan-card[data-plan="copper"]:has(input:checked) { box-shadow: 0 0 0 3px rgba(217,119,6,0.4); }
+    .plan-card[data-plan="silver"]:has(input:checked)  { box-shadow: 0 0 0 3px rgba(100,116,139,0.4); }
+    .plan-card[data-plan="diamond"]:has(input:checked) { box-shadow: 0 0 0 3px rgba(99,102,241,0.4); }
+    .plan-card[data-plan="gold"]:has(input:checked)    { box-shadow: 0 0 0 3px rgba(202,138,4,0.4); }
+    #licenseStatusDemo:has(input:checked)  { border-color: #f59e0b; background: #fffbeb; }
+    #licenseStatusFull:has(input:checked)  { border-color: #16a34a; background: #f0fdf4; }
+  </style>
+
+  <!-- EDIT LIST ITEM MODAL -->
+  <div class="modal-backdrop" id="listModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="listModalTitle">Edit Item</h3>
+        <button class="modal-close" onclick="closeListModal()">&times;</button>
+      </div>
+      <form id="listForm" onsubmit="handleListSubmit(event)">
+        <input type="hidden" id="formListColumn">
+        <input type="hidden" id="formListOldValue">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">New Value</label>
+            <input type="text" id="formListNewValue" class="form-input" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeListModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="listSaveBtn">Update Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SCORE PERCENTAGE MODAL -->
+  <div class="modal-backdrop" id="scorePercentageModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="scorePercentageModalTitle">Edit Score Percentage</h3>
+        <button class="modal-close" onclick="closeScorePercentageModal()">&times;</button>
+      </div>
+      <form id="scorePercentageForm" onsubmit="handleScorePercentageSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="formScoreParamName">
+          <div class="form-group">
+            <label class="form-label" id="scorePercentageModalLabel">Percentage Value</label>
+            <input type="number" step="1" min="0" max="100" id="formScorePercentageValue" class="form-input" placeholder="Enter percentage (0-100)" required>
+            <div style="margin-top: 8px; font-size: 12px; color: #64748b;">
+              Enter a value between 0 and 100. Ensure Class Score % + Exam Score % = 100%.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeScorePercentageModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="scorePercentageSaveBtn">Update Percentage</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SELECTIVE BACKUP MODAL -->
+  <div class="modal-backdrop" id="selectiveBackupModal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3>Select Sheets to Backup</h3>
+        <button class="modal-close" onclick="closeSelectiveBackupModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Choose sheets to include in backup</label>
+          <div class="checkbox-group" id="sheetsCheckboxGroup">
+            <div style="text-align:center; color: #64748b;">Loading sheets...</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeSelectiveBackupModal()">Cancel</button>
+        <button type="button" class="btn btn-backup" onclick="createSelectiveBackup()">Create Backup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESTORE MODAL -->
+  <div class="modal-backdrop" id="restoreModal">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3>⚠️ Restore from Backup</h3>
+        <button class="modal-close" onclick="closeRestoreModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <strong style="color: #92400e;">Warning:</strong>
+          <p style="color: #92400e; margin-top: 5px; font-size: 13px;">Restoring will overwrite your current data. This action cannot be undone. Make sure you have a recent backup before proceeding.</p>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Select Backup File</label>
+          <select id="restoreBackupSelect" class="form-input">
+            <option value="">Loading backups...</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">
+            <input type="checkbox" id="restoreAllSheets" checked onchange="toggleRestoreSheets()">
+            Restore all sheets (recommended)
+          </label>
+        </div>
+        
+        <div class="form-group" id="restoreSheetSelection" style="display: none;">
+          <label class="form-label">Or select specific sheets:</label>
+          <div class="checkbox-group" id="restoreSheetsCheckboxGroup">
+            <div style="text-align:center; color: #64748b;">Select a backup first</div>
+          </div>
+        </div>
+
+          <!-- AUTO-BACKUP CONFIRM MODAL -->
+          <div class="modal-backdrop" id="autoBackupModal">
+            <div class="modal-content" style="max-width: 420px;">
+              <div class="modal-header">
+                <h3 id="autoBackupModalTitle">Confirm Auto-Backup</h3>
+                <button class="modal-close" onclick="closeAutoBackupModal()">&times;</button>
+              </div>
+              <div class="modal-body">
+                <p id="autoBackupModalMessage">Are you sure?</p>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAutoBackupModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmAutoBackupBtn" onclick="confirmAutoBackup()">Confirm</button>
+              </div>
+            </div>
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeRestoreModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="confirmRestore()">Restore Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYSTEM ERROR MODAL -->
+  <div class="modal-backdrop" id="systemErrorModal">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 id="systemErrorModalTitle">Connection Problem</h3>
+        <button class="modal-close" onclick="closeSystemErrorModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="system-error-hero">
+          <div class="system-error-icon" id="systemErrorIcon">⚠️</div>
+          <div>
+            <div class="system-error-title" id="systemErrorHeadline">We couldn’t complete this request</div>
+            <div class="system-error-text" id="systemErrorMessage">Something interrupted communication with the server. Please try again.</div>
+          </div>
+        </div>
+
+        <div class="system-error-help">
+          <div class="system-error-help-title">What you can do</div>
+          <ul>
+            <li>Check your internet connection and try again.</li>
+            <li>Reload the page if the problem continues.</li>
+            <li>If this happens during backup or restore, confirm the script has the required authorization.</li>
+          </ul>
+        </div>
+
+        <div class="system-error-detail" id="systemErrorDetail" style="display:none;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="window.location.reload()">Reload Page</button>
+        <button type="button" class="btn btn-primary" onclick="closeSystemErrorModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTHORIZATION GUIDE MODAL -->
+  <div class="modal-backdrop" id="authorizationGuideModal">
+    <div class="modal-content" style="max-width: 700px; max-height: 80vh;">
+      <div class="modal-header">
+        <h3>🔐 Drive Authorization Guide</h3>
+        <button class="modal-close" onclick="closeAuthorizationGuideModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+        <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <strong style="color: #1e40af;">ℹ️ One-Time Setup</strong>
+          <p style="color: #1e40af; margin-top: 5px; font-size: 13px;">
+            This authorization is required only once to enable backup features. It allows the system to create and manage backup files in your Google Drive.
+          </p>
+        </div>
+
+        <h4 style="color: #0f172a; margin-bottom: 10px; margin-top: 20px;">📋 Step-by-Step Instructions</h4>
+        
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 8px;">Step 1: Open Apps Script Editor</strong>
+          <ul style="margin-left: 20px; color: #475569;">
+            <li>In your Google Sheets menu, click <strong>Extensions</strong></li>
+            <li>Select <strong>Apps Script</strong> from the dropdown</li>
+            <li>A new tab will open with the script editor</li>
+          </ul>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 8px;">Step 2: Select Authorization Function</strong>
+          <ul style="margin-left: 20px; color: #475569;">
+            <li>At the top of the editor, find the function dropdown (shows "Select function")</li>
+            <li>Click it and select <strong>authorizeDriveAccess</strong></li>
+          </ul>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 8px;">Step 3: Run the Function</strong>
+          <ul style="margin-left: 20px; color: #475569;">
+            <li>Click the <strong>Run</strong> button ▶️ (looks like a play button)</li>
+            <li>A permission dialog will appear</li>
+          </ul>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 8px;">Step 4: Grant Permissions</strong>
+          <ul style="margin-left: 20px; color: #475569;">
+            <li>Click <strong>Review permissions</strong></li>
+            <li>Select your Google account</li>
+            <li>Click <strong>Advanced</strong> (if you see a warning)</li>
+            <li>Click <strong>Go to [Your Project Name] (unsafe)</strong></li>
+            <li>Click <strong>Allow</strong> to grant Drive access</li>
+          </ul>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+          <strong style="color: #0f172a; display: block; margin-bottom: 8px;">Step 5: Verify Success</strong>
+          <ul style="margin-left: 20px; color: #475569;">
+            <li>Check the execution log at the bottom of the Apps Script editor</li>
+            <li>You should see "✅ Drive access authorized successfully!"</li>
+            <li>Close the Apps Script tab and return to this page</li>
+            <li>Click the <strong>🔄 Refresh</strong> button to reload backup statistics</li>
+          </ul>
+        </div>
+
+        <div style="background: #dcfce7; border: 1px solid #16a34a; padding: 15px; border-radius: 8px; margin-top: 20px;">
+          <strong style="color: #166534;">✅ What Happens Next?</strong>
+          <p style="color: #166534; margin-top: 5px; font-size: 13px;">
+            After authorization, a folder called <strong>SMS_Backups</strong> will be created in your Google Drive. All backup files will be stored there automatically.
+          </p>
+        </div>
+
+        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin-top: 15px;">
+          <strong style="color: #92400e;">⚠️ Troubleshooting</strong>
+          <p style="color: #92400e; margin-top: 5px; font-size: 13px; margin-bottom: 8px;">
+            If you still see authorization errors after following these steps:
+          </p>
+          <ul style="margin-left: 20px; color: #92400e; font-size: 13px;">
+            <li>Make sure you selected the correct Google account</li>
+            <li>Try refreshing the page and running the authorization again</li>
+            <li>Check that pop-ups are not blocked in your browser</li>
+            <li>See <strong>BACKUP_AUTHORIZATION_GUIDE.md</strong> for detailed troubleshooting</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="closeAuthorizationGuideModal()">Got it!</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Toast notification system
+    function showToast(title, message, type = 'info', duration = 5000, actions = []) {
+      const container = document.getElementById('toastContainer');
+      
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+      };
+      
+      let actionsHtml = '';
+      if (actions.length > 0) {
+        actionsHtml = '<div class="toast-actions">';
+        actions.forEach(action => {
+          actionsHtml += `<a href="${action.url}" target="_blank" class="toast-link">${action.text}</a>`;
+        });
+        actionsHtml += '</div>';
+      }
+      
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || 'ℹ️'}</div>
+        <div class="toast-content">
+          <div class="toast-title">${title}</div>
+          <div class="toast-message">${message}</div>
+          ${actionsHtml}
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+      `;
+      
+      container.appendChild(toast);
+      
+      // Trigger animation
+      setTimeout(() => toast.classList.add('show'), 10);
+      
+      // Auto remove after duration
+      if (duration > 0) {
+        setTimeout(() => {
+          toast.classList.remove('show');
+          setTimeout(() => toast.remove(), 300);
+        }, duration);
+      }
+    }
+    
+    let licenseRequestInProgress = false;
+    let licenseCodeSent = false;
+    let developerEmailConfigured = false;
+    const SETTINGS_TAB_STORAGE_KEY = 'settingsActiveTab';
+    const TAB_SEQUENCE = ['general', 'grading', 'backups', 'auditlogs'];
+
+    function closeSystemErrorModal() {
+      document.getElementById('systemErrorModal').classList.remove('active');
+    }
+
+    function getFriendlyErrorMeta(err, fallbackTitle = 'Request Failed') {
+      const rawMessage = err && err.message ? String(err.message) : '';
+      const lowerMessage = rawMessage.toLowerCase();
+
+      if (!navigator.onLine || lowerMessage.includes('network') || lowerMessage.includes('server ip address could not be found') || lowerMessage.includes('failed to fetch')) {
+        return {
+          title: 'No Internet Connection',
+          headline: 'The app cannot reach the server',
+          message: 'Please check your internet connection and try again. The request could not be completed because the server is currently unreachable.',
+          icon: '📡',
+          detail: rawMessage || 'Network connection unavailable.'
+        };
+      }
+
+      if (lowerMessage.includes('permission') || lowerMessage.includes('authorization') || lowerMessage.includes('access denied')) {
+        return {
+          title: 'Authorization Required',
+          headline: 'This action needs permission before it can continue',
+          message: 'The system could not complete the request because access has not been granted yet. Please review the required authorization and try again.',
+          icon: '🔐',
+          detail: rawMessage || 'Authorization or permission error.'
+        };
       }
 
       return {
-        param: paramName,
-        value: displayValue,
-        rawValue: rawValue
+        title: fallbackTitle,
+        headline: 'We couldn’t complete this request',
+        message: 'An unexpected error occurred while communicating with the server. Please try again in a moment.',
+        icon: '⚠️',
+        detail: rawMessage || 'No additional details were provided.'
       };
-    })
-    .filter(item => item.param !== '');
-}
+    }
 
-// Returns a flat { paramName: value } map for quick key-based lookups.
-// Passwords are masked in the returned map, and direct Google Drive image links are formatted.
-function getParameters() {
-  const params = getSystemParameters();
-  const map = {};
-  
-  params.forEach(function(item) {
-    map[item.param] = item.value;
+    function showSystemErrorModal(err, fallbackTitle = 'Request Failed') {
+      const meta = getFriendlyErrorMeta(err, fallbackTitle);
+      document.getElementById('systemErrorModalTitle').innerText = meta.title;
+      document.getElementById('systemErrorHeadline').innerText = meta.headline;
+      document.getElementById('systemErrorMessage').innerText = meta.message;
+      document.getElementById('systemErrorIcon').innerText = meta.icon;
+
+      const detail = document.getElementById('systemErrorDetail');
+      if (meta.detail) {
+        detail.style.display = 'block';
+        detail.innerText = 'Technical details: ' + meta.detail;
+      } else {
+        detail.style.display = 'none';
+        detail.innerText = '';
+      }
+
+      document.getElementById('systemErrorModal').classList.add('active');
+    }
+
+    function setTabBadge(tabName, count) {
+      const badge = document.getElementById('tabBadge-' + tabName);
+      if (badge) badge.textContent = String(count);
+    }
+
+    function updateGeneralTabBadge(paramCount, listCount) {
+      setTabBadge('general', Number(paramCount || 0) + Number(listCount || 0));
+    }
+
+    function updateGradingTabBadge() {
+      const count = document.querySelectorAll('#tab-grading .edit-trigger').length || 0;
+      setTabBadge('grading', count);
+    }
+
+    function updateBackupsTabBadge(totalBackups) {
+      setTabBadge('backups', Number(totalBackups || 0));
+    }
+
+    function activateTab(tabName, persist = true, updateHash = true) {
+      const buttons = document.querySelectorAll('.tab-btn');
+      const panels = document.querySelectorAll('.tab-panel');
+      const targetPanelId = 'tab-' + tabName;
+      const targetButton = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+      const targetPanel = document.getElementById(targetPanelId);
+
+      if (!targetButton || !targetPanel) {
+        tabName = 'general';
+      }
+
+      buttons.forEach(function(btn) {
+        const isActive = btn.dataset.tab === tabName;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        btn.tabIndex = isActive ? 0 : -1;
+      });
+
+      panels.forEach(function(panel) {
+        panel.classList.toggle('active', panel.id === 'tab-' + tabName);
+      });
+
+      if (persist) {
+        try {
+          localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, tabName);
+        } catch (error) {
+          console.warn('Unable to persist active tab:', error);
+        }
+      }
+
+      if (updateHash) {
+        try {
+          // Only update hash if we're not in an iframe with srcdoc
+          if (window.self === window.top && window.location.protocol !== 'about:') {
+            if (window.location.hash !== '#' + tabName) {
+              history.replaceState(null, '', '#' + tabName);
+            }
+          }
+        } catch (error) {
+          console.warn('Unable to update tab hash:', error);
+        }
+      }
+    }
+
+    function focusAdjacentTab(currentTab, direction) {
+      const currentIndex = TAB_SEQUENCE.indexOf(currentTab);
+      if (currentIndex === -1) return;
+      const nextIndex = (currentIndex + direction + TAB_SEQUENCE.length) % TAB_SEQUENCE.length;
+      const nextTab = TAB_SEQUENCE[nextIndex];
+      const nextButton = document.querySelector('.tab-btn[data-tab="' + nextTab + '"]');
+      activateTab(nextTab);
+      if (nextButton) nextButton.focus();
+    }
+
+    function getTabFromHash() {
+      const hash = (window.location.hash || '').replace('#', '').trim();
+      return TAB_SEQUENCE.includes(hash) ? hash : null;
+    }
+
+    function getSavedTab() {
+      try {
+        return localStorage.getItem(SETTINGS_TAB_STORAGE_KEY) || 'general';
+      } catch (error) {
+        console.warn('Unable to read saved tab:', error);
+        return 'general';
+      }
+    }
+
+    function initializeTabs() {
+      const buttons = document.querySelectorAll('.tab-btn');
+      buttons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          activateTab(btn.dataset.tab);
+        });
+
+        btn.addEventListener('keydown', function(event) {
+          if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            focusAdjacentTab(btn.dataset.tab, 1);
+          } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            focusAdjacentTab(btn.dataset.tab, -1);
+          } else if (event.key === 'Home') {
+            event.preventDefault();
+            const firstButton = document.querySelector('.tab-btn[data-tab="' + TAB_SEQUENCE[0] + '"]');
+            activateTab(TAB_SEQUENCE[0]);
+            if (firstButton) firstButton.focus();
+          } else if (event.key === 'End') {
+            event.preventDefault();
+            const lastTab = TAB_SEQUENCE[TAB_SEQUENCE.length - 1];
+            const lastButton = document.querySelector('.tab-btn[data-tab="' + lastTab + '"]');
+            activateTab(lastTab);
+            if (lastButton) lastButton.focus();
+          }
+        });
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      initializeTabs();
+      activateTab(getTabFromHash() || getSavedTab(), false, false);
+      updateGeneralTabBadge(0, 0);
+      updateGradingTabBadge();
+      updateBackupsTabBadge(0);
+      loadParameters();
+      loadLists();
+      loadScorePercentages();
+      loadBackupStats();
+    });
+
+    window.addEventListener('hashchange', function() {
+      const hashTab = getTabFromHash();
+      if (hashTab) {
+        activateTab(hashTab, true, false);
+      }
+    });
+
+    /* --- 1. LOAD PARAMETERS --- */
+    function loadParameters() {
+      google.script.run.withSuccessHandler(function(params) {
+        const container = document.getElementById('paramsContainer');
+        container.innerHTML = '';
+
+        let renderedParamCount = 0;
+
+        // Look for a controller parameter that defines which params are editable.
+        // Accepts either 'Editable Parameters' (CSV of names) or 'Read Only Parameters'.
+        let editableList = null; // null means allow all
+        let readOnlyList = [];
+        params.forEach(p => {
+          if(!p || !p.param) return;
+          const key = (p.param || '').trim();
+          if(key.toLowerCase() === 'editable parameters' && p.value) {
+            editableList = p.value.split(',').map(s => s.trim()).filter(Boolean);
+          }
+          if(key.toLowerCase() === 'read only parameters' && p.value) {
+            readOnlyList = p.value.split(',').map(s => s.trim()).filter(Boolean);
+          }
+        });
+
+        // Render each parameter
+        params.forEach(p => {
+          if(!p || !p.param) return;
+
+          const name = p.param;
+          const value = p.value || '';
+
+          // determine type and display
+          let inputType = 'text';
+          if (/ID/i.test(name)) inputType = 'number';
+          if (/password/i.test(name)) inputType = 'password';
+
+          const isReadOnly = (editableList && !editableList.includes(name)) || readOnlyList.includes(name);
+          const displayValue = (inputType === 'password') ? '••••••' : value;
+          const normKey = function(s) { return String(s || '').trim().toLowerCase().replace(/[\s_\-]+/g, ''); };
+          developerEmailConfigured = params.some(function(item) {
+            return item && normKey(item.param) === 'developeremail' && item.value && item.value.trim().length > 0;
+          });
+
+          const row = document.createElement('div');
+          row.className = 'param-row';
+
+          const safeId = 'val_' + (name || '').replace(/\s/g, '_').replace(/[^A-Za-z0-9_]/g, '');
+          const escParam = (name || '').replace(/'/g, "\\'");
+          const escValue = (value || '').replace(/'/g, "\\'");
+
+          const isLicenseField = (name === 'License Status' || name === 'Student Limit');
+          const isMasterPassword = /master\s*password/i.test(name);
+
+          // Master Password gets a "Request Code" trigger that opens the email verification flow
+          const masterPasswordTrigger = () => {
+            if (!developerEmailConfigured) {
+              return `<span style="color:#94a3b8; font-size:12px;">Developer Email required</span>`;
+            }
+            if (licenseRequestInProgress) {
+              return `<span style="color:#94a3b8; font-size:12px;">Sending code...</span>`;
+            }
+            if (licenseCodeSent) {
+              return `<span style="color:#10b981; font-size:12px;">Code sent ✓</span>`;
+            }
+            return `<span class="edit-trigger" onclick="openEmailVerificationModal()">Request Code</span>`;
+          };
+
+          const editTrigger = isReadOnly
+            ? `<span style="color:#94a3b8; font-size:12px;">Read-only</span>`
+            : isLicenseField
+              ? `<span style="color:#94a3b8; font-size:12px;">From sheet</span>`
+              : isMasterPassword
+                ? masterPasswordTrigger()
+                : `<span class="edit-trigger" onclick="openParamEditModal('${escParam}', '${escValue}', '${inputType}')">Edit</span>`;
+
+          row.innerHTML = `
+            <span class="param-label">${name}</span>
+            <div class="param-value">
+              <span id="${safeId}">${displayValue}</span>
+              ${editTrigger}
+            </div>
+          `;
+
+          container.appendChild(row);
+          renderedParamCount += 1;
+        });
+
+        const listCount = document.querySelectorAll('#categoriesContainer .tag, #methodsContainer .tag, #statusesContainer .tag').length;
+        updateGeneralTabBadge(renderedParamCount, listCount);
+      }).getSystemParameters();
+    }
+
+    /* --- 2. LOAD LISTS --- */
+    function loadLists() {
+      google.script.run.withSuccessHandler(function(lists) {
+        renderTags('categoriesContainer', lists.categories, 'E');
+        renderTags('methodsContainer', lists.methods, 'F');
+        renderTags('statusesContainer', lists.statuses, 'G');
+
+        const paramCount = document.querySelectorAll('#paramsContainer .param-row').length;
+        const listCount = (lists.categories || []).length + (lists.methods || []).length + (lists.statuses || []).length;
+        updateGeneralTabBadge(paramCount, listCount);
+      }).getSystemLists();
+    }
+
+    function renderTags(containerId, items, columnLetter) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      if(!items || items.length === 0) {
+        container.innerHTML = '<span style="color:#94a3b8; font-size:13px;">No items defined yet.</span>';
+        return;
+      }
+      items.forEach(item => {
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        
+        // Only allow editing for Categories and Methods (Statuses are usually static in systems)
+        let editBtn = '';
+        if(columnLetter !== 'G') {
+          editBtn = `<button class="tag-edit-btn" onclick="openListEditModal('${columnLetter}', '${item}')">✏️</button>`;
+        }
+
+        tag.innerHTML = `${item} ${editBtn}`;
+        container.appendChild(tag);
+      });
+    }
+
+    /* --- 3. LOAD SCORE PERCENTAGES --- */
+    function loadScorePercentages() {
+      google.script.run.withSuccessHandler(function(percentages) {
+        if (percentages) {
+          document.getElementById('classScorePercentageDisplay').textContent = percentages.classScorePercentage + '%';
+          document.getElementById('examScorePercentageDisplay').textContent = percentages.examScorePercentage + '%';
+        }
+        updateGradingTabBadge();
+      }).withFailureHandler(function(err) {
+        console.error('Failed to load score percentages:', err);
+        showSystemErrorModal(err, 'Unable to Load Score Settings');
+      }).getScorePercentages();
+    }
+
+    /* --- MODAL HANDLERS: PARAMETERS --- */
+    function openParamEditModal(name, currentVal, type) {
+      document.getElementById('paramModalTitle').innerText = `Edit ${name}`;
+      document.getElementById('paramModalLabel').innerText = `New value for "${name}"`;
+      document.getElementById('formParamName').value = name;
+      document.getElementById('formParamValue').type = type;
+      document.getElementById('formParamValue').value = (type === 'password') ? '' : currentVal;
+
+      const hint = document.getElementById('paramPasswordHint');
+      if (type === 'password') {
+        hint.style.display = 'block';
+        if (/master password/i.test(name)) {
+          hint.innerText = 'Password strength required: 12+ characters, uppercase, lowercase, number, and special character.';
+        } else {
+          hint.innerText = 'Enter a secure password when changing this value.';
+        }
+      } else {
+        hint.style.display = 'none';
+        hint.innerText = '';
+      }
+
+      document.getElementById('paramModal').classList.add('active');
+    }
+    function closeParamModal() { document.getElementById('paramModal').classList.remove('active'); }
+
+    function openLicenseAuthModal() {
+      document.getElementById('licenseMasterPassword').value = '';
+      document.getElementById('verifyLicenseBtn').disabled = false;
+      document.getElementById('verifyLicenseBtn').innerText = 'Verify';
+      document.getElementById('licenseAuthModal').classList.add('active');
+    }
+
+    function closeLicenseAuthModal() {
+      document.getElementById('licenseAuthModal').classList.remove('active');
+    }
+
+    function openDeveloperEmailSetting() {
+      closeLicenseAuthModal();
+      openParamEditModal('Developer Email', '', 'text');
+    }
+
+    function openEmailVerificationModal() {
+      if (!developerEmailConfigured) {
+        const status = document.getElementById('licenseCodeStatus');
+        const action = document.getElementById('licenseEmailSetupAction');
+        status.style.display = 'block';
+        status.style.color = '#ef4444';
+        status.innerText = 'Developer Email is not configured.';
+        action.style.display = 'block';
+        action.innerHTML = '<span onclick="openDeveloperEmailSetting()" style="cursor:pointer; color:#3b82f6; text-decoration:underline;">Set Developer Email in settings</span>';
+        document.getElementById('licenseMasterPassword').value = '';
+        document.getElementById('verifyLicenseBtn').disabled = true;
+        document.getElementById('verifyLicenseBtn').innerText = 'Verify';
+        document.getElementById('licenseAuthModal').classList.add('active');
+        return;
+      }
+
+      // Show the verification modal immediately so the user sees the flow start.
+      licenseRequestInProgress = true;
+      licenseCodeSent = false;
+      loadParameters();
+
+      const status = document.getElementById('licenseCodeStatus');
+      const action = document.getElementById('licenseEmailSetupAction');
+      status.style.display = 'block';
+      action.style.display = 'none';
+      action.innerHTML = '';
+      status.style.color = '#60a5fa';
+      status.innerText = 'Sending verification code to your email...';
+      document.getElementById('licenseMasterPassword').value = '';
+      document.getElementById('verifyLicenseBtn').disabled = true;
+      document.getElementById('verifyLicenseBtn').innerText = 'Verify';
+      document.getElementById('licenseAuthModal').classList.add('active');
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          licenseRequestInProgress = false;
+          if (res.success) {
+            licenseCodeSent = true;
+            loadParameters();
+            status.innerText = 'Verification code sent. Check your email.';
+            document.getElementById('verifyLicenseBtn').disabled = false;
+            showToast('Code Sent', res.message, 'success');
+          } else {
+            status.innerText = res.message || 'Failed to send verification code.';
+            status.style.color = '#ef4444';
+            showToast('Error', res.message, 'error');
+            loadParameters();
+          }
+        })
+        .withFailureHandler(function(err) {
+          licenseRequestInProgress = false;
+          status.innerText = 'Failed to send verification code. Please try again.';
+          status.style.color = '#ef4444';
+          showSystemErrorModal(err, 'Verification Request Failed');
+          loadParameters();
+        })
+        .generateAndEmailVerificationCode();
+    }
+
+    function resendVerificationCode(event) {
+      const btn = event ? event.target : document.getElementById('licenseResendBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Sending...';
+      }
+
+      const status = document.getElementById('licenseCodeStatus');
+      status.style.display = 'block';
+      status.style.color = '#60a5fa';
+      status.innerText = 'Resending verification code...';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          licenseRequestInProgress = false;
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Resend Code';
+          }
+          if (res.success) {
+            licenseCodeSent = true;
+            loadParameters();
+            status.innerText = 'Verification code resent. Check your email.';
+            showToast('Code Sent', res.message, 'success');
+          } else {
+            status.innerText = res.message || 'Failed to resend verification code.';
+            status.style.color = '#ef4444';
+            showToast('Error', res.message, 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          licenseRequestInProgress = false;
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Resend Code';
+          }
+          status.innerText = 'Failed to resend verification code. Please try again.';
+          status.style.color = '#ef4444';
+          showSystemErrorModal(err, 'Verification Request Failed');
+          loadParameters();
+        })
+        .generateAndEmailVerificationCode();
+    }
+
+    function verifyLicensePassword() {
+      const btn = document.getElementById('verifyLicenseBtn');
+      const codeInput = document.getElementById('licenseMasterPassword');
+      const code = codeInput.value.trim();
+      if (!code) {
+        showToast('Required', 'Please enter the verification code from your email.', 'warning');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = 'Verifying...';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Verify';
+          if (!res.success) {
+            showToast('Verification Failed', res.message || 'Invalid verification code.', 'error');
+            return;
+          }
+
+          window.licenseUpdatePassword = code; // Store for later use (not used, but keeping structure)
+          closeLicenseAuthModal();
+          openLicenseEditModal(res.license);
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = 'Verify';
+          showSystemErrorModal(err, 'Verification Failed');
+        })
+        .verifyEmailCode(code);
+    }
+
+    function openLicenseEditModal(details) {
+      // Pre-select License Status radio
+      const status = (details.status || 'Demo').trim();
+      const radioDemo = document.getElementById('radioDemo');
+      const radioFull = document.getElementById('radioFull');
+      if (status === 'Full Access') {
+        radioFull.checked = true;
+        radioDemo.checked = false;
+      } else {
+        radioDemo.checked = true;
+        radioFull.checked = false;
+      }
+
+      // Pre-select Student Plan radio based on limit value
+      const limit = Number(details.limit) || 0;
+      const planMap = { 50: 'planCopper', 100: 'planSilver', 150: 'planDiamond', 200: 'planGold' };
+      // Clear all
+      Object.values(planMap).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.checked = false;
+      });
+      // Select matching plan (closest >= limit)
+      if (planMap[limit]) {
+        document.getElementById(planMap[limit]).checked = true;
+      } else if (limit > 150) {
+        document.getElementById('planGold').checked = true;
+      } else if (limit > 100) {
+        document.getElementById('planDiamond').checked = true;
+      } else if (limit > 50) {
+        document.getElementById('planSilver').checked = true;
+      } else {
+        document.getElementById('planCopper').checked = true;
+      }
+
+      document.getElementById('licenseEditModal').classList.add('active');
+    }
+
+    function closeLicenseEditModal() {
+      document.getElementById('licenseEditModal').classList.remove('active');
+      window.licenseUpdatePassword = null;
+    }
+
+    function handleLicenseSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('licenseSaveBtn');
+
+      // Read checked License Status radio
+      const statusRadio = document.querySelector('input[name="licenseStatus"]:checked');
+      if (!statusRadio) {
+        showToast('Validation Error', 'Please select a License Status.', 'warning');
+        return;
+      }
+      const status = statusRadio.value;
+
+      // Read checked Student Plan radio
+      const planRadio = document.querySelector('input[name="studentPlan"]:checked');
+      if (!planRadio) {
+        showToast('Validation Error', 'Please select a Student Limit plan.', 'warning');
+        return;
+      }
+      const limit = Number(planRadio.value);
+
+      btn.disabled = true;
+      btn.innerText = 'Saving...';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = '💾 Submit';
+          if (res.success) {
+            showToast('Saved', 'License settings updated successfully.', 'success');
+            closeLicenseEditModal();
+            loadParameters();
+          } else {
+            showToast('Save Failed', res.message || 'Unable to save license settings.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = '💾 Submit';
+          showSystemErrorModal(err, 'Unable to Save License Settings');
+        })
+        .updateLicenseSettings(status, limit, '');
+    }
+
+    function isStrongPassword(value) {
+      return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$/.test(value);
+    }
+
+    function handleParamSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('paramSaveBtn');
+      btn.disabled = true; btn.innerText = 'Saving...';
+
+      const name = document.getElementById('formParamName').value;
+      const value = document.getElementById('formParamValue').value;
+
+      if (/password/i.test(name) && !value) {
+        showToast('Value Required', 'Please enter a new password before saving.', 'warning');
+        btn.disabled = false;
+        btn.innerText = 'Save Changes';
+        return;
+      }
+
+      if (/master password/i.test(name) && value && !isStrongPassword(value)) {
+        showToast('Password Strength Required', 'The master password must be at least 12 characters and include uppercase, lowercase, a number, and a special character.', 'warning');
+        btn.disabled = false;
+        btn.innerText = 'Save Changes';
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false; btn.innerText = 'Save Changes';
+          if(res.success) { closeParamModal(); loadParameters(); }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false; btn.innerText = 'Save Changes';
+          showSystemErrorModal(err, 'Unable to Save Changes');
+        })
+        .updateSystemParameter(name, value);
+    }
+
+    /* --- MODAL HANDLERS: LIST ITEMS --- */
+    function openListEditModal(column, oldValue) {
+      document.getElementById('listModalTitle').innerText = `Edit List Item`;
+      document.getElementById('formListColumn').value = column;
+      document.getElementById('formListOldValue').value = oldValue;
+      document.getElementById('formListNewValue').value = oldValue;
+      document.getElementById('listModal').classList.add('active');
+    }
+    function closeListModal() { document.getElementById('listModal').classList.remove('active'); }
+
+    function handleListSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('listSaveBtn');
+      btn.disabled = true; btn.innerText = 'Updating...';
+
+      const column = document.getElementById('formListColumn').value;
+      const oldVal = document.getElementById('formListOldValue').value;
+      const newVal = document.getElementById('formListNewValue').value;
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false; btn.innerText = 'Update Item';
+          if(res.success) { closeListModal(); loadLists(); }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false; btn.innerText = 'Update Item';
+          showSystemErrorModal(err, 'Unable to Update List Item');
+        })
+        .updateSystemListItem(column, oldVal, newVal);
+    }
+
+    /* --- MODAL HANDLERS: SCORE PERCENTAGES --- */
+    function openScorePercentageModal(paramName) {
+      document.getElementById('scorePercentageModalTitle').innerText = `Edit ${paramName} Percentage`;
+      document.getElementById('scorePercentageModalLabel').innerText = `${paramName} Percentage (%)`;
+      document.getElementById('formScoreParamName').value = paramName;
+      
+      // Get current value
+      const displayElement = paramName === 'Class Score' 
+        ? document.getElementById('classScorePercentageDisplay')
+        : document.getElementById('examScorePercentageDisplay');
+      
+      const currentValue = displayElement.textContent.replace('%', '').trim();
+      document.getElementById('formScorePercentageValue').value = currentValue;
+      
+      document.getElementById('scorePercentageModal').classList.add('active');
+    }
+
+    function closeScorePercentageModal() { 
+      document.getElementById('scorePercentageModal').classList.remove('active'); 
+    }
+
+    function handleScorePercentageSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('scorePercentageSaveBtn');
+      btn.disabled = true; 
+      btn.innerText = 'Updating...';
+
+      const paramName = document.getElementById('formScoreParamName').value;
+      const newValue = document.getElementById('formScorePercentageValue').value;
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false; 
+          btn.innerText = 'Update Percentage';
+          if(res && res.success) { 
+            closeScorePercentageModal(); 
+            loadScorePercentages();
+            showToast(`${paramName} percentage updated successfully!`, 'success');
+          } else {
+            showToast(res && res.message ? res.message : 'Failed to update percentage', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false; 
+          btn.innerText = 'Update Percentage';
+          showSystemErrorModal(err, 'Unable to Update Percentage');
+        })
+        .updateSystemParameter(paramName, newValue);
+    }
     
-    // Normalize keys for easy access (e.g. "School Name" -> "schoolName", "School Logo URL" -> "schoolLogoUrl")
-    const camelKey = item.param.toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, function(m, chr) {
-      return chr.toUpperCase();
-    }).replace(/[^a-zA-Z0-9]/g, '');
+    /* --- BACKUP FUNCTIONS --- */
+    function loadBackupStats() {
+      google.script.run.withSuccessHandler(function(stats) {
+        if(stats.error) {
+          // Show authorization needed message
+          showAuthorizationNotice();
+          return;
+        }
+        
+        document.getElementById('totalBackups').textContent = stats.totalBackups || 0;
+        document.getElementById('totalSize').textContent = stats.totalSize || '0 KB';
+        document.getElementById('newestBackup').textContent = stats.newestBackup || 'None';
+        document.getElementById('autoBackupStatus').textContent = stats.autoBackupEnabled ? '✅ Enabled' : '❌ Disabled';
+        document.getElementById('autoBackupBtn').textContent = stats.autoBackupEnabled ? '⏸️ Disable Auto' : '⏰ Enable Auto';
+        updateBackupsTabBadge(stats.totalBackups || 0);
+      }).withFailureHandler(function(err) {
+        console.error('Failed to load backup stats:', err);
+        showAuthorizationNotice();
+        showSystemErrorModal(err, 'Unable to Load Backup Status');
+      }).getBackupStats();
+    }
     
-    map[camelKey] = item.value;
+    function showAuthorizationNotice() {
+      // Insert a lightweight banner above the stats grid so it doesn't overlap the cards.
+      const statsDiv = document.getElementById('backupStats');
+      if (!statsDiv) return;
 
-    // Direct image link conversion for logo URL
-    if (/logo/i.test(item.param)) {
-      map['schoolLogoDirectUrl'] = convertDriveUrlToDirectImage(item.rawValue || item.value);
+      // If banner already exists, don't add another
+      const card = statsDiv.closest('.card') || statsDiv.parentElement;
+      if (!card) return;
+      if (card.querySelector('.auth-required-banner')) return;
+
+      const banner = document.createElement('div');
+      banner.className = 'auth-required-banner';
+      banner.innerHTML = `
+        <div class="auth-content">
+          <div class="auth-title">🔐 Authorization Required</div>
+          <div style="font-size:13px;">Before using backup features, you need to authorize Google Drive access (one-time setup).</div>
+        </div>
+        <div class="auth-actions">
+          <button class="btn btn-secondary" onclick="openAuthorizationGuideModal()">📖 View Guide</button>
+        </div>
+      `;
+
+      // Ensure stat placeholders still show when authorization is required
+      const elTotal = document.getElementById('totalBackups'); if (elTotal) elTotal.textContent = '-';
+      const elSize = document.getElementById('totalSize'); if (elSize) elSize.textContent = '-';
+      const elNewest = document.getElementById('newestBackup'); if (elNewest) elNewest.textContent = '-';
+      const elAuto = document.getElementById('autoBackupStatus'); if (elAuto) elAuto.textContent = '-';
+      const autoBtn = document.getElementById('autoBackupBtn'); if (autoBtn) autoBtn.textContent = '⏰ Auto-Backup';
+      updateBackupsTabBadge(0);
+
+      // Insert banner immediately above the stats grid so it pushes content down
+      card.insertBefore(banner, statsDiv);
     }
-  });
-
-  // Ensure default fallback school name if missing
-  if (!map['schoolName'] && !map['School Name']) {
-    map['School Name'] = 'GLOBAL EVANGELICAL BASIC SCHOOL, TETTEKOPE';
-    map['schoolName']  = 'GLOBAL EVANGELICAL BASIC SCHOOL, TETTEKOPE';
-  }
-  
-  return map;
-}
-
-// 2. Update a specific System Parameter
-function normalizeParamName(name) {
-  return String(name || '').trim().toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-}
-
-function hashString(value) {
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(value), Utilities.Charset.UTF_8);
-  return bytes.map(function(byte) {
-    return (byte + 256).toString(16).slice(-2);
-  }).join('');
-}
-
-function isStrongPassword(value) {
-  return /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{12,}$/.test(String(value || ''));
-}
-
-function updateSystemParameter(paramName, newValue) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Settings");
-  if (!sheet) throw new Error("Settings worksheet not found.");
-
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) throw new Error("No system parameters found.");
-
-  const normalizedTarget = normalizeParamName(paramName);
-  const paramsRange = sheet.getRange(2, 2, lastRow - 1, 1);
-  const params = paramsRange.getValues();
-
-  let foundRow = -1;
-  for (let i = 0; i < params.length; i++) {
-    if (normalizeParamName(params[i][0]) === normalizedTarget) {
-      foundRow = 2 + i;
-      break;
-    }
-  }
-
-  let storedValue = String(newValue || '').trim();
-  if (normalizedTarget === 'masterpassword' || normalizedTarget === 'masterpass') {
-    if (!isStrongPassword(storedValue)) {
-      throw new Error('Master password must be at least 12 characters and include letters, numbers, and special characters.');
-    }
-    if (!storedValue.startsWith('sha256:')) {
-      storedValue = 'sha256:' + hashString(storedValue);
-    }
-  }
-
-  if (foundRow === -1) {
-    sheet.getRange(lastRow + 1, 2, 1, 2).setValues([[paramName, storedValue]]);
-    return { success: true };
-  }
-
-  sheet.getRange(foundRow, 3).setValue(storedValue);
-  return { success: true };
-}
-
-// 3. Fetch Lists (Fee Categories, Payment Methods, Statuses)
-function getSystemLists() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Settings");
-  if (!sheet) return { categories: [], methods: [], statuses: [] };
-
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return { categories: [], methods: [], statuses: [] };
-
-  // Read Column E (5), F (6), G (7)
-  const dataRange = sheet.getRange(2, 5, lastRow - 1, 3); 
-  const data = dataRange.getValues();
-
-  const categories = [];
-  const methods = [];
-  const statuses = [];
-
-  data.forEach(row => {
-    if (String(row[0]).trim()) categories.push(String(row[0]).trim());
-    if (String(row[1]).trim()) methods.push(String(row[1]).trim());
-    if (String(row[2]).trim()) statuses.push(String(row[2]).trim());
-  });
-
-  return { categories, methods, statuses };
-}
-
-// 4. Update a List Item (Used for Categories and Methods)
-function updateSystemListItem(columnLetter, oldValue, newValue) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Settings");
-  if (!sheet) throw new Error("Settings worksheet not found.");
-
-  const colIndex = columnLetter.charCodeAt(0) - 64; 
-  if (colIndex < 5 || colIndex > 7) throw new Error("Invalid column.");
-
-  const lastRow = sheet.getLastRow();
-  for (let r = 2; r <= lastRow; r++) {
-    const cell = sheet.getRange(r, colIndex);
-    if (String(cell.getValue()).trim() === oldValue) {
-      cell.setValue(newValue);
-      return { success: true };
-    }
-  }
-  throw new Error("List item not found.");
-}
-
-// 5. Get Score Percentages for Performance Calculations
-function getScorePercentages() {
-  const params = getSystemParameters();
-  let classScorePercentage = 50;
-  let examScorePercentage = 50;
-  
-  params.forEach(function(item) {
-    const paramName = String(item.param || '').trim();
-    const paramValue = String(item.value || '').trim();
     
-    if (paramName === 'Class Score' && paramValue && !isNaN(paramValue)) {
-      classScorePercentage = parseFloat(paramValue);
+    function createBackup() {
+      if(!confirm('Create a full backup of all sheets?')) return;
+      
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = '⏳ Creating...';
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          btn.disabled = false;
+          btn.textContent = '📦 Create Full Backup';
+          
+          if(result.success) {
+            // Show success toast with actions
+            showToast(
+              'Backup Created Successfully',
+              `File: ${result.fileName}\nLocation: Google Drive/SMS_Backups\nSize: ${result.size}`,
+              'success',
+              8000,
+              [
+                { text: '📂 Open Folder', url: 'https://drive.google.com/drive/folders/' + result.folderId },
+                { text: '⬇️ Download', url: result.downloadUrl }
+              ]
+            );
+            
+            loadBackupStats();
+            loadBackups();
+          } else {
+            if(result.message && result.message.includes('permission')) {
+              showToast(
+                'Authorization Required',
+                'Please authorize Drive access first:\n1. Extensions → Apps Script\n2. Run: authorizeDriveAccess\n3. Grant permissions',
+                'error',
+                10000
+              );
+            } else {
+              showToast('Backup Failed', result.message, 'error');
+            }
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '📦 Create Full Backup';
+          showSystemErrorModal(err, 'Backup Creation Failed');
+        })
+        .createFullBackup();
     }
-    if (paramName === 'Exams Score' && paramValue && !isNaN(paramValue)) {
-      examScorePercentage = parseFloat(paramValue);
+    
+    function loadBackups() {
+      const container = document.getElementById('backupsList');
+      container.innerHTML = '<div style="text-align:center; color: #64748b; padding: 20px;">Loading backups...</div>';
+      
+      google.script.run
+        .withSuccessHandler(function(backups) {
+          if(!backups || backups.length === 0) {
+            container.innerHTML = '<div style="text-align:center; color: #64748b; padding: 20px;">No backups found. Create your first backup above.</div>';
+            return;
+          }
+          
+          container.innerHTML = '';
+          backups.forEach(function(backup) {
+            const item = document.createElement('div');
+            item.className = 'backup-item';
+            
+            const date = new Date(backup.created);
+            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            
+            item.innerHTML = `
+              <div class="backup-info">
+                <div class="backup-name">${backup.fileName}</div>
+                <div class="backup-meta">${dateStr} • ${backup.size}</div>
+              </div>
+              <div class="backup-actions-btn">
+                <a href="${backup.downloadUrl}" target="_blank" class="btn-small btn-download">⬇️ Download</a>
+                <button class="btn-small btn-delete" onclick="deleteBackup('${backup.fileId}', '${backup.fileName}')">🗑️ Delete</button>
+              </div>
+            `;
+            container.appendChild(item);
+          });
+        })
+        .withFailureHandler(function(err) {
+          container.innerHTML = '<div style="text-align:center; color: #ef4444; padding: 20px;">Unable to load backups right now.</div>';
+          showSystemErrorModal(err, 'Unable to Load Backups');
+        })
+        .listBackups(20);
     }
-  });
-  
-  return {
-    classScorePercentage: classScorePercentage,
-    examScorePercentage: examScorePercentage,
-    classScoreDecimal: classScorePercentage / 100,
-    examScoreDecimal: examScorePercentage / 100
-  };
-}
+    
+    function deleteBackup(fileId, fileName) {
+      if(!confirm('Delete backup: ' + fileName + '?\n\nThis action cannot be undone.')) return;
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if(result.success) {
+            showToast('Backup Deleted', result.message, 'info');
+            loadBackupStats();
+            loadBackups();
+          } else {
+            showToast('Delete Failed', result.message, 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          showSystemErrorModal(err, 'Unable to Delete Backup');
+        })
+        .deleteBackup(fileId);
+    }
+    
+    function toggleAutoBackup() {
+      const btn = document.getElementById('autoBackupBtn');
+      const isEnabled = btn.textContent.includes('Disable');
+      // Open modal instead of using native confirm()
+      openAutoBackupModal(isEnabled);
+    }
+
+    function openAutoBackupModal(isCurrentlyEnabled) {
+      const modal = document.getElementById('autoBackupModal');
+      modal.dataset.isEnabled = isCurrentlyEnabled ? 'true' : 'false';
+      const msg = isCurrentlyEnabled
+        ? 'Are you sure you want to disable automatic daily backups?'
+        : 'Enable automatic daily backups at 2 AM? This will create a daily backup automatically.';
+      document.getElementById('autoBackupModalMessage').innerText = msg;
+      const confirmBtn = document.getElementById('confirmAutoBackupBtn');
+      confirmBtn.disabled = false;
+      confirmBtn.innerText = 'Confirm';
+      modal.classList.add('active');
+    }
+
+    function closeAutoBackupModal() {
+      document.getElementById('autoBackupModal').classList.remove('active');
+    }
+
+    function confirmAutoBackup() {
+      const modal = document.getElementById('autoBackupModal');
+      const isEnabled = modal.dataset.isEnabled === 'true';
+      const confirmBtn = document.getElementById('confirmAutoBackupBtn');
+      const uiBtn = document.getElementById('autoBackupBtn');
+
+      // small animated loading state
+      confirmBtn.disabled = true;
+      confirmBtn.dataset.origText = confirmBtn.innerText || 'Confirm';
+      confirmBtn.classList.add('btn-loading', 'animate');
+      confirmBtn.innerText = 'Processing...';
+      if (uiBtn) { uiBtn.disabled = true; uiBtn.textContent = '⏳ Processing...'; }
+
+      const funcName = isEnabled ? 'disableAutomaticBackups' : 'setupAutomaticBackups';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          // restore button state
+          confirmBtn.classList.remove('btn-loading', 'animate');
+          confirmBtn.disabled = false;
+          confirmBtn.innerText = confirmBtn.dataset.origText || 'Confirm';
+          if (uiBtn) uiBtn.disabled = false;
+          closeAutoBackupModal();
+          if(result.success) {
+            showToast(
+              isEnabled ? 'Auto-Backup Disabled' : 'Auto-Backup Enabled',
+              result.message,
+              'success'
+            );
+            loadBackupStats();
+          } else {
+            showToast('Operation Failed', result.message, 'error');
+            if (uiBtn) uiBtn.textContent = isEnabled ? '⏸️ Disable Auto' : '⏰ Enable Auto';
+          }
+        })
+          .withFailureHandler(function(err) {
+            if (uiBtn) { uiBtn.disabled = false; uiBtn.textContent = isEnabled ? '⏸️ Disable Auto' : '⏰ Enable Auto'; }
+            // remove loading state
+            confirmBtn.classList.remove('btn-loading', 'animate');
+            confirmBtn.disabled = false;
+            confirmBtn.innerText = confirmBtn.dataset.origText || 'Confirm';
+            showSystemErrorModal(err, 'Unable to Update Auto-Backup');
+          })[funcName]();
+    }
+    
+    function openSelectiveBackupModal() {
+      document.getElementById('selectiveBackupModal').classList.add('active');
+      
+      google.script.run
+        .withSuccessHandler(function(sheets) {
+          const container = document.getElementById('sheetsCheckboxGroup');
+          container.innerHTML = '';
+          
+          sheets.forEach(function(sheet) {
+            const label = document.createElement('label');
+            label.className = 'checkbox-label';
+            label.innerHTML = `
+              <input type="checkbox" value="${sheet.name}" checked>
+              ${sheet.name} (${sheet.rowCount} rows)
+            `;
+            container.appendChild(label);
+          });
+        })
+        .getAvailableSheets();
+    }
+    
+    function closeSelectiveBackupModal() {
+      document.getElementById('selectiveBackupModal').classList.remove('active');
+    }
+    
+    function createSelectiveBackup() {
+      const checkboxes = document.querySelectorAll('#sheetsCheckboxGroup input:checked');
+      const selectedSheets = Array.from(checkboxes).map(cb => cb.value);
+      
+      if(selectedSheets.length === 0) {
+        showToast('No Sheets Selected', 'Please select at least one sheet to backup.', 'warning');
+        return;
+      }
+      
+      closeSelectiveBackupModal();
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if(result.success) {
+            showToast(
+              'Selective Backup Created',
+              `File: ${result.fileName}\nSheets: ${result.sheetsBackedUp.join(', ')}\nLocation: Google Drive/SMS_Backups`,
+              'success',
+              8000,
+              [
+                { text: '📂 Open Folder', url: 'https://drive.google.com/drive/folders/' + result.folderId },
+                { text: '⬇️ Download', url: result.downloadUrl }
+              ]
+            );
+            loadBackupStats();
+            loadBackups();
+          } else {
+            showToast('Backup Failed', result.message, 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          showSystemErrorModal(err, 'Selective Backup Failed');
+        })
+        .createSelectiveBackup(selectedSheets);
+    }
+    
+    function openRestoreModal() {
+      document.getElementById('restoreModal').classList.add('active');
+      
+      const select = document.getElementById('restoreBackupSelect');
+      select.innerHTML = '<option value="">Loading backups...</option>';
+      
+      google.script.run
+        .withSuccessHandler(function(backups) {
+          select.innerHTML = '<option value="">-- Select a backup to restore --</option>';
+          backups.forEach(function(backup) {
+            const date = new Date(backup.created);
+            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            const option = document.createElement('option');
+            option.value = backup.fileId;
+            option.textContent = backup.fileName + ' (' + dateStr + ')';
+            select.appendChild(option);
+          });
+        })
+        .listBackups(20);
+    }
+    
+    function closeRestoreModal() {
+      document.getElementById('restoreModal').classList.remove('active');
+    }
+    
+    function toggleRestoreSheets() {
+      const isAll = document.getElementById('restoreAllSheets').checked;
+      document.getElementById('restoreSheetSelection').style.display = isAll ? 'none' : 'block';
+    }
+    
+    function confirmRestore() {
+      const fileId = document.getElementById('restoreBackupSelect').value;
+      
+      if(!fileId) {
+        showToast('No Backup Selected', 'Please select a backup file to restore.', 'warning');
+        return;
+      }
+      
+      if(!confirm('⚠️ WARNING: This will overwrite your current data!\n\nAre you absolutely sure you want to restore from this backup?\n\nThis action CANNOT be undone.')) {
+        return;
+      }
+      
+      const isAll = document.getElementById('restoreAllSheets').checked;
+      let sheetNames = null;
+      
+      if(!isAll) {
+        const checkboxes = document.querySelectorAll('#restoreSheetsCheckboxGroup input:checked');
+        sheetNames = Array.from(checkboxes).map(cb => cb.value);
+        
+        if(sheetNames.length === 0) {
+          showToast('No Sheets Selected', 'Please select at least one sheet to restore.', 'warning');
+          return;
+        }
+      }
+      
+      closeRestoreModal();
+      
+      // Show loading toast
+      showToast('Restoring Data', 'Please wait while we restore your data...', 'info', 0);
+      
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if(result.success) {
+            showToast(
+              'Restore Successful',
+              `Restored: ${result.restoredSheets.join(', ')}\n\nPage will reload in 2 seconds...`,
+              'success',
+              2000
+            );
+            setTimeout(() => window.location.reload(), 2000);
+          } else {
+            showToast('Restore Failed', result.message, 'error', 10000);
+          }
+        })
+        .withFailureHandler(function(err) {
+          showSystemErrorModal(err, 'Restore Failed');
+        })
+        .restoreFromBackup(fileId, sheetNames);
+    }
+    
+    function openAuthorizationGuideModal() {
+      document.getElementById('authorizationGuideModal').classList.add('active');
+    }
+    
+    function closeAuthorizationGuideModal() {
+      document.getElementById('authorizationGuideModal').classList.remove('active');
+    }
+
+    /* --- AUDIT LOGS FUNCTIONS --- */
+    
+    /**
+     * Load audit logs statistics and populate the preview cards
+     */
+    function loadAuditLogsStats() {
+      // Set loading state
+      document.getElementById('auditTotalActions').textContent = 'Loading...';
+      document.getElementById('auditTodayActions').textContent = 'Loading...';
+      document.getElementById('auditActiveUsers').textContent = 'Loading...';
+      document.getElementById('auditDeletions').textContent = 'Loading...';
+      
+      // Fetch stats from backend
+      google.script.run
+        .withSuccessHandler(function(stats) {
+          if (stats && !stats.error) {
+            document.getElementById('auditTotalActions').textContent = stats.totalActions || '0';
+            document.getElementById('auditTodayActions').textContent = stats.todayActions || '0';
+            document.getElementById('auditActiveUsers').textContent = stats.activeUsers || '0';
+            document.getElementById('auditDeletions').textContent = stats.deletions || '0';
+            
+            // Update badge
+            setTabBadge('auditlogs', stats.totalActions || 0);
+          } else {
+            document.getElementById('auditTotalActions').textContent = 'Error';
+            document.getElementById('auditTodayActions').textContent = 'Error';
+            document.getElementById('auditActiveUsers').textContent = 'Error';
+            document.getElementById('auditDeletions').textContent = 'Error';
+            
+            console.error('Failed to load audit stats:', stats ? stats.error : 'Unknown error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('auditTotalActions').textContent = 'Error';
+          document.getElementById('auditTodayActions').textContent = 'Error';
+          document.getElementById('auditActiveUsers').textContent = 'Error';
+          document.getElementById('auditDeletions').textContent = 'Error';
+          
+          console.error('Error loading audit stats:', err);
+          showToast('Error', 'Failed to load audit statistics: ' + err.message, 'error');
+        })
+        .getAuditStats();
+    }
+    
+    /**
+     * Open the full Audit Logs interface in a new browser tab
+     */
+    function openAuditLogsInNewTab() {
+      // Get the script URL and append the audit logs page parameter
+      google.script.run
+        .withSuccessHandler(function(scriptUrl) {
+          const auditLogsUrl = scriptUrl + '?page=AuditTrials';
+          window.open(auditLogsUrl, '_blank');
+        })
+        .withFailureHandler(function(err) {
+          console.error('Error opening audit logs:', err);
+          showToast('Error', 'Failed to open audit logs: ' + err.message, 'error');
+        })
+        .getScriptUrl();
+    }
+    
+    /**
+     * Refresh the embedded audit logs iframe
+     */
+    function refreshAuditLogsFrame() {
+      const iframe = document.getElementById('auditLogsFrame');
+      if (iframe && iframe.src) {
+        // Add timestamp to force refresh
+        const url = iframe.src.split('?')[0];
+        iframe.src = url + '?t=' + Date.now();
+        
+        showToast('Refreshed', 'Audit logs refreshed successfully', 'success', 2000);
+      } else {
+        // Load the iframe for the first time
+        loadAuditLogsIframe();
+      }
+    }
+    
+    /**
+     * Load the audit logs iframe with the correct URL
+     */
+    function loadAuditLogsIframe() {
+      google.script.run
+        .withSuccessHandler(function(scriptUrl) {
+          const iframe = document.getElementById('auditLogsFrame');
+          if (iframe) {
+            iframe.src = scriptUrl + '?page=AuditTrials&embedded=true';
+          }
+        })
+        .withFailureHandler(function(err) {
+          console.error('Error loading audit logs iframe:', err);
+          showToast('Error', 'Failed to load audit logs: ' + err.message, 'error');
+        })
+        .getScriptUrl();
+    }
+    
+    /**
+     * Initialize audit logs tab when it's activated
+     */
+    function initializeAuditLogsTab() {
+      // Load the iframe if not already loaded
+      const iframe = document.getElementById('auditLogsFrame');
+      if (iframe && !iframe.src) {
+        loadAuditLogsIframe();
+      }
+      
+      // Load statistics
+      loadAuditLogsStats();
+    }
+    
+    // Enhance the activateTab function to initialize audit logs when the tab is activated
+    const originalActivateTab = activateTab;
+    activateTab = function(tabName, persist, updateHash) {
+      originalActivateTab(tabName, persist, updateHash);
+      
+      // If audit logs tab is activated, initialize it
+      if (tabName === 'auditlogs') {
+        initializeAuditLogsTab();
+      }
+    };
+  </script>
+</body>
+</html>

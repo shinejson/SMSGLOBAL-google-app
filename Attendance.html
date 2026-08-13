@@ -11,114 +11,145 @@
     .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
     .page-title { font-size: 22px; color: #0f172a; font-weight: 600; display: flex; align-items: center; gap: 10px; }
     .page-title span { color: #64748b; font-weight: 400; font-size: 16px; background: #e2e8f0; padding: 2px 10px; border-radius: 20px; }
-    .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
     .action-btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
     .action-btn:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3); }
-    .action-btn-outline { background: transparent; color: #3b82f6; border: 2px solid #3b82f6; padding: 8px 18px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
-    .action-btn-outline:hover { background: #eff6ff; }
 
     /* --- TOOLBAR --- */
     .toolbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px 10px 0 0; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px; margin: 0 -40px; }
     .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .search-box { display: flex; align-items: center; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 8px; width: 280px; background: #f8fafc; }
+    .search-box { display: flex; align-items: center; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 8px; width: 250px; background: #f8fafc; }
     .search-box input { border: none; outline: none; background: transparent; width: 100%; margin-left: 8px; font-size: 14px; color: #333; }
-    .form-select { padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; outline: none; transition: border-color 0.2s; cursor: pointer; }
-    .form-select:focus { border-color: #3b82f6; }
+    .form-input, .form-select { padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; outline: none; transition: border-color 0.2s; }
+    .form-input:focus, .form-select:focus { border-color: #3b82f6; }
 
     /* --- TABLE --- */
     .table-container { background: white; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow-x: auto; margin: 0 -40px; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     thead { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
-    th { text-align: left; padding: 14px 18px; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; white-space: nowrap; }
-    td { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; color: #1e293b; white-space: nowrap; }
-    tr:last-child td { border-bottom: none; }
+    th { text-align: left; padding: 16px 20px; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+    td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
     tr:hover { background-color: #f8fafc; }
-    #loading { text-align: center; padding: 60px; color: #64748b; font-size: 15px; }
 
     /* --- BADGES --- */
     .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-block; }
     .status-present { background: #dcfce7; color: #166534; }
-    .status-absent  { background: #fee2e2; color: #991b1b; }
-    .status-late    { background: #fef9c3; color: #854d0e; }
-    .status-excused { background: #e0f2fe; color: #0369a1; }
+    .status-absent { background: #fee2e2; color: #991b1b; }
+    .status-late { background: #fef9c3; color: #854d0e; }
+
+    /* --- LOADING --- */
+    #loading { text-align: center; padding: 40px; color: #64748b; }
 
     /* --- MODALS --- */
-    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+    .modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
     .modal-backdrop.active { opacity: 1; pointer-events: auto; }
-    .modal-content { background: white; width: 92%; max-width: 620px; border-radius: 14px; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.18); transform: scale(0.95); transition: transform 0.25s ease; overflow: hidden; display: flex; flex-direction: column; max-height: 92vh; }
+    .modal-content { background: white; width: 92%; max-width: 620px; border-radius: 14px; box-shadow: 0 24px 40px -15px rgba(15, 23, 42, 0.15); transform: scale(0.95); transition: transform 0.25s ease, box-shadow 0.25s ease; overflow: hidden; display: flex; flex-direction: column; }
     .modal-backdrop.active .modal-content { transform: scale(1); }
-    .modal-header { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-    .modal-header h3 { font-size: 18px; color: #0f172a; font-weight: 600; }
-    .modal-close { color: #94a3b8; font-size: 26px; background: none; border: none; cursor: pointer; line-height: 1; padding: 0 4px; transition: color 0.15s; }
+    .modal-header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 18px; color: #0f172a; font-weight: 700; letter-spacing: 0.02em; margin: 0; }
+    .modal-close { color: #94a3b8; font-size: 24px; background: none; border: none; cursor: pointer; transition: color 0.15s; padding: 4px; line-height: 1; }
     .modal-close:hover { color: #334155; }
-    .modal-body { padding: 24px; overflow-y: auto; flex: 1; }
-    .modal-footer { padding: 16px 24px; border-top: 1px solid #f1f5f9; background: #f8fafc; display: flex; justify-content: flex-end; gap: 12px; flex-shrink: 0; flex-wrap: wrap; }
+    .modal-body { padding: 22px 20px 20px; max-height: 72vh; overflow-y: auto; }
+    .modal-footer { padding: 14px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: flex-end; gap: 10px; }
+    .btn { padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: none; }
+    
+    .modal-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .modal-grid.three-col { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .info-note { display: block; margin-top: 6px; font-size: 12px; color: #64748b; }
+    .form-group { margin-bottom: 0; }
 
-    /* --- BULK MODAL (extra wide) --- */
-    .modal-bulk .modal-content { max-width: 780px; }
-
-    /* --- FORM ELEMENTS --- */
-    .form-group { margin-bottom: 18px; }
+    /* --- CLASS ROSTER --- */
+    .roster-wrap { margin-top: 16px; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+    .roster-header { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 0; background: #f1f5f9; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #475569; }
+    .roster-header > div:not(:first-child) { text-align: center; }
+    .roster-body { max-height: 300px; overflow-y: auto; }
+    .roster-row { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 0; align-items: center; padding: 10px 14px; border-top: 1px solid #f1f5f9; transition: background 0.15s; }
+    .roster-row:hover { background: #f8fafc; }
+    .roster-row .student-info { font-size: 13px; }
+    .roster-row .student-info .sid { font-size: 11px; color: #64748b; }
+    /* Duplicate warning style */
+    .roster-row.is-duplicate { background: #fffbeb; opacity: 0.85; }
+    .roster-row.is-duplicate .student-info::after { content: ' ⚠ Already recorded'; font-size: 10px; font-weight: 700; color: #b45309; margin-left: 6px; }
+    .roster-row.is-duplicate .status-pill label { opacity: 0.4; pointer-events: none; }
+    .status-pill { display: flex; align-items: center; justify-content: center; }
+    .status-pill input[type=radio] { display: none; }
+    .status-pill label { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid #d1d5db; background: #f8fafc; color: #64748b; transition: all 0.15s; user-select: none; }
+    .status-pill input[type=radio]:checked + label.present-lbl { background: #dcfce7; color: #166534; border-color: #86efac; }
+    .status-pill input[type=radio]:checked + label.absent-lbl  { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+    .status-pill input[type=radio]:checked + label.late-lbl    { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+    .roster-empty { padding: 24px; text-align: center; color: #94a3b8; font-size: 13px; }
+    .mark-all-bar { display: flex; gap: 8px; align-items: center; padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 12px; color: #475569; }
+    .mark-all-bar button { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.15s; }
+    .mark-all-bar .ma-present { background: #dcfce7; color: #166534; border-color: #86efac; }
+    .mark-all-bar .ma-absent  { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+    .mark-all-bar .ma-late    { background: #fef9c3; color: #854d0e; border-color: #fde047; }
     .form-label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; margin-bottom: 6px; letter-spacing: 0.5px; }
-    .form-input, .form-select-full { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; transition: border-color 0.15s, box-shadow 0.15s; }
-    .form-input:focus, .form-select-full:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-
-    /* --- BUTTONS --- */
     .btn { padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; }
     .btn-secondary { background: #e2e8f0; color: #475569; }
     .btn-secondary:hover { background: #cbd5e1; color: #1e293b; }
     .btn-primary { background: #3b82f6; color: #fff; }
     .btn-primary:hover { background: #2563eb; }
-    .btn-success { background: #10b981; color: #fff; }
-    .btn-success:hover { background: #059669; }
-    .btn-danger { background: #ef4444; color: #fff; }
-    .btn-danger:hover { background: #dc2626; }
-    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+
+    /* Make input and select elements full width inside modal bodies */
+    .modal-body .form-input,
+    .modal-body .form-select {
+      width: 100%;
+    }
 
     /* --- ACTION ICONS --- */
-    .actions-cell { display: flex; gap: 6px; }
-    .action-icon-btn { background: transparent; border: 1px solid #e2e8f0; padding: 6px; border-radius: 6px; cursor: pointer; transition: 0.2s; color: #64748b; display: flex; align-items: center; justify-content: center; }
-    .edit-btn:hover { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
-    .delete-btn:hover { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
-
-    /* --- BULK TABLE --- */
-    .bulk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .bulk-table th { background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #64748b; white-space: nowrap; }
-    .bulk-table td { border: 1px solid #f1f5f9; padding: 6px 8px; }
-    .bulk-table td select, .bulk-table td input { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; background: #fff; outline: none; }
-    .bulk-table td select:focus, .bulk-table td input:focus { border-color: #3b82f6; }
-    .bulk-row-status { font-size: 12px; font-weight: 600; }
-    .bulk-row-status.saved { color: #166534; }
-    .bulk-row-status.error { color: #991b1b; }
-    .bulk-row-status.pending { color: #64748b; }
-
-    /* --- PROGRESS BAR --- */
-    .progress-bar-wrap { height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-top: 8px; display: none; }
-    .progress-bar-fill { height: 100%; background: #3b82f6; border-radius: 99px; transition: width 0.3s ease; }
+    .actions-cell { display: flex; align-items: center; gap: 4px; }
+    .action-icon-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 6px; color: #64748b; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .action-icon-btn:hover { transform: scale(1.1); }
+    .action-icon-btn.edit-btn:hover { background: #eff6ff; color: #2563eb; }
+    .action-icon-btn.delete-btn:hover { background: #fef2f2; color: #dc2626; }
 
     /* --- TOAST NOTIFICATIONS --- */
-    .toast-container { position: fixed; top: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-    .toast { pointer-events: auto; min-width: 300px; max-width: 440px; background: white; padding: 14px 18px; border-radius: 10px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1); display: flex; align-items: flex-start; gap: 12px; border-left: 5px solid #10b981; transform: translateX(120%); transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease; opacity: 0; }
+    .toast-container {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      min-width: 320px;
+      max-width: 440px;
+      background: white;
+      color: #0f172a;
+      padding: 14px 18px;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-left: 5px solid #10b981;
+      transform: translateX(120%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+      opacity: 0;
+    }
     .toast.active { transform: translateX(0); opacity: 1; }
-    .toast-error { border-left-color: #ef4444; }
-    .toast-warning { border-left-color: #f59e0b; }
-    .toast-info { border-left-color: #3b82f6; }
-    .toast-icon { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; flex-shrink: 0; margin-top: 1px; }
-    .toast:not(.toast-error):not(.toast-warning):not(.toast-info) .toast-icon { background: #dcfce7; color: #166534; }
-    .toast-error .toast-icon { background: #fee2e2; color: #991b1b; }
-    .toast-warning .toast-icon { background: #fef9c3; color: #854d0e; }
-    .toast-info .toast-icon { background: #dbeafe; color: #1d4ed8; }
-    .toast-body { flex: 1; }
-    .toast-title { font-size: 14px; font-weight: 600; color: #0f172a; line-height: 1.3; }
-    .toast-message { font-size: 13px; color: #64748b; margin-top: 2px; line-height: 1.4; }
-    .toast-close { background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
-    .toast-close:hover { color: #334155; }
-
-    /* --- EMPTY STATE --- */
-    .empty-state { text-align: center; padding: 60px 20px; color: #64748b; }
-    .empty-state-icon { font-size: 48px; margin-bottom: 16px; }
-    .empty-state h4 { font-size: 16px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    .toast.toast-error { border-left-color: #ef4444; }
+    .toast.toast-warning { border-left-color: #f59e0b; }
+    .toast-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #dcfce7;
+      color: #166534;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .toast.toast-error .toast-icon { background: #fee2e2; color: #991b1b; }
+    .toast.toast-warning .toast-icon { background: #fef9c3; color: #854d0e; }
+    .toast-message { flex: 1; font-size: 14px; line-height: 1.4; }
+    .toast-close { background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1; }
+    .toast-close:hover { color: #475569; }
 
     /* --- RESPONSIVE --- */
     @media (max-width: 768px) {
@@ -128,147 +159,111 @@
       .toolbar { flex-direction: column; align-items: flex-start; }
       .toolbar-left, .toolbar-right { width: 100%; flex-direction: column; }
       .search-box { width: 100%; }
-      .form-grid { grid-template-columns: 1fr; }
-      .toast-container { top: 16px; right: 16px; left: 16px; }
-      .toast { min-width: auto; max-width: 100%; }
+      .form-input, .form-select { width: 100%; }
     }
-
-    /* --- DARK MODE --- */
-    body.dark-mode { background-color: #0f172a; color: #f1f5f9; }
-    body.dark-mode .page-title { color: #f1f5f9; }
-    body.dark-mode .page-title span { background: #334155; color: #94a3b8; }
-    body.dark-mode .toolbar { background: #1e293b; border-bottom-color: #334155; }
-    body.dark-mode .search-box { background: #0f172a; border-color: #334155; }
-    body.dark-mode .search-box input { color: #f1f5f9; }
-    body.dark-mode .search-box input::placeholder { color: #64748b; }
-    body.dark-mode .form-select { background: #0f172a; border-color: #334155; color: #f1f5f9; }
-    body.dark-mode .table-container { background: #1e293b; }
-    body.dark-mode thead { background: #0f172a; border-bottom-color: #334155; }
-    body.dark-mode th { color: #94a3b8; }
-    body.dark-mode td { border-bottom-color: #334155; color: #f1f5f9; }
-    body.dark-mode tr:hover { background-color: #334155; }
-    body.dark-mode #loading { color: #94a3b8; }
-    body.dark-mode .modal-content { background: #1e293b; }
-    body.dark-mode .modal-header { border-bottom-color: #334155; }
-    body.dark-mode .modal-header h3 { color: #f1f5f9; }
-    body.dark-mode .modal-close { color: #94a3b8; }
-    body.dark-mode .modal-footer { background: #0f172a; border-top-color: #334155; }
-    body.dark-mode .form-label { color: #94a3b8; }
-    body.dark-mode .form-input, body.dark-mode .form-select-full { background: #0f172a; border-color: #334155; color: #f1f5f9; }
-    body.dark-mode .form-input:focus, body.dark-mode .form-select-full:focus { border-color: #3b82f6; }
-    body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
-    body.dark-mode .btn-secondary:hover { background: #475569; }
-    body.dark-mode .action-icon-btn { border-color: #334155; color: #94a3b8; }
-    body.dark-mode .toast { background: #1e293b; }
-    body.dark-mode .toast-title { color: #f1f5f9; }
-    body.dark-mode .bulk-table th { background: #0f172a; border-color: #334155; color: #94a3b8; }
-    body.dark-mode .bulk-table td { border-color: #334155; }
-    body.dark-mode .bulk-table td select, body.dark-mode .bulk-table td input { background: #0f172a; border-color: #334155; color: #f1f5f9; }
-    body.dark-mode .progress-bar-wrap { background: #334155; }
   </style>
 </head>
 <body>
 
-  <!-- TOAST CONTAINER -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- PAGE HEADER -->
+  <!-- HEADER -->
   <div class="page-header">
     <div class="page-title">
-      📋 Attendance
+      ✅ Attendance Records
       <span id="attendanceCount">0</span>
     </div>
-    <div class="header-actions">
-      <button class="action-btn-outline" onclick="openBulkModal()">📋 Bulk Entry</button>
-      <button class="action-btn" onclick="openAddModal()">+ Add Record</button>
-    </div>
+    <button class="action-btn" onclick="openAddModal()">+ Mark Attendance</button>
   </div>
 
-  <!-- TOOLBAR (FILTERS) -->
+  <!-- TOOLBAR -->
   <div class="toolbar">
     <div class="toolbar-left">
       <div class="search-box">
         <span>🔍</span>
-        <input type="text" id="searchInput" placeholder="Search by student, course, ID..." oninput="filterTable()">
+        <input type="text" id="searchInput" placeholder="Search ID, Course, or Status..." onkeyup="filterTable()">
       </div>
     </div>
     <div class="toolbar-right">
-      <select id="filterDate" class="form-select" onchange="filterTable()">
-        <option value="">All Dates</option>
+      <input type="date" id="dateFilter" class="form-input" onchange="filterTable()">
+      <select id="academicYearFilter" class="form-select" onchange="filterTable()">
+        <option value="">All Years</option>
       </select>
-      <select id="filterClass" class="form-select" onchange="filterTable()">
+      <select id="classFilter" class="form-select" onchange="filterTable()">
         <option value="">All Classes</option>
       </select>
-      <select id="filterStatus" class="form-select" onchange="filterTable()">
+      <select id="termFilter" class="form-select" onchange="filterTable()">
+        <option value="">All Terms</option>
+      </select>
+      <select id="statusFilter" class="form-select" onchange="filterTable()">
         <option value="">All Statuses</option>
         <!-- Statuses loaded dynamically from settings -->
       </select>
-      <select id="filterTerm" class="form-select" onchange="filterTable()">
-        <option value="">All Terms</option>
-        <option value="Term 1">Term 1</option>
-        <option value="Term 2">Term 2</option>
-        <option value="Term 3">Term 3</option>
-      </select>
+      <input type="text" id="exportFolderId" class="form-input" placeholder="Export Folder ID">
+      <button class="action-btn" style="background:#10b981;" onclick="exportPdf()">Export PDF</button>
     </div>
   </div>
 
   <!-- TABLE -->
   <div class="table-container">
-    <div id="loading">⏳ Loading attendance records...</div>
+    <div id="loading">Loading attendance data...</div>
     <table id="attendanceTable" style="display:none;">
       <thead>
         <tr>
-          <th>ID</th>
+          <th>Attendance ID</th>
           <th>Date</th>
           <th>Academic Year</th>
           <th>Class</th>
-          <th>Student ID</th>
-          <th>Student Name</th>
-          <th>Course</th>
+          <th>Student</th>
+          <th>Course ID</th>
           <th>Status</th>
           <th>Term</th>
-          <th style="text-align:center;">Actions</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
 
-  <!-- ===== ADD / EDIT MODAL ===== -->
+  <!-- ADD ATTENDANCE MODAL (Bulk — one row per student in class) -->
   <div class="modal-backdrop" id="attendanceModal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width:700px;">
       <div class="modal-header">
-        <h3 id="modalTitle">Add Attendance Record</h3>
+        <h3>Mark Attendance</h3>
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       <form id="attendanceForm" onsubmit="handleSubmit(event)">
-        <input type="hidden" id="formAttendanceId">
         <div class="modal-body">
-
-          <div class="form-grid">
+          <!-- Session fields -->
+          <div class="modal-grid three-col">
             <div class="form-group">
-              <label class="form-label" for="formDate">Date *</label>
-              <input type="date" id="formDate" class="form-input" required>
+              <label class="form-label" for="attendanceDate">Date</label>
+              <input type="date" id="attendanceDate" class="form-input" required>
             </div>
             <div class="form-group">
-              <label class="form-label" for="formStatus">Status *</label>
-              <select id="formStatus" class="form-select-full" required>
-                <!-- Statuses loaded dynamically from settings -->
+              <label class="form-label" for="academicYear">Academic Year <span style="font-weight:400;text-transform:none;">(Active)</span></label>
+              <select id="academicYear" class="form-select" required>
+                <option value="" disabled selected>Select Year</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="courseSelect">Course <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+              <select id="courseSelect" class="form-select">
+                <option value="">Select a Course</option>
               </select>
             </div>
           </div>
-
-          <div class="form-grid">
+          <div class="modal-grid" style="margin-top:14px;">
             <div class="form-group">
-              <label class="form-label" for="formAcademicYear">Academic Year *</label>
-              <select id="formAcademicYear" class="form-select-full" required>
-                <option value="">— Select Year —</option>
+              <label class="form-label" for="className">Class</label>
+              <select id="className" class="form-select" required onchange="renderClassRoster()">
+                <option value="" disabled selected>-- Select Class --</option>
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label" for="formTerm">Term *</label>
-              <select id="formTerm" class="form-select-full" required>
-                <option value="">— Select Term —</option>
+              <label class="form-label" for="term">Term</label>
+              <select id="term" class="form-select" required>
+                <option value="" disabled selected>Select Term</option>
                 <option value="Term 1">Term 1</option>
                 <option value="Term 2">Term 2</option>
                 <option value="Term 3">Term 3</option>
@@ -276,582 +271,590 @@
             </div>
           </div>
 
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label" for="formClass">Class *</label>
-              <select id="formClass" class="form-select-full" required onchange="filterStudentsByClass()">
-                <option value="">— Select Class —</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="formCourse">Course</label>
-              <select id="formCourse" class="form-select-full">
-                <option value="">— Select Course —</option>
-              </select>
+          <!-- Student roster (rendered dynamically on class select) -->
+          <div id="rosterSection" style="margin-top:16px; display:none;">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:#475569;letter-spacing:0.5px;margin-bottom:8px;">Student Roster <span id="rosterCount" style="font-weight:400;color:#94a3b8;"></span></div>
+            <div class="roster-wrap">
+              <div class="mark-all-bar" id="markAllBar">
+                <span>Mark all:</span>
+                <!-- Buttons loaded dynamically from status settings -->
+              </div>
+              <div class="roster-header" id="rosterHeader">
+                <div>Student</div>
+                <!-- Status columns loaded dynamically -->
+              </div>
+              <div class="roster-body" id="rosterBody"></div>
             </div>
           </div>
-
-          <div class="form-group">
-            <label class="form-label" for="formStudent">Student *</label>
-            <select id="formStudent" class="form-select-full" required onchange="fillStudentName()">
-              <option value="">— Select Student —</option>
-            </select>
-          </div>
-
-          <input type="hidden" id="formStudentName">
-
+          <div id="rosterPlaceholder" style="margin-top:16px;padding:20px;text-align:center;color:#94a3b8;font-size:13px;border:1px dashed #e2e8f0;border-radius:10px;">Select a class above to load the student roster.</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="saveBtn">💾 Save Record</button>
+          <button type="submit" class="btn btn-primary" id="saveBtn">Save Attendance</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- ===== BULK ENTRY MODAL ===== -->
-  <div class="modal-backdrop modal-bulk" id="bulkModal">
-    <div class="modal-content">
+  <!-- EDIT SINGLE ATTENDANCE MODAL -->
+  <div class="modal-backdrop" id="editAttendanceModal">
+    <div class="modal-content" style="max-width:480px;">
       <div class="modal-header">
-        <h3>📋 Bulk Attendance Entry</h3>
-        <button class="modal-close" onclick="closeBulkModal()">&times;</button>
+        <h3>Edit Attendance</h3>
+        <button class="modal-close" onclick="closeEditModal()">&times;</button>
       </div>
-      <div class="modal-body">
-        <!-- Bulk filters -->
-        <div class="form-grid" style="margin-bottom:16px;">
-          <div class="form-group">
-            <label class="form-label">Date *</label>
-            <input type="date" id="bulkDate" class="form-input">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Academic Year *</label>
-            <select id="bulkAcademicYear" class="form-select-full">
-              <option value="">— Select Year —</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-grid" style="margin-bottom:16px;">
-          <div class="form-group">
-            <label class="form-label">Class *</label>
-            <select id="bulkClass" class="form-select-full" onchange="loadBulkStudents()">
-              <option value="">— Select Class —</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Course</label>
-            <select id="bulkCourse" class="form-select-full">
-              <option value="">— Select Course (optional) —</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom:16px;">
-          <label class="form-label">Term *</label>
-          <select id="bulkTerm" class="form-select-full">
-            <option value="">— Select Term —</option>
-            <option value="Term 1">Term 1</option>
-            <option value="Term 2">Term 2</option>
-            <option value="Term 3">Term 3</option>
-          </select>
-        </div>
-
-        <!-- Student table -->
-        <div id="bulkTableWrap" style="display:none;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span style="font-size:13px;font-weight:600;color:#475569;" id="bulkStudentCount"></span>
-            <div style="display:flex;gap:8px;" id="bulkMarkAllButtons">
-              <!-- Mark all buttons will be populated dynamically -->
+      <form id="editAttendanceForm" onsubmit="handleEditSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="edit_attendanceId">
+          <div class="modal-grid" style="margin-bottom:14px;">
+            <div class="form-group">
+              <label class="form-label">Date</label>
+              <input type="date" id="edit_date" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Academic Year</label>
+              <select id="edit_academicYear" class="form-select"></select>
             </div>
           </div>
-          <div style="max-height:300px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;">
-            <table class="bulk-table" id="bulkStudentTable">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Student ID</th>
-                  <th>Student Name</th>
-                  <th>Status</th>
-                  <th>Save Status</th>
-                </tr>
-              </thead>
-              <tbody id="bulkTableBody"></tbody>
-            </table>
+          <div class="modal-grid" style="margin-bottom:14px;">
+            <div class="form-group">
+              <label class="form-label">Class</label>
+              <select id="edit_className" class="form-select"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Term</label>
+              <select id="edit_term" class="form-select">
+                <option value="Term 1">Term 1</option>
+                <option value="Term 2">Term 2</option>
+                <option value="Term 3">Term 3</option>
+              </select>
+            </div>
           </div>
-          <div class="progress-bar-wrap" id="bulkProgressWrap">
-            <div class="progress-bar-fill" id="bulkProgressBar" style="width:0%"></div>
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label">Student</label>
+            <input type="text" id="edit_studentDisplay" class="form-input" readonly style="background:#f8fafc;">
           </div>
-          <div id="bulkSummary" style="font-size:13px;color:#64748b;margin-top:8px;"></div>
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label">Course (optional)</label>
+            <select id="edit_courseSelect" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select id="edit_status" class="form-select" required>
+              <!-- Status options loaded dynamically -->
+            </select>
+          </div>
         </div>
-
-        <div id="bulkNoStudents" style="display:none;text-align:center;padding:30px;color:#64748b;font-size:14px;">
-          ℹ️ No students found for the selected class.
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="editSaveBtn">Update Record</button>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeBulkModal()">Close</button>
-        <button type="button" class="btn btn-primary" id="bulkSaveBtn" onclick="saveBulkAttendance()" style="display:none;">💾 Save All Records</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== DELETE CONFIRM MODAL ===== -->
-  <div class="modal-backdrop" id="deleteModal">
-    <div class="modal-content" style="max-width:420px;">
-      <div class="modal-header">
-        <h3>Delete Attendance Record</h3>
-        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p style="color:#64748b;font-size:15px;line-height:1.6;">
-          Are you sure you want to delete record <strong id="deleteRecordId" style="color:#0f172a;"></strong>?<br>
-          This action <strong>cannot be undone</strong>.
-        </p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">🗑️ Delete</button>
-      </div>
+      </form>
     </div>
   </div>
 
   <script>
-    /* ============================================================
-       STATE
-    ============================================================ */
-    let attendanceList  = [];
-    let studentList     = [];
-    let allStudentList  = [];
-    let courseList      = [];
-    let academicYears   = [];
-    let classesList     = [];
+    let attendanceList = [];
+    let studentsList = [];
     let attendanceStatuses = []; // Dynamic statuses from settings
-    let currentDeleteId = null;
-    let isEditMode      = false;
+    let activeAcademicYear = '';
 
-    /* ============================================================
-       INIT
-    ============================================================ */
-    document.addEventListener('DOMContentLoaded', function () {
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast' + (type === 'error' ? ' toast-error' : type === 'warning' ? ' toast-warning' : '');
+      const icon = type === 'error' ? '✕' : type === 'warning' ? '⚠' : '✓';
+      toast.innerHTML = `
+        <div class="toast-icon">${icon}</div>
+        <div class="toast-message">${message}</div>
+        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('active'), 10);
+      setTimeout(() => {
+        toast.classList.remove('active');
+        setTimeout(() => toast.remove(), 300);
+      }, 4500);
+    }
+
+    function applyDefaultFilters() {
       const today = new Date().toISOString().split('T')[0];
-      document.getElementById('formDate').value = today;
-      loadAllData();
+      document.getElementById('dateFilter').value = today;
+      if (activeAcademicYear) {
+        const yearSel = document.getElementById('academicYearFilter');
+        const hasOption = Array.from(yearSel.options).some(o => o.value === activeAcademicYear);
+        if (hasOption) yearSel.value = activeAcademicYear;
+      }
+      filterTable();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('attendanceDate').value = today;
+      document.getElementById('dateFilter').value = today;
+
+      populateCourseDropdown();
+      populateClassDropdown();
+      populateAcademicYearDropdown();
+      populateStudentDropdown();
+      loadAttendanceStatuses(); // Load dynamic statuses from settings
+
+      // Re-mark duplicates whenever the date changes
+      document.getElementById('attendanceDate').addEventListener('change', markDuplicatesInRoster);
+
+      refreshData();
     });
 
-    function loadAllData() {
+    // --- DATA LOADING ---
+    function refreshData() {
       document.getElementById('loading').style.display = 'block';
       document.getElementById('attendanceTable').style.display = 'none';
+      google.script.run.withSuccessHandler(renderTable).getAttendanceData();
+    }
 
-      // Load attendance + students + courses + years + classes + statuses in parallel
-      google.script.run
-        .withSuccessHandler(function (data) { attendanceList = data || []; tryRender(); })
-        .withFailureHandler(function (e) { showToast('Error', 'Failed to load attendance: ' + e.message, 'error'); })
-        .getAttendanceData();
+    function formatDisplayDate(d) {
+      if (!d) return '-';
+      const s = String(d);
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+      return s;
+    }
 
+    function renderTable(data) {
+      attendanceList = data || [];
+      const tbody = document.getElementById('tableBody');
+      const loading = document.getElementById('loading');
+      const table = document.getElementById('attendanceTable');
+      const countBadge = document.getElementById('attendanceCount');
+
+      loading.style.display = 'none';
+      table.style.display = 'table';
+      countBadge.innerText = attendanceList.length;
+
+      tbody.innerHTML = '';
+      
+      if(attendanceList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No attendance records found.</td></tr>`;
+        return;
+      }
+
+      attendanceList.forEach(row => {
+        const displayDate = formatDisplayDate(row.date);
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-status', row.status || '');
+        tr.setAttribute('data-date', displayDate);
+        tr.setAttribute('data-academicyear', row.academicYear || '');
+        tr.setAttribute('data-classname', row.className || '');
+        tr.setAttribute('data-term', row.term || '');
+
+        // Get dynamic status class
+        let statusClass = 'status-present'; // default
+        const statusConfig = attendanceStatuses.find(s => s.value === row.status);
+        if (statusConfig && statusConfig.badgeClass) {
+          statusClass = statusConfig.badgeClass;
+        } else if (row.status) {
+          // Generate dynamic class name from status text
+          statusClass = 'status-' + row.status.toLowerCase().replace(/\s+/g, '-');
+        }
+
+        tr.innerHTML = `
+          <td><strong>${row.attendanceId || '-'}</strong></td>
+          <td>${displayDate}</td>
+          <td>${row.academicYear || '-'}</td>
+          <td>${row.className || '-'}</td>
+          <td>
+            <strong>${row.studentId || '-'}</strong><br>
+            <small style="color: #64748b; font-size: 12px;">${row.studentName || ''}</small>
+          </td>
+          <td>${row.courseId || '-'}</td>
+          <td><span class="status-badge ${statusClass}">${row.status || 'Present'}</span></td>
+          <td>${row.term || '-'}</td>
+          <td>
+            <div class="actions-cell">
+              <button class="action-icon-btn edit-btn" onclick="editAttendance('${row.attendanceId}')" title="Edit">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+              </button>
+              <button class="action-icon-btn delete-btn" onclick="deleteAttendanceRecord('${row.attendanceId}')" title="Delete">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      
+      // Populate filters based on loaded data
+      populateFiltersFromData();
+
+      filterTable();
+    }
+
+    function populateFiltersFromData() {
+      const years = new Set();
+      const classes = new Set();
+      const terms = new Set();
+
+      attendanceList.forEach(r => {
+        if (r.academicYear) years.add(r.academicYear);
+        if (r.className) classes.add(r.className);
+        if (r.term) terms.add(r.term);
+      });
+
+      const yearSel = document.getElementById('academicYearFilter');
+      const classSel = document.getElementById('classFilter');
+      const termSel = document.getElementById('termFilter');
+      const statusSel = document.getElementById('statusFilter');
+
+      // Reset (keep first placeholder option)
+      yearSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
+      classSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
+      termSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
+      statusSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
+
+      Array.from(years).sort().forEach(y => {
+        const o = document.createElement('option'); o.value = y; o.innerText = y; yearSel.appendChild(o);
+      });
+      Array.from(classes).sort().forEach(c => {
+        const o = document.createElement('option'); o.value = c; o.innerText = c; classSel.appendChild(o);
+      });
+      Array.from(terms).sort().forEach(t => {
+        const o = document.createElement('option'); o.value = t; o.innerText = t; termSel.appendChild(o);
+      });
+      
+      // Populate status filter from dynamic statuses
+      attendanceStatuses.forEach(s => {
+        const o = document.createElement('option'); o.value = s.value; o.innerText = s.label; statusSel.appendChild(o);
+      });
+
+      applyDefaultFilters();
+    }
+
+    // --- DROPDOWN POPULATORS ---
+    function populateStudentDropdown() {
       google.script.run
-        .withSuccessHandler(function (data) {
-          allStudentList = data || [];
-          studentList = allStudentList;
-          populateStudentDropdown(studentList);
+        .withSuccessHandler(function(students) {
+          studentsList = students || [];
         })
-        .withFailureHandler(function () {})
-        .getStudentIdNamePairs();
+        .withFailureHandler(function(err) { console.error('Error loading students:', err); })
+        .getStudentsData();
+    }
 
+    function loadAttendanceStatuses() {
       google.script.run
-        .withSuccessHandler(function (data) {
-          courseList = data || [];
-          populateCourseDropdowns(courseList);
+        .withSuccessHandler(function(statuses) {
+          attendanceStatuses = statuses || [
+            { value: 'Present', label: 'Present', badgeClass: 'status-present' },
+            { value: 'Absent', label: 'Absent', badgeClass: 'status-absent' },
+            { value: 'Late', label: 'Late', badgeClass: 'status-late' },
+            { value: 'Excused', label: 'Excused', badgeClass: 'status-excused' }
+          ];
+          if (attendanceList.length > 0) {
+            populateFiltersFromData();
+            filterTable();
+          }
         })
-        .withFailureHandler(function () {})
-        .getCourseIdNamePairs();
-
-      google.script.run
-        .withSuccessHandler(function (data) {
-          academicYears = data || [];
-          populateYearDropdowns(academicYears);
-        })
-        .withFailureHandler(function () {})
-        .getAcademicYearsData();
-
-      google.script.run
-        .withSuccessHandler(function (data) {
-          classesList = data || [];
-          populateClassDropdowns(classesList);
-        })
-        .withFailureHandler(function () {})
-        .getClassNames();
-
-      // Load attendance statuses from settings
-      google.script.run
-        .withSuccessHandler(function (data) {
-          attendanceStatuses = data || [];
-          populateStatusDropdowns(attendanceStatuses);
-        })
-        .withFailureHandler(function () {
-          // Use default statuses if loading fails
+        .withFailureHandler(function(err) {
+          console.error('Error loading attendance statuses:', err);
+          // Use default statuses on failure
           attendanceStatuses = [
             { value: 'Present', label: 'Present', badgeClass: 'status-present' },
             { value: 'Absent', label: 'Absent', badgeClass: 'status-absent' },
             { value: 'Late', label: 'Late', badgeClass: 'status-late' },
             { value: 'Excused', label: 'Excused', badgeClass: 'status-excused' }
           ];
-          populateStatusDropdowns(attendanceStatuses);
         })
         .getAttendanceStatuses();
     }
 
-    let _renderReady = 0;
-    function tryRender() {
-      // Only depends on attendanceList being loaded
-      renderTable(attendanceList);
-    }
+    /* Render the roster table for the selected class */
+    function renderClassRoster() {
+      const cls = document.getElementById('className').value;
+      const body = document.getElementById('rosterBody');
+      const section = document.getElementById('rosterSection');
+      const placeholder = document.getElementById('rosterPlaceholder');
+      body.innerHTML = '';
 
-    /* ============================================================
-       POPULATE DROPDOWNS
-    ============================================================ */
-    function populateStudentDropdown(students) {
-      const sel = document.getElementById('formStudent');
-      const cur = sel.value;
-      sel.innerHTML = '<option value="">— Select Student —</option>';
-      students.forEach(function (s) {
-        const opt = document.createElement('option');
-        opt.value = s.studentId;
-        opt.textContent = s.studentId + ' — ' + s.fullName;
-        opt.dataset.name = s.fullName;
-        opt.dataset.class = s.studentClass || '';
-        sel.appendChild(opt);
-      });
-      if (cur) sel.value = cur;
-    }
-
-    function populateCourseDropdowns(courses) {
-      [document.getElementById('formCourse'), document.getElementById('bulkCourse')].forEach(function (sel) {
-        const cur = sel.value;
-        sel.innerHTML = '<option value="">— Select Course —</option>';
-        courses.forEach(function (c) {
-          const opt = document.createElement('option');
-          opt.value = c.courseId;
-          opt.textContent = c.courseId + ' — ' + c.courseName;
-          sel.appendChild(opt);
-        });
-        if (cur) sel.value = cur;
-      });
-    }
-
-    function populateYearDropdowns(years) {
-      [document.getElementById('formAcademicYear'), document.getElementById('bulkAcademicYear')].forEach(function (sel) {
-        const cur = sel.value;
-        sel.innerHTML = '<option value="">— Select Year —</option>';
-        years.forEach(function (y) {
-          const opt = document.createElement('option');
-          opt.value = y.academicYear;
-          opt.textContent = y.academicYear + (y.status === 'Active' ? ' ✓' : '');
-          sel.appendChild(opt);
-        });
-        if (cur) sel.value = cur;
-      });
-    }
-
-    function populateClassDropdowns(classes) {
-      const classNames = Array.isArray(classes)
-        ? classes.map(function (c) { return typeof c === 'string' ? c : (c.className || c); })
-        : [];
-
-      [document.getElementById('formClass'), document.getElementById('bulkClass'), document.getElementById('filterClass')].forEach(function (sel) {
-        if (!sel) return;
-        const cur = sel.value;
-        const isFilter = sel.id === 'filterClass';
-        sel.innerHTML = isFilter ? '<option value="">All Classes</option>' : '<option value="">— Select Class —</option>';
-        classNames.forEach(function (cls) {
-          const opt = document.createElement('option');
-          opt.value = cls;
-          opt.textContent = cls;
-          sel.appendChild(opt);
-        });
-        if (cur) sel.value = cur;
-      });
-    }
-
-    function populateStatusDropdowns(statuses) {
-      // Populate form status dropdown
-      const formStatus = document.getElementById('formStatus');
-      if (formStatus) {
-        const cur = formStatus.value;
-        formStatus.innerHTML = '';
-        statuses.forEach(function (s) {
-          const opt = document.createElement('option');
-          opt.value = s.value;
-          opt.textContent = s.label;
-          formStatus.appendChild(opt);
-        });
-        if (cur) formStatus.value = cur;
-      }
-
-      // Populate filter status dropdown
-      const filterStatus = document.getElementById('filterStatus');
-      if (filterStatus) {
-        const cur = filterStatus.value;
-        filterStatus.innerHTML = '<option value="">All Statuses</option>';
-        statuses.forEach(function (s) {
-          const opt = document.createElement('option');
-          opt.value = s.value;
-          opt.textContent = s.label;
-          filterStatus.appendChild(opt);
-        });
-        if (cur) filterStatus.value = cur;
-      }
-
-      // Populate bulk "Mark All" buttons (show first 2-3 most common statuses)
-      const bulkButtonsContainer = document.getElementById('bulkMarkAllButtons');
-      if (bulkButtonsContainer && statuses.length > 0) {
-        bulkButtonsContainer.innerHTML = '';
-        
-        // Show buttons for first 2 statuses (typically Present and Absent)
-        const statusIcons = {
-          'Present': '✅',
-          'Absent': '❌',
-          'Late': '⏰',
-          'Excused': '📝'
-        };
-        
-        statuses.slice(0, 2).forEach(function (s) {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'btn btn-secondary';
-          btn.style.cssText = 'padding:6px 12px;font-size:12px;';
-          const icon = statusIcons[s.value] || '📌';
-          btn.textContent = icon + ' All ' + s.label;
-          btn.onclick = function () { markAllBulk(s.value); };
-          bulkButtonsContainer.appendChild(btn);
-        });
-      }
-    }
-
-    /* ============================================================
-       RENDER TABLE
-    ============================================================ */
-    function renderTable(data) {
-      const loading = document.getElementById('loading');
-      const table   = document.getElementById('attendanceTable');
-      const tbody   = document.getElementById('tableBody');
-      const count   = document.getElementById('attendanceCount');
-
-      loading.style.display = 'none';
-      table.style.display   = 'table';
-      count.innerText        = data.length;
-
-      // Populate date filter
-      const dateFilter = document.getElementById('filterDate');
-      const dateSet    = new Set(data.map(function (r) { return r.date; }).filter(Boolean));
-      const savedDate  = dateFilter.value;
-      dateFilter.innerHTML = '<option value="">All Dates</option>';
-      Array.from(dateSet).sort().reverse().forEach(function (d) {
-        const opt = document.createElement('option');
-        opt.value = d; opt.textContent = d;
-        dateFilter.appendChild(opt);
-      });
-      if (savedDate) dateFilter.value = savedDate;
-
-      tbody.innerHTML = '';
-      if (data.length === 0) {
-        tbody.innerHTML = `
-          <tr><td colspan="10">
-            <div class="empty-state">
-              <div class="empty-state-icon">📋</div>
-              <h4>No Attendance Records Found</h4>
-              <p>Click "Add Record" or "Bulk Entry" to get started.</p>
-            </div>
-          </td></tr>`;
+      if (!cls) {
+        section.style.display = 'none';
+        placeholder.style.display = 'block';
         return;
       }
 
-      data.forEach(function (r) {
-        let statusText = String(r.status || '').trim();
-        let termText = String(r.term || '').trim();
-
-        const knownStatuses = new Set(['Present', 'Absent', 'Late', 'Excused']);
-        const knownTerms = new Set(['Term 1', 'Term 2', 'Term 3']);
-
-        if (knownStatuses.has(termText) && knownTerms.has(statusText)) {
-          // Handle occasional column mapping errors where status and term are swapped.
-          [statusText, termText] = [termText, statusText];
-        }
-
-        if (!statusText || statusText.toLowerCase() === 'undefined' || statusText.toLowerCase() === 'null') {
-          // Use first status from settings as default
-          statusText = attendanceStatuses.length > 0 ? attendanceStatuses[0].value : 'Present';
-        }
-
-        // Get badge class from settings or generate dynamic class
-        let statusClass = 'status-present'; // default
-        const statusConfig = attendanceStatuses.find(s => s.value === statusText);
-        if (statusConfig && statusConfig.badgeClass) {
-          statusClass = statusConfig.badgeClass;
-        } else {
-          // Generate dynamic class name from status text
-          statusClass = 'status-' + statusText.toLowerCase().replace(/\s+/g, '-');
-        }
-
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-id', r.attendanceId);
-
-        tr.innerHTML = `
-          <td><strong>${esc(r.attendanceId)}</strong></td>
-          <td>${esc(r.date)}</td>
-          <td>${esc(r.academicYear)}</td>
-          <td>${esc(r.className)}</td>
-          <td>${esc(r.studentId)}</td>
-          <td>${esc(r.studentName)}</td>
-          <td>${esc(r.courseId)}</td>
-          <td><span class="status-badge ${statusClass}">${esc(statusText)}</span></td>
-          <td>${esc(r.term)}</td>
-          <td style="text-align:center;">
-            <div class="actions-cell" style="justify-content:center;">
-              <button class="action-icon-btn edit-btn" onclick="openEditModal('${esc(r.attendanceId)}')" title="Edit">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>
-              <button class="action-icon-btn delete-btn" onclick="openDeleteModal('${esc(r.attendanceId)}')" title="Delete">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-              </button>
-            </div>
-          </td>`;
-        tbody.appendChild(tr);
+      // Populate mark-all buttons dynamically
+      const markAllBar = document.getElementById('markAllBar');
+      const existingSpan = markAllBar.querySelector('span');
+      markAllBar.innerHTML = '';
+      markAllBar.appendChild(existingSpan);
+      
+      const statusIcons = {
+        'Present': '✓',
+        'Absent': '✗',
+        'Late': '⏰',
+        'Excused': '📝'
+      };
+      
+      attendanceStatuses.forEach(status => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ma-' + status.value.toLowerCase().replace(/\s+/g, '-');
+        const icon = statusIcons[status.value] || '•';
+        btn.textContent = icon + ' ' + status.label;
+        btn.onclick = function() { markAll(status.value); };
+        markAllBar.appendChild(btn);
       });
 
-      filterTable();
+      // Populate roster header dynamically
+      const rosterHeader = document.getElementById('rosterHeader');
+      rosterHeader.innerHTML = '<div>Student</div>';
+      attendanceStatuses.forEach(status => {
+        const div = document.createElement('div');
+        div.textContent = status.label;
+        rosterHeader.appendChild(div);
+      });
+
+      const filtered = studentsList.filter(s => (s.class || s.className || '') === cls);
+      document.getElementById('rosterCount').innerText = filtered.length ? `(${filtered.length} students)` : '';
+
+      if (filtered.length === 0) {
+        body.innerHTML = '<div class="roster-empty">No students found in this class.</div>';
+        section.style.display = 'block';
+        placeholder.style.display = 'none';
+        return;
+      }
+
+      filtered.forEach((s, idx) => {
+        const fullName = `${s.firstName || ''} ${s.lastName || ''}`.trim();
+        const row = document.createElement('div');
+        row.className = 'roster-row';
+        row.dataset.studentId = s.studentId;
+        row.dataset.fullName  = fullName;
+        
+        // Build status radio buttons dynamically
+        let statusPills = '';
+        attendanceStatuses.forEach(status => {
+          const radioId = `s${idx}_${status.value.toLowerCase().replace(/\s+/g, '_')}`;
+          const checked = status.value === (attendanceStatuses[0]?.value || 'Present') ? 'checked' : '';
+          const labelClass = status.badgeClass || 'status-' + status.value.toLowerCase().replace(/\s+/g, '-');
+          // Use first letter of status as label
+          const shortLabel = status.label.charAt(0).toUpperCase();
+          
+          statusPills += `
+            <div class="status-pill">
+              <input type="radio" id="${radioId}" name="stu_${s.studentId}" value="${status.value}" ${checked}>
+              <label for="${radioId}" class="${labelClass.replace('status-', '')}-lbl">${shortLabel}</label>
+            </div>`;
+        });
+        
+        row.innerHTML = `
+          <div class="student-info">
+            <div>${fullName}</div>
+            <div class="sid">${s.studentId}</div>
+          </div>
+          ${statusPills}`;
+        body.appendChild(row);
+      });
+
+      section.style.display = 'block';
+      placeholder.style.display = 'none';
+
+      // Highlight any students already recorded for the selected date
+      markDuplicatesInRoster();
     }
 
-    function esc(v) {
-      return String(v == null ? '' : v)
-        .replace(/&/g,'&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;');
+    function markAll(status) {
+      document.querySelectorAll('#rosterBody .roster-row').forEach(row => {
+        const sid = row.dataset.studentId;
+        const radio = row.querySelector(`input[name="stu_${sid}"][value="${status}"]`);
+        if (radio) radio.checked = true;
+      });
     }
 
-    /* ============================================================
-       FILTERING
-    ============================================================ */
-    function filterTable() {
-      const search  = document.getElementById('searchInput').value.toLowerCase();
-      const date    = document.getElementById('filterDate').value;
-      const cls     = document.getElementById('filterClass').value;
-      const status  = document.getElementById('filterStatus').value;
-      const term    = document.getElementById('filterTerm').value;
+    function populateCourseDropdown() {
+      const select = document.getElementById('courseSelect');
+      const editSelect = document.getElementById('edit_courseSelect');
+      google.script.run
+        .withSuccessHandler(function(courses) {
+          select.innerHTML = '<option value="">Select a Course</option>';
+          editSelect.innerHTML = '<option value="">Select a Course</option>';
+          if (!courses || courses.length === 0) return;
+          courses.forEach(c => {
+            [select, editSelect].forEach(sel => {
+              let opt = document.createElement('option');
+              opt.value = c;
+              opt.innerText = c;
+              sel.appendChild(opt);
+            });
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading courses:', error);
+        })
+        .getCourseIds();
+    }
 
-      const rows = document.querySelectorAll('#tableBody tr');
-      let visible = 0;
+    function populateClassDropdown() {
+      const sel = document.getElementById('className');
+      const editSel = document.getElementById('edit_className');
+      google.script.run
+        .withSuccessHandler(function(classes) {
+          sel.innerHTML = '<option value="" disabled selected>-- Select Class --</option>';
+          editSel.innerHTML = '<option value="" disabled selected>-- Select Class --</option>';
+          if (!classes || classes.length === 0) return;
+          classes.forEach(c => {
+            [sel, editSel].forEach(s => {
+              let opt = document.createElement('option');
+              opt.value = c;
+              opt.innerText = c;
+              s.appendChild(opt);
+            });
+          });
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading classes:', error);
+        })
+        .getClassNames();
+    }
 
-      rows.forEach(function (row) {
-        if (row.cells.length === 1 && row.cells[0].getAttribute('colspan')) {
-          return; // empty state row
+    function populateAcademicYearDropdown() {
+      const sel = document.getElementById('academicYear');
+      const editSel = document.getElementById('edit_academicYear');
+      const filterSel = document.getElementById('academicYearFilter');
+      google.script.run
+        .withSuccessHandler(function(years) {
+          sel.innerHTML = '<option value="" disabled selected>Select Year</option>';
+          editSel.innerHTML = '<option value="" disabled selected>Select Year</option>';
+          if (!years || years.length === 0) return;
+
+          const activeYears = years.filter(y => y.status === 'Active');
+          if (activeYears.length > 0) {
+            activeAcademicYear = activeYears[0].academicYear;
+          }
+
+          activeYears.forEach(y => {
+            let opt = document.createElement('option');
+            opt.value = y.academicYear;
+            opt.innerText = y.academicYear;
+            sel.appendChild(opt);
+          });
+
+          if (activeYears.length === 1) {
+            sel.value = activeYears[0].academicYear;
+          }
+
+          years.forEach(y => {
+            let opt = document.createElement('option');
+            opt.value = y.academicYear;
+            opt.innerText = y.academicYear + (y.status !== 'Active' ? ' (Inactive)' : '');
+            editSel.appendChild(opt);
+          });
+
+          // Populate year filter from all academic years and default to active
+          filterSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
+          years.forEach(y => {
+            const opt = document.createElement('option');
+            opt.value = y.academicYear;
+            opt.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : '');
+            filterSel.appendChild(opt);
+          });
+          if (activeAcademicYear) {
+            filterSel.value = activeAcademicYear;
+            filterTable();
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error loading academic years:', error);
+        })
+        .getAcademicYearsData();
+    }
+
+    // --- FILTERS ---
+    function normalizeDateStr(dStr) {
+      if (!dStr) return '';
+      dStr = String(dStr).trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(dStr)) return dStr.substring(0, 10);
+      const parts = dStr.split(/[\/\-\.]/);
+      if (parts.length === 3) {
+        let m, d, y;
+        if (parts[0].length === 4) {
+          y = parts[0]; m = parts[1].padStart(2, '0'); d = parts[2].padStart(2, '0');
+        } else {
+          m = parts[0].padStart(2, '0'); d = parts[1].padStart(2, '0'); y = parts[2];
         }
+        if (y && m && d && y.length === 4) return `${y}-${m}-${d}`;
+      }
+      return dStr;
+    }
+
+    function filterTable() {
+      const searchVal = document.getElementById('searchInput').value.toLowerCase();
+      const statusVal = document.getElementById('statusFilter').value.toLowerCase();
+      const academicYearVal = document.getElementById('academicYearFilter').value;
+      const classVal = document.getElementById('classFilter').value;
+      const termVal = document.getElementById('termFilter').value;
+      const rawDateVal = document.getElementById('dateFilter').value;
+      const normDateVal = normalizeDateStr(rawDateVal);
+      const rows = document.querySelectorAll('#tableBody tr');
+      const countBadge = document.getElementById('attendanceCount');
+
+      let visibleCount = 0;
+      rows.forEach(row => {
+        if (row.cells.length === 1 && row.cells[0].getAttribute('colspan')) return;
+
         const text = row.innerText.toLowerCase();
+        const rowStatus = (row.getAttribute('data-status') || '').toLowerCase();
+        const rowDate = (row.getAttribute('data-date') || '');
+        const normRowDate = normalizeDateStr(rowDate);
+        const rowYear = (row.getAttribute('data-academicyear') || '');
+        const rowClass = (row.getAttribute('data-classname') || '');
+        const rowTerm = (row.getAttribute('data-term') || '');
 
-        const matchSearch = !search || text.includes(search);
-        const matchDate   = !date   || (row.cells[1] && row.cells[1].innerText.trim() === date);
-        const matchClass  = !cls    || (row.cells[3] && row.cells[3].innerText.trim() === cls);
-        const matchStatus = !status || (row.cells[7] && row.cells[7].innerText.trim() === status);
-        const matchTerm   = !term   || (row.cells[8] && row.cells[8].innerText.trim() === term);
+        const matchSearch = text.includes(searchVal);
+        const matchStatus = statusVal === '' || rowStatus === statusVal;
+        const matchDate = normDateVal === '' || normRowDate === normDateVal;
+        const matchYear = academicYearVal === '' || rowYear === academicYearVal;
+        const matchClass = classVal === '' || rowClass === classVal;
+        const matchTerm = termVal === '' || rowTerm === termVal;
 
-        if (matchSearch && matchDate && matchClass && matchStatus && matchTerm) {
-          row.style.display = ''; visible++;
+        if (matchSearch && matchStatus && matchDate && matchYear && matchClass && matchTerm) {
+          row.style.display = ''; visibleCount++;
         } else {
           row.style.display = 'none';
         }
       });
-
-      document.getElementById('attendanceCount').innerText = visible;
+      countBadge.innerText = visibleCount;
     }
 
-    /* ============================================================
-       ADD MODAL
-    ============================================================ */
+    // Export the currently applied filters to PDF
+    function exportPdf() {
+      const filters = {
+        search: document.getElementById('searchInput').value || '',
+        status: document.getElementById('statusFilter').value || '',
+        date: document.getElementById('dateFilter').value || '',
+        academicYear: document.getElementById('academicYearFilter').value || '',
+        className: document.getElementById('classFilter').value || '',
+        term: document.getElementById('termFilter').value || '',
+        folderId: document.getElementById('exportFolderId').value.trim() || ''
+      };
+
+      google.script.run.withSuccessHandler(function(res) {
+        if (!res || !res.success) { alert('No data returned for PDF.'); return; }
+        // Use the direct Drive download URL returned by the server if available
+        const direct = res.downloadUrl || ('https://docs.google.com/uc?export=download&id=' + encodeURIComponent(res.id));
+        // Show success message with link and open download
+        const msg = 'Exported: ' + (res.name || '') + '\nOpen/download: ' + direct;
+        try { window.open(direct, '_blank'); } catch (e) { /* popup blocked */ }
+        alert(msg);
+      }).withFailureHandler(function(err){ alert('Export error: '+err.message); }).exportAttendancePdfToDrive(filters);
+    }
+
+    // --- MODAL LOGIC ---
     function openAddModal() {
-      isEditMode = false;
       document.getElementById('attendanceForm').reset();
-      document.getElementById('formAttendanceId').value = '';
-      document.getElementById('formDate').value = new Date().toISOString().split('T')[0];
-      document.getElementById('formStatus').value = 'Present';
-      document.getElementById('modalTitle').innerText = 'Add Attendance Record';
-
-      const saveBtn = document.getElementById('saveBtn');
-      saveBtn.innerText = '💾 Save Record';
-      saveBtn.disabled = false;
-
-      populateStudentDropdown(allStudentList); // reset to all students
-      document.getElementById('attendanceModal').classList.add('active');
-    }
-
-    /* ============================================================
-       FILTER STUDENTS BY CLASS (SINGLE MODAL)
-    ============================================================ */
-    function filterStudentsByClass() {
-      const cls = document.getElementById('formClass').value;
-      if (!cls) {
-        populateStudentDropdown(allStudentList);
-      } else {
-        const filtered = allStudentList.filter(function (s) {
-          return !s.studentClass || s.studentClass === cls;
-        });
-        populateStudentDropdown(filtered.length ? filtered : allStudentList);
-      }
-      document.getElementById('formStudent').value = '';
-      document.getElementById('formStudentName').value = '';
-    }
-
-    function fillStudentName() {
-      const sel = document.getElementById('formStudent');
-      const opt = sel.options[sel.selectedIndex];
-      document.getElementById('formStudentName').value = opt ? (opt.dataset.name || '') : '';
-    }
-
-    function addMissingOption(selectId, value, displayName) {
-      if (!value) return;
-      const sel = document.getElementById(selectId);
-      if (!sel) return;
-      const exists = Array.from(sel.options).some(function (opt) {
-        return String(opt.value).trim() === String(value).trim();
-      });
-      if (exists) return;
-
-      const opt = document.createElement('option');
-      opt.value = value;
-      opt.textContent = displayName ? (value + ' — ' + displayName) : value;
-      sel.appendChild(opt);
-    }
-
-    /* ============================================================
-       EDIT MODAL
-    ============================================================ */
-    function openEditModal(attendanceId) {
-      const rec = attendanceList.find(function (r) { return r.attendanceId === attendanceId; });
-      if (!rec) { showToast('Error', 'Record not found.', 'error'); return; }
-
-      isEditMode = true;
-      document.getElementById('formAttendanceId').value = rec.attendanceId;
-      document.getElementById('formDate').value         = rec.date || '';
-      document.getElementById('formStatus').value       = rec.status || 'Present';
-      document.getElementById('formAcademicYear').value = rec.academicYear || '';
-      document.getElementById('formTerm').value         = rec.term || '';
-      document.getElementById('formClass').value        = rec.className || '';
-      document.getElementById('formCourse').value       = rec.courseId || '';
-      document.getElementById('formStudentName').value  = rec.studentName || '';
-
-      // Ensure the dropdowns include this record's values even if async data is not loaded yet.
-      addMissingOption('formAcademicYear', rec.academicYear);
-      addMissingOption('formClass', rec.className);
-      addMissingOption('formCourse', rec.courseId);
-      addMissingOption('formStudent', rec.studentId, rec.studentName);
-
-      // Populate student dropdown and set value
-      filterStudentsByClass();
-      document.getElementById('formStudent').value = rec.studentId || '';
-      fillStudentName();
-
-      document.getElementById('modalTitle').innerText = 'Edit Attendance Record';
-      const saveBtn = document.getElementById('saveBtn');
-      saveBtn.innerText = '💾 Update Record';
-      saveBtn.disabled = false;
-
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('attendanceDate').value = today;
+      document.getElementById('rosterBody').innerHTML = '';
+      document.getElementById('rosterSection').style.display  = 'none';
+      document.getElementById('rosterPlaceholder').style.display = 'block';
       document.getElementById('attendanceModal').classList.add('active');
     }
 
@@ -859,354 +862,206 @@
       document.getElementById('attendanceModal').classList.remove('active');
     }
 
-    /* ============================================================
-       FORM SUBMIT (ADD / EDIT)
-    ============================================================ */
+    /* ---- Mark duplicate rows in roster when date/class changes ---- */
+    function markDuplicatesInRoster() {
+      const date      = document.getElementById('attendanceDate').value;
+      const className = document.getElementById('className').value;
+      if (!date || !className) return;
+
+      // Build a Set of studentIds already recorded for this date
+      const alreadyRecorded = new Set(
+        attendanceList
+          .filter(r => formatDisplayDate(r.date) === date && r.className === className)
+          .map(r => r.studentId)
+      );
+
+      document.querySelectorAll('#rosterBody .roster-row').forEach(row => {
+        const sid = row.dataset.studentId;
+        if (alreadyRecorded.has(sid)) {
+          row.classList.add('is-duplicate');
+          row.dataset.isDuplicate = 'true';
+        } else {
+          row.classList.remove('is-duplicate');
+          delete row.dataset.isDuplicate;
+        }
+      });
+
+      // Show count of duplicates in roster header
+      const dupeCount = alreadyRecorded.size;
+      const rosterCount = document.getElementById('rosterCount');
+      if (rosterCount && dupeCount > 0) {
+        const total = document.querySelectorAll('#rosterBody .roster-row').length;
+        rosterCount.innerHTML = `(${total} students &nbsp;·&nbsp; <span style="color:#b45309;">⚠ ${dupeCount} already recorded today</span>)`;
+      }
+    }
+
+    /* ---- BULK SUBMIT (one record per roster row, skips duplicates) ---- */
     function handleSubmit(e) {
       e.preventDefault();
 
-      const saveBtn = document.getElementById('saveBtn');
-      saveBtn.disabled = true;
-      saveBtn.innerText = '⏳ Saving...';
-
-      const attendanceId = document.getElementById('formAttendanceId').value;
-      const studentSel   = document.getElementById('formStudent');
-      const studentOpt   = studentSel.options[studentSel.selectedIndex];
-
-      const data = {
-        date:         document.getElementById('formDate').value,
-        academicYear: document.getElementById('formAcademicYear').value,
-        className:    document.getElementById('formClass').value,
-        studentId:    studentSel.value,
-        studentName:  studentOpt ? (studentOpt.dataset.name || document.getElementById('formStudentName').value) : document.getElementById('formStudentName').value,
-        courseId:     document.getElementById('formCourse').value,
-        status:       document.getElementById('formStatus').value,
-        term:         document.getElementById('formTerm').value,
-      };
-
-      if (attendanceId) {
-        // UPDATE
-        google.script.run
-          .withSuccessHandler(function (res) {
-            saveBtn.disabled = false;
-            saveBtn.innerText = '💾 Update Record';
-            if (res && res.success) {
-              showToast('Updated!', 'Attendance record updated successfully.', 'success');
-              closeModal();
-              refreshData();
-            } else {
-              showToast('Error', (res && res.message) || 'Update failed.', 'error');
-            }
-          })
-          .withFailureHandler(function (err) {
-            saveBtn.disabled = false;
-            saveBtn.innerText = '💾 Update Record';
-            showToast('Error', err.message || 'Server error.', 'error');
-          })
-          .updateAttendance(attendanceId, data);
-      } else {
-        // ADD
-        google.script.run
-          .withSuccessHandler(function (res) {
-            saveBtn.disabled = false;
-            saveBtn.innerText = '💾 Save Record';
-            if (res && res.success) {
-              showToast('Saved!', 'Attendance record added (ID: ' + res.attendanceId + ').', 'success');
-              closeModal();
-              refreshData();
-            } else {
-              showToast('Warning', (res && res.message) || 'Could not save record.', res && res.duplicate ? 'warning' : 'error');
-            }
-          })
-          .withFailureHandler(function (err) {
-            saveBtn.disabled = false;
-            saveBtn.innerText = '💾 Save Record';
-            showToast('Error', err.message || 'Server error.', 'error');
-          })
-          .addAttendance(data);
-      }
-    }
-
-    /* ============================================================
-       REFRESH DATA
-    ============================================================ */
-    function refreshData() {
-      document.getElementById('loading').style.display = 'block';
-      document.getElementById('attendanceTable').style.display = 'none';
-      google.script.run
-        .withSuccessHandler(function (data) {
-          attendanceList = data || [];
-          renderTable(attendanceList);
-        })
-        .withFailureHandler(function (e) {
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('attendanceTable').style.display = 'table';
-          showToast('Error', 'Failed to refresh: ' + e.message, 'error');
-        })
-        .getAttendanceData();
-    }
-
-    /* ============================================================
-       DELETE
-    ============================================================ */
-    function openDeleteModal(attendanceId) {
-      currentDeleteId = attendanceId;
-      document.getElementById('deleteRecordId').innerText = attendanceId;
-      document.getElementById('deleteModal').classList.add('active');
-    }
-    function closeDeleteModal() {
-      document.getElementById('deleteModal').classList.remove('active');
-      currentDeleteId = null;
-    }
-
-    document.getElementById('confirmDeleteBtn').onclick = function () {
-      if (!currentDeleteId) return;
-      const btn = this;
-      btn.disabled = true;
-      btn.innerText = '⏳ Deleting...';
-      google.script.run
-        .withSuccessHandler(function (res) {
-          btn.disabled = false;
-          btn.innerText = '🗑️ Delete';
-          if (res && res.success) {
-            showToast('Deleted!', 'Attendance record removed.', 'success');
-            closeDeleteModal();
-            refreshData();
-          } else {
-            showToast('Error', (res && res.message) || 'Delete failed.', 'error');
-          }
-        })
-        .withFailureHandler(function (err) {
-          btn.disabled = false;
-          btn.innerText = '🗑️ Delete';
-          showToast('Error', err.message || 'Server error.', 'error');
-        })
-        .deleteAttendance(currentDeleteId);
-    };
-
-    /* ============================================================
-       BULK ENTRY MODAL
-    ============================================================ */
-    function openBulkModal() {
-      document.getElementById('bulkDate').value = new Date().toISOString().split('T')[0];
-      document.getElementById('bulkTableWrap').style.display = 'none';
-      document.getElementById('bulkNoStudents').style.display = 'none';
-      document.getElementById('bulkSaveBtn').style.display = 'none';
-      document.getElementById('bulkSummary').innerText = '';
-      document.getElementById('bulkProgressWrap').style.display = 'none';
-      document.getElementById('bulkProgressBar').style.width = '0%';
-      document.getElementById('bulkTableBody').innerHTML = '';
-      document.getElementById('bulkClass').value = '';
-      document.getElementById('bulkModal').classList.add('active');
-    }
-    function closeBulkModal() {
-      document.getElementById('bulkModal').classList.remove('active');
-      refreshData();
-    }
-
-    function loadBulkStudents() {
-      const cls = document.getElementById('bulkClass').value;
-      document.getElementById('bulkTableWrap').style.display = 'none';
-      document.getElementById('bulkNoStudents').style.display = 'none';
-      document.getElementById('bulkSaveBtn').style.display = 'none';
-      document.getElementById('bulkSummary').innerText = '';
-
-      if (!cls) return;
-
-      const students = allStudentList.filter(function (s) {
-        return !s.studentClass || s.studentClass === cls;
-      });
-
-      if (students.length === 0) {
-        document.getElementById('bulkNoStudents').style.display = 'block';
+      const rows = document.querySelectorAll('#rosterBody .roster-row');
+      if (rows.length === 0) {
+        showToast('Please select a class to load the student roster first.', 'warning');
         return;
       }
 
-      const tbody = document.getElementById('bulkTableBody');
-      tbody.innerHTML = '';
-      students.forEach(function (s, i) {
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-student-id', s.studentId);
-        tr.setAttribute('data-student-name', s.fullName);
-        
-        // Build status options dynamically
-        let statusOptions = '';
-        attendanceStatuses.forEach(function (status, idx) {
-          const selected = idx === 0 ? 'selected' : ''; // Select first status by default
-          statusOptions += `<option value="${esc(status.value)}" ${selected}>${esc(status.label)}</option>`;
-        });
-        
-        tr.innerHTML = `
-          <td>${i + 1}</td>
-          <td>${esc(s.studentId)}</td>
-          <td>${esc(s.fullName)}</td>
-          <td>
-            <select class="bulk-status-select">
-              ${statusOptions}
-            </select>
-          </td>
-          <td><span class="bulk-row-status pending" id="bulk_status_${esc(s.studentId)}">Pending</span></td>`;
-        tbody.appendChild(tr);
-      });
+      const date         = document.getElementById('attendanceDate').value;
+      const academicYear = document.getElementById('academicYear').value;
+      const courseId     = document.getElementById('courseSelect').value;
+      const className    = document.getElementById('className').value;
+      const term         = document.getElementById('term').value;
 
-      document.getElementById('bulkStudentCount').innerText = students.length + ' student(s) found for class: ' + cls;
-      document.getElementById('bulkTableWrap').style.display = 'block';
-      document.getElementById('bulkSaveBtn').style.display = 'inline-flex';
-    }
-
-    function markAllBulk(status) {
-      document.querySelectorAll('.bulk-status-select').forEach(function (sel) {
-        sel.value = status;
-      });
-    }
-
-    /* ============================================================
-       SAVE BULK ATTENDANCE — fixed saveNext using closure, no outer `btn` reference
-    ============================================================ */
-    function saveBulkAttendance() {
-      const date         = document.getElementById('bulkDate').value;
-      const academicYear = document.getElementById('bulkAcademicYear').value;
-      const className    = document.getElementById('bulkClass').value;
-      const courseId     = document.getElementById('bulkCourse').value;
-      const term         = document.getElementById('bulkTerm').value;
-
-      if (!date)         { showToast('Validation', 'Please select a date.', 'warning'); return; }
-      if (!academicYear) { showToast('Validation', 'Please select an academic year.', 'warning'); return; }
-      if (!className)    { showToast('Validation', 'Please select a class.', 'warning'); return; }
-      if (!term)         { showToast('Validation', 'Please select a term.', 'warning'); return; }
-
-      const rows = document.querySelectorAll('#bulkTableBody tr');
-      if (!rows.length)  { showToast('Validation', 'No students loaded.', 'warning'); return; }
-
-      // Collect records to save
-      const records = [];
-      rows.forEach(function (row) {
-        records.push({
-          studentId:    row.getAttribute('data-student-id'),
-          studentName:  row.getAttribute('data-student-name'),
-          status:       row.querySelector('.bulk-status-select').value,
-        });
-      });
-
-      const saveBulkBtn = document.getElementById('bulkSaveBtn');
-      saveBulkBtn.disabled = true;
-      saveBulkBtn.innerText = '⏳ Saving...';
-
-      const progressWrap = document.getElementById('bulkProgressWrap');
-      const progressBar  = document.getElementById('bulkProgressBar');
-      const summary      = document.getElementById('bulkSummary');
-      progressWrap.style.display = 'block';
-      progressBar.style.width = '0%';
-      summary.innerText = '';
-
-      let savedCount  = 0;
-      let skippedCount = 0;
-      let errorCount  = 0;
-      let index       = 0;
-      const total     = records.length;
-
-      // Use a self-contained recursive function — NO outer `btn` variable reference
-      function saveNext() {
-        if (index >= total) {
-          // Done
-          progressBar.style.width = '100%';
-          saveBulkBtn.disabled = false;
-          saveBulkBtn.innerText = '✅ Done — Save Again';
-          summary.innerText = 'Completed: ' + savedCount + ' saved, ' + skippedCount + ' skipped (duplicate), ' + errorCount + ' error(s).';
-          if (savedCount > 0) {
-            showToast('Bulk Complete!', savedCount + ' attendance record(s) saved.', 'success');
-          }
-          if (skippedCount > 0) {
-            showToast('Duplicates Skipped', skippedCount + ' record(s) were already recorded.', 'warning');
-          }
-          return;
-        }
-
-        var rec = records[index];
-        var statusEl = document.getElementById('bulk_status_' + rec.studentId);
-
-        var data = {
-          date:         date,
-          academicYear: academicYear,
-          className:    className,
-          studentId:    rec.studentId,
-          studentName:  rec.studentName,
-          courseId:     courseId,
-          status:       rec.status,
-          term:         term,
-        };
-
-        google.script.run
-          .withSuccessHandler(function (res) {
-            if (res && res.success) {
-              savedCount++;
-              if (statusEl) { statusEl.className = 'bulk-row-status saved'; statusEl.innerText = '✅ Saved'; }
-            } else if (res && res.duplicate) {
-              skippedCount++;
-              if (statusEl) { statusEl.className = 'bulk-row-status pending'; statusEl.innerText = '⚠️ Duplicate'; }
-            } else {
-              errorCount++;
-              if (statusEl) { statusEl.className = 'bulk-row-status error'; statusEl.innerText = '❌ Error'; }
-            }
-            index++;
-            var pct = Math.round((index / total) * 100);
-            progressBar.style.width = pct + '%';
-            summary.innerText = 'Processing ' + index + ' / ' + total + '...';
-            saveNext();
-          })
-          .withFailureHandler(function (err) {
-            errorCount++;
-            if (statusEl) { statusEl.className = 'bulk-row-status error'; statusEl.innerText = '❌ ' + (err.message || 'Error'); }
-            index++;
-            var pct = Math.round((index / total) * 100);
-            progressBar.style.width = pct + '%';
-            summary.innerText = 'Processing ' + index + ' / ' + total + '...';
-            saveNext();
-          })
-          .addAttendance(data);
+      if (!date || !academicYear || !className || !term) {
+        showToast('Please fill in Date, Academic Year, Class and Term.', 'warning');
+        return;
       }
 
-      saveNext(); // kick off the chain
-    }
+      // ---- CLIENT-SIDE DUPLICATE CHECK ----
+      const alreadyRecorded = new Set(
+        attendanceList
+          .filter(r => formatDisplayDate(r.date) === date && r.className === className)
+          .map(r => r.studentId)
+      );
 
-    /* ============================================================
-       TOAST NOTIFICATIONS
-    ============================================================ */
-    function showToast(title, message, type) {
-      // type: 'success' | 'error' | 'warning' | 'info'
-      const container = document.getElementById('toastContainer');
-      const toast     = document.createElement('div');
-      toast.className = 'toast' + (type === 'error' ? ' toast-error' : type === 'warning' ? ' toast-warning' : type === 'info' ? ' toast-info' : '');
-
-      const icons = { success: '✓', error: '✕', warning: '!', info: 'i' };
-      const icon  = icons[type] || '✓';
-
-      toast.innerHTML = `
-        <div class="toast-icon">${icon}</div>
-        <div class="toast-body">
-          <div class="toast-title">${esc(title)}</div>
-          ${message ? '<div class="toast-message">' + esc(message) + '</div>' : ''}
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>`;
-
-      container.appendChild(toast);
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () { toast.classList.add('active'); });
+      // Build arrays: new records to save, and duplicates to skip
+      const records   = [];
+      const skipped   = [];
+      rows.forEach(row => {
+        const sid    = row.dataset.studentId;
+        const name   = row.dataset.fullName;
+        const radio  = row.querySelector(`input[name="stu_${sid}"]:checked`);
+        const status = radio ? radio.value : 'Present';
+        if (alreadyRecorded.has(sid)) {
+          skipped.push(name || sid);
+        } else {
+          records.push({ date, studentId: sid, studentName: name, courseId, academicYear, className, term, status });
+        }
       });
 
-      var duration = type === 'error' ? 6000 : type === 'warning' ? 5000 : 4000;
-      setTimeout(function () {
-        toast.classList.remove('active');
-        setTimeout(function () { if (toast.parentElement) toast.remove(); }, 400);
-      }, duration);
+      // If everyone is already recorded, stop
+      if (records.length === 0) {
+        showToast(`Attendance for all ${skipped.length} student(s) has already been recorded on ${date}.`, 'warning');
+        return;
+      }
+
+      // Warn about partial skips
+      if (skipped.length > 0) {
+        const proceed = confirm(
+          `⚠ ${skipped.length} student(s) already have attendance on ${date} and will be SKIPPED:\n• ${skipped.join('\n• ')}\n\nSave attendance for the remaining ${records.length} student(s)?`
+        );
+        if (!proceed) return;
+      }
+
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true; btn.innerText = `Saving ${records.length} records...`;
+
+      let saved  = 0;
+      let errors = [];
+
+      function saveNext(idx) {
+        if (idx >= records.length) {
+          btn.disabled = false; btn.innerText = 'Save Attendance';
+          const skipMsg = skipped.length ? `\n${skipped.length} skipped (already recorded).` : '';
+          if (errors.length) {
+            showToast(`Saved ${saved}/${records.length}.${skipMsg.replace('\n', ' ')} Errors: ${errors.join('; ')}`, 'error');
+          } else {
+            closeModal();
+            const msg = skipped.length
+              ? `Attendance saved for ${saved} student(s). ${skipped.length} skipped (already recorded).`
+              : `Attendance saved for ${saved} student(s).`;
+            showToast(msg, 'success');
+          }
+          refreshData();
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.success) saved++;
+            else errors.push(records[idx].studentId + ': ' + (res && res.message ? res.message : 'failed'));
+            saveNext(idx + 1);
+          })
+          .withFailureHandler(function(err) {
+            errors.push(records[idx].studentId + ': ' + (err && err.message ? err.message : 'error'));
+            saveNext(idx + 1);
+          })
+          .addAttendance(records[idx]);
+      }
+
+      saveNext(0);
     }
 
-    /* ============================================================
-       DARK MODE SYNC (called by parent shell)
-    ============================================================ */
-    window.applyDarkMode = function (isDark) {
-      document.body.classList.toggle('dark-mode', isDark);
-    };
+    /* ---- EDIT SINGLE RECORD ---- */
+    function editAttendance(attendanceId) {
+      const record = attendanceList.find(r => r.attendanceId === attendanceId);
+      if (!record) { showToast('Record not found.', 'error'); return; }
+
+      // Populate edit status dropdown
+      const editStatusSelect = document.getElementById('edit_status');
+      editStatusSelect.innerHTML = '';
+      attendanceStatuses.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.value;
+        opt.innerText = s.label;
+        editStatusSelect.appendChild(opt);
+      });
+
+      document.getElementById('edit_attendanceId').value      = record.attendanceId;
+      document.getElementById('edit_date').value              = formatDisplayDate(record.date);
+      document.getElementById('edit_academicYear').value      = record.academicYear;
+      document.getElementById('edit_className').value         = record.className;
+      document.getElementById('edit_term').value              = record.term;
+      document.getElementById('edit_studentDisplay').value    = `${record.studentName || ''} (${record.studentId || ''})`;
+      document.getElementById('edit_courseSelect').value      = record.courseId || '';
+      document.getElementById('edit_status').value            = record.status || '';
+
+      document.getElementById('editAttendanceModal').classList.add('active');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editAttendanceModal').classList.remove('active');
+    }
+
+    function handleEditSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('editSaveBtn');
+      btn.disabled = true; btn.innerText = 'Saving...';
+
+      const attendanceId = document.getElementById('edit_attendanceId').value;
+      const data = {
+        date:         document.getElementById('edit_date').value,
+        academicYear: document.getElementById('edit_academicYear').value,
+        className:    document.getElementById('edit_className').value,
+        term:         document.getElementById('edit_term').value,
+        courseId:     document.getElementById('edit_courseSelect').value,
+        status:       document.getElementById('edit_status').value
+      };
+      // Preserve studentId/studentName from the original record
+      const record = attendanceList.find(r => r.attendanceId === attendanceId);
+      if (record) { data.studentId = record.studentId; data.studentName = record.studentName; }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false; btn.innerText = 'Update Record';
+          if (res && res.success) { closeEditModal(); refreshData(); showToast('Attendance updated successfully!', 'success'); }
+          else { showToast(res && res.message ? res.message : 'Update failed.', 'error'); }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false; btn.innerText = 'Update Record';
+          showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error');
+        })
+        .updateAttendance(attendanceId, data);
+    }
+
+    function deleteAttendanceRecord(attendanceId) {
+      if (!confirm('Are you sure you want to delete this attendance record?')) return;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res.success) { refreshData(); showToast('Attendance record deleted.', 'success'); }
+          else { showToast(res.message || 'Could not delete record.', 'error'); }
+        })
+        .withFailureHandler(function(err) { showToast('Error: ' + err.message, 'error'); })
+        .deleteAttendance(attendanceId);
+    }
   </script>
 </body>
 </html>
