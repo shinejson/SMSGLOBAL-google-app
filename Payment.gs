@@ -131,6 +131,29 @@ function addPayment(payData) {
   try { recalcPaymentsBalances(); } catch (e) { /* fail silently to avoid breaking UI */ }
   try { invalidateFinancialCache(); } catch (e) { /* fail silently */ }
 
+  const createdPayment = getPaymentsDataFromSheet().find((payment) => String(payment.transactionId).trim() === String(nextId).trim()) || buildAuditSnapshot({
+    transactionId: nextId,
+    invoiceId: payData.invoiceId,
+    studentId: payData.studentId,
+    paymentDate: payData.paymentDate,
+    amountPaid: Number(payData.amountPaid) || 0,
+    paymentMethod: payData.paymentMethod,
+    referenceNo: payData.referenceNo,
+    studentName: payData.studentName,
+    academicYear: payData.academicYear,
+    term: payData.term,
+    studentClass: payData.studentClass
+  });
+
+  safeLogAuditEvent(
+    'Create',
+    'Payments',
+    nextId,
+    'Created payment for ' + String(createdPayment.studentName || createdPayment.studentId || nextId).trim(),
+    null,
+    createdPayment
+  );
+
   return { success: true, transactionId: nextId };
 }
 
@@ -140,6 +163,7 @@ function updatePayment(transactionId, payData) {
   const sheet = ss.getSheetByName("Payments");
   if (!sheet) throw new Error("Payments worksheet not found.");
 
+  const existingPayment = getPaymentsDataFromSheet().find((payment) => String(payment.transactionId).trim() === String(transactionId).trim()) || null;
   const row = findPaymentRowById(sheet, transactionId);
   if (row === -1) throw new Error("Payment record not found.");
 
@@ -165,6 +189,17 @@ function updatePayment(transactionId, payData) {
   try { recalcPaymentsBalances(); } catch (e) { /* fail silently to avoid breaking UI */ }
   try { invalidateFinancialCache(); } catch (e) { /* fail silently */ }
 
+  const updatedPayment = getPaymentsDataFromSheet().find((payment) => String(payment.transactionId).trim() === String(transactionId).trim()) || buildAuditSnapshot(Object.assign({}, existingPayment || {}, payData, { transactionId: transactionId }));
+
+  safeLogAuditEvent(
+    'Update',
+    'Payments',
+    transactionId,
+    'Updated payment for ' + String((updatedPayment && (updatedPayment.studentName || updatedPayment.studentId)) || transactionId).trim(),
+    existingPayment,
+    updatedPayment
+  );
+
   return { success: true };
 }
 
@@ -174,6 +209,7 @@ function deletePayment(transactionId) {
   const sheet = ss.getSheetByName("Payments");
   if (!sheet) throw new Error("Payments worksheet not found.");
 
+  const existingPayment = getPaymentsDataFromSheet().find((payment) => String(payment.transactionId).trim() === String(transactionId).trim()) || null;
   const row = findPaymentRowById(sheet, transactionId);
   if (row === -1) throw new Error("Payment record not found.");
 
@@ -181,6 +217,16 @@ function deletePayment(transactionId) {
   // Recalculate balances after deletion
   try { recalcPaymentsBalances(); } catch (e) { /* fail silently */ }
   try { invalidateFinancialCache(); } catch (e) { /* fail silently */ }
+
+  safeLogAuditEvent(
+    'Delete',
+    'Payments',
+    transactionId,
+    'Deleted payment for ' + String(((existingPayment && (existingPayment.studentName || existingPayment.studentId)) || transactionId)).trim(),
+    existingPayment,
+    null
+  );
+
   return { success: true };
 }
 

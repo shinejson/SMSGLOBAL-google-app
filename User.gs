@@ -66,6 +66,20 @@ function findUserRowById(sheet, userId) {
   return -1;
 }
 
+function buildUserAuditSnapshot(userData) {
+  if (!userData) return null;
+
+  return buildAuditSnapshot({
+    userId: userData.userId,
+    googleEmail: userData.googleEmail,
+    fullName: userData.fullName,
+    role: userData.role,
+    accountStatus: userData.accountStatus,
+    username: userData.username,
+    passwordChanged: userData.passwordChanged === true ? true : undefined
+  });
+}
+
 // 4. Add New User (Create) - Now includes Username and Password
 function addUser(userData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -97,6 +111,25 @@ function addUser(userData) {
   invalidateCacheOnModify('Users');
   invalidateIndex('Users');
 
+  const createdUserSnapshot = buildUserAuditSnapshot({
+    userId: nextId,
+    googleEmail: userData.googleEmail,
+    fullName: userData.fullName,
+    role: userData.role,
+    accountStatus: userData.accountStatus || 'Active',
+    username: userData.username,
+    passwordChanged: true
+  });
+
+  safeLogAuditEvent(
+    'Create',
+    'Users',
+    nextId,
+    'Created user ' + String(userData.fullName || nextId).trim(),
+    null,
+    createdUserSnapshot
+  );
+
   return { success: true, userId: nextId };
 }
 
@@ -106,6 +139,7 @@ function updateUser(userId, userData) {
   const sheet = ss.getSheetByName("Users");
   if (!sheet) throw new Error("Users worksheet not found.");
 
+  const existingUser = getUsersData().find((user) => String(user.userId).trim() === String(userId).trim()) || null;
   const row = findUserRowById(sheet, userId);
   if (row === -1) throw new Error("User record not found.");
 
@@ -136,6 +170,20 @@ function updateUser(userId, userData) {
   invalidateCacheOnModify('Users');
   invalidateIndex('Users');
 
+  const updatedUserSnapshot = buildUserAuditSnapshot(Object.assign({}, existingUser || {}, userData, {
+    userId: userId,
+    passwordChanged: !!userData.password
+  }));
+
+  safeLogAuditEvent(
+    'Update',
+    'Users',
+    userId,
+    'Updated user ' + String((updatedUserSnapshot && updatedUserSnapshot.fullName) || userId).trim(),
+    buildUserAuditSnapshot(existingUser),
+    updatedUserSnapshot
+  );
+
   return { success: true };
 }
 
@@ -145,6 +193,7 @@ function deleteUser(userId) {
   const sheet = ss.getSheetByName("Users");
   if (!sheet) throw new Error("Users worksheet not found.");
 
+  const existingUser = getUsersData().find((user) => String(user.userId).trim() === String(userId).trim()) || null;
   const row = findUserRowById(sheet, userId);
   if (row === -1) throw new Error("User record not found.");
 
@@ -163,6 +212,15 @@ function deleteUser(userId) {
   // Invalidate cache and index
   invalidateCacheOnModify('Users');
   invalidateIndex('Users');
+
+  safeLogAuditEvent(
+    'Delete',
+    'Users',
+    userId,
+    'Deleted user ' + String(((existingUser && existingUser.fullName) || userId)).trim(),
+    buildUserAuditSnapshot(existingUser),
+    null
+  );
   
   return { success: true };
 }

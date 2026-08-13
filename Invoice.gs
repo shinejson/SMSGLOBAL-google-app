@@ -120,6 +120,31 @@ function addInvoice(invData) {
     ]
   ]);
 
+  const createdInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(nextId).trim()) || buildAuditSnapshot({
+    invoiceId: nextId,
+    studentId: invData.studentId || '',
+    studentName: invData.studentName || '',
+    studentClass: invData.studentClass || '',
+    academicYear: invData.academicYear || '',
+    term: invData.term || '',
+    category: invData.category || '',
+    items: invData.items || '',
+    amountDue: Number(invData.amountDue) || 0,
+    issueDate: invData.issueDate || '',
+    dueDate: invData.dueDate || '',
+    status: invData.status || 'Pending',
+    paymentStatus: invData.paymentStatus || 'Unpaid'
+  });
+
+  safeLogAuditEvent(
+    'Create',
+    'Invoices',
+    nextId,
+    'Created invoice for ' + String(createdInvoice.studentName || createdInvoice.studentId || nextId).trim(),
+    null,
+    createdInvoice
+  );
+
   return { success: true, invoiceId: nextId };
 }
 
@@ -129,6 +154,7 @@ function updateInvoice(invoiceId, invData) {
   const sheet = ss.getSheetByName("Invoices");
   if (!sheet) throw new Error("Invoices worksheet not found.");
 
+  const existingInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || null;
   const row = findInvoiceRowById(sheet, invoiceId);
   if (row === -1) throw new Error("Invoice record not found.");
 
@@ -161,6 +187,17 @@ function updateInvoice(invoiceId, invData) {
     ]
   ]);
 
+  const updatedInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || buildAuditSnapshot(Object.assign({}, existingInvoice || {}, invData, { invoiceId: invoiceId }));
+
+  safeLogAuditEvent(
+    'Update',
+    'Invoices',
+    invoiceId,
+    'Updated invoice for ' + String((updatedInvoice && (updatedInvoice.studentName || updatedInvoice.studentId)) || invoiceId).trim(),
+    existingInvoice,
+    updatedInvoice
+  );
+
   return { success: true };
 }
 
@@ -170,9 +207,20 @@ function deleteInvoice(invoiceId) {
   const sheet = ss.getSheetByName("Invoices");
   if (!sheet) throw new Error("Invoices worksheet not found.");
 
+  const existingInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || null;
   const row = findInvoiceRowById(sheet, invoiceId);
   if (row === -1) throw new Error("Invoice record not found.");
 
   sheet.deleteRow(row);
+
+  safeLogAuditEvent(
+    'Delete',
+    'Invoices',
+    invoiceId,
+    'Deleted invoice for ' + String(((existingInvoice && (existingInvoice.studentName || existingInvoice.studentId)) || invoiceId)).trim(),
+    existingInvoice,
+    null
+  );
+
   return { success: true };
 }

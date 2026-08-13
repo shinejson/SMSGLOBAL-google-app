@@ -81,6 +81,17 @@ function getStudentNameById(studentId) {
   return "";
 }
 
+function findParentMappingRowById(sheet, mappingId) {
+  const lastRow = sheet.getLastRow();
+  for (let r = 3; r <= lastRow; r++) {
+    const cell = sheet.getRange(r, 2).getValue();
+    if (String(cell).trim() === String(mappingId).trim()) {
+      return r;
+    }
+  }
+  return -1;
+}
+
 // 5. Add New Mapping (Create)
 function addParentMapping(mapData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -105,6 +116,26 @@ function addParentMapping(mapData) {
     ]
   ]);
 
+  const createdMapping = getParentsData().find((mapping) => String(mapping.mappingId).trim() === String(nextId).trim()) || buildAuditSnapshot({
+    mappingId: nextId,
+    parentUserId: mapData.parentUserId,
+    parentName: mapData.parentName || '',
+    studentId: mapData.studentId,
+    studentName: mapData.studentName,
+    relationship: mapData.relationship,
+    isPrimary: mapData.isPrimary,
+    billing: mapData.billing
+  });
+
+  safeLogAuditEvent(
+    'Create',
+    'Parents',
+    nextId,
+    'Created parent mapping for ' + String(createdMapping.studentName || createdMapping.studentId || nextId).trim(),
+    null,
+    createdMapping
+  );
+
   return { success: true, mappingId: nextId };
 }
 
@@ -114,16 +145,8 @@ function updateParentMapping(mappingId, mapData) {
   const sheet = ss.getSheetByName("Parents");
   if (!sheet) throw new Error("Parents worksheet not found.");
 
-  // Because mappingId is unique, we must find the row
-  const lastRow = sheet.getLastRow();
-  let rowIndex = -1;
-  for (let r = 3; r <= lastRow; r++) {
-    const cell = sheet.getRange(r, 2).getValue();
-    if (String(cell).trim() === mappingId) {
-      rowIndex = r;
-      break;
-    }
-  }
+  const existingMapping = getParentsData().find((mapping) => String(mapping.mappingId).trim() === String(mappingId).trim()) || null;
+  const rowIndex = findParentMappingRowById(sheet, mappingId);
   if (rowIndex === -1) throw new Error("Mapping record not found.");
 
   // Update from Col C(3) to Col I(9) -> 7 columns (including Parent Name)
@@ -139,6 +162,17 @@ function updateParentMapping(mappingId, mapData) {
     ]
   ]);
 
+  const updatedMapping = getParentsData().find((mapping) => String(mapping.mappingId).trim() === String(mappingId).trim()) || buildAuditSnapshot(Object.assign({}, existingMapping || {}, mapData, { mappingId: mappingId }));
+
+  safeLogAuditEvent(
+    'Update',
+    'Parents',
+    mappingId,
+    'Updated parent mapping for ' + String((updatedMapping && (updatedMapping.studentName || updatedMapping.studentId)) || mappingId).trim(),
+    existingMapping,
+    updatedMapping
+  );
+
   return { success: true };
 }
 
@@ -148,17 +182,20 @@ function deleteParentMapping(mappingId) {
   const sheet = ss.getSheetByName("Parents");
   if (!sheet) throw new Error("Parents worksheet not found.");
 
-  const lastRow = sheet.getLastRow();
-  let rowIndex = -1;
-  for (let r = 3; r <= lastRow; r++) {
-    const cell = sheet.getRange(r, 2).getValue();
-    if (String(cell).trim() === mappingId) {
-      rowIndex = r;
-      break;
-    }
-  }
+  const existingMapping = getParentsData().find((mapping) => String(mapping.mappingId).trim() === String(mappingId).trim()) || null;
+  const rowIndex = findParentMappingRowById(sheet, mappingId);
   if (rowIndex === -1) throw new Error("Mapping record not found.");
 
   sheet.deleteRow(rowIndex);
+
+  safeLogAuditEvent(
+    'Delete',
+    'Parents',
+    mappingId,
+    'Deleted parent mapping for ' + String(((existingMapping && (existingMapping.studentName || existingMapping.studentId)) || mappingId)).trim(),
+    existingMapping,
+    null
+  );
+
   return { success: true };
 }
