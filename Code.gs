@@ -2606,6 +2606,451 @@ function buildPerformanceAuditSnapshot(perfData) {
   });
 }
 
+function normalizePerformanceText(value) {
+  return String(value || '').trim();
+}
+
+function normalizePerformanceKey(value) {
+  return normalizePerformanceText(value).toLowerCase();
+}
+
+function roundPerformanceNumber(value) {
+  return Math.round((Number(value) || 0) * 10) / 10;
+}
+
+function calculatePerformanceDerivedScores(classScore, examScore100) {
+  const percentages = getScorePercentages();
+  const parsedClassScore = roundPerformanceNumber(classScore);
+  const parsedExamScore100 = roundPerformanceNumber(examScore100);
+  const weightedExamScore = roundPerformanceNumber(parsedExamScore100 * Number(percentages.examScoreDecimal || 0.5));
+  const total = roundPerformanceNumber(parsedClassScore + weightedExamScore);
+
+  return {
+    classScore: parsedClassScore,
+    examScore100: parsedExamScore100,
+    examScore60: weightedExamScore,
+    examScore50: weightedExamScore,
+    total: total,
+    maxClassScore: Number(percentages.classScorePercentage) || 50
+  };
+}
+
+function normalizePerformanceTerm(value) {
+  const key = normalizePerformanceKey(value).replace(/\s+/g, '');
+  const termMap = {
+    term1: 'Term 1',
+    term2: 'Term 2',
+    term3: 'Term 3'
+  };
+  return termMap[key] || '';
+}
+
+function buildPerformanceImportReferenceData() {
+  const studentLookup = {};
+  getStudentIdNamePairs().forEach(function(student) {
+    const studentId = normalizePerformanceText(student && student.studentId);
+    if (!studentId) return;
+    studentLookup[normalizePerformanceKey(studentId)] = {
+      studentId: studentId,
+      fullName: normalizePerformanceText(student.fullName),
+      studentClass: normalizePerformanceText(student.studentClass)
+    };
+  });
+
+  const classLookup = {};
+  getClassNames().forEach(function(className) {
+    const value = normalizePerformanceText(className);
+    if (!value) return;
+    classLookup[normalizePerformanceKey(value)] = value;
+  });
+
+  const courseLookup = {};
+  getCoursesData().forEach(function(course) {
+    const courseName = normalizePerformanceText(course && course.courseName);
+    if (!courseName) return;
+    courseLookup[normalizePerformanceKey(courseName)] = courseName;
+  });
+
+  const academicYearLookup = {};
+  getAcademicYearsData().forEach(function(year) {
+    const academicYear = normalizePerformanceText(year && year.academicYear);
+    if (!academicYear) return;
+    academicYearLookup[normalizePerformanceKey(academicYear)] = academicYear;
+  });
+
+  return {
+    studentLookup: studentLookup,
+    classLookup: classLookup,
+    courseLookup: courseLookup,
+    academicYearLookup: academicYearLookup
+  };
+}
+
+function importPerformance(performanceArray) {
+  try {
+    requireLogin();
+
+    const rows = Array.isArray(performanceArray) ? performanceArray : [];
+    if (rows.length === 0) {
+      return { success: false, message: 'No performance data provided for import.' };
+    }
+
+    const referenceData = buildPerformanceImportReferenceData();
+    const uniqueYears = rows
+      .map(function(row) {
+        const rawYear = normalizePerformanceText(row && row.academicYear);
+        return referenceData.academicYearLookup[normalizePerformanceKey(rawYear)] || normalizeAcademicYearValue(rawYear);
+      })
+      .filter(function(year, index, arr) { return year && arr.indexOf(year) === index; });
+
+    const importGuard = enforceAcademicYearCrudSecurity({
+      action: 'Import',
+      module: 'Performance',
+      recordId: 'PerformanceImport',
+      academicYears: uniqueYears,
+      newValue: buildAuditSnapshot({ totalRows: rows.length, academicYears: uniqueYears }),
+      overrideConfirmed: rows.some(function(row) { return row && row.__adminAcademicYearOverride === true; })
+    });
+    if (!importGuard.allowed) return importGuard;
+
+    let imported = 0;
+    let failed = 0;
+    let duplicates = 0;
+    const errors = [];
+    const seenImportKeys = {};
+
+    rows.forEach(function(row, index) {
+      const rowNumber = row && row.rowNumber ? row.rowNumber : index + 2;
+      try {
+        const studentId = normalizePerformanceText(row && row.studentId);
+        const rawStudentName = normalizePerformanceText(row && row.studentName);
+        const rawStudentClass = normalizePerformanceText((row && row.studentClass) || (row && row.class));
+        const lookupStudent = referenceData.studentLookup[normalizePerformanceKey(studentId)] || null;
+        const rawTerm = normalizePerformanceText(row && row.term);
+        const rawAcademicYear = normalizePerformanceText(row && row.academicYear);
+        const rawCourse = normalizePerformanceText((row && row.course) || (row && row.subject));
+        const rawClassScore = row && row.classScore;
+        const rawExamScore100 = row && row.examScore100;
+
+        if (!studentId) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Student ID is required.`);
+          return;
+        }
+
+        if (!lookupStudent) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Student ID not found in the system.`);
+          return;
+        }
+
+        const studentName = normalizePerformanceText(lookupStudent.fullName);
+        const studentClass = referenceData.classLookup[normalizePerformanceKey(lookupStudent.studentClass)] || normalizePerformanceText(lookupStudent.studentClass);
+        const term = normalizePerformanceTerm(rawTerm);
+        const academicYear = referenceData.academicYearLookup[normalizePerformanceKey(rawAcademicYear)] || '';
+        const course = referenceData.courseLookup[normalizePerformanceKey(rawCourse)] || '';
+
+        if (rawStudentName && normalizePerformanceKey(rawStudentName) !== normalizePerformanceKey(studentName)) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Student Name does not match Student ID ${studentId}. Expected ${studentName}.`);
+          return;
+        }
+
+        if (rawStudentClass && normalizePerformanceKey(rawStudentClass) !== normalizePerformanceKey(studentClass)) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Class does not match Student ID ${studentId}. Expected ${studentClass}.`);
+          return;
+        }
+
+        if (!studentName || !studentClass) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Student record is missing a valid name or class.`);
+          return;
+        }
+
+        if (!term) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Term must be Term 1, Term 2, or Term 3.`);
+          return;
+        }
+
+        if (!academicYear) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Academic Year was not found in the system.`);
+          return;
+        }
+
+        if (!course) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Course / Subject was not found in the system.`);
+          return;
+        }
+
+        const importKey = [studentId, studentClass, term, academicYear, course]
+          .map(normalizePerformanceKey)
+          .join('|');
+        if (seenImportKeys[importKey]) {
+          duplicates++;
+          errors.push(`Row ${rowNumber}: Duplicate entry found in the CSV file for this student, class, term, academic year, and course.`);
+          return;
+        }
+        seenImportKeys[importKey] = true;
+
+        if (rawClassScore === '' || rawClassScore == null || isNaN(Number(rawClassScore))) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Invalid Class Score.`);
+          return;
+        }
+
+        if (rawExamScore100 === '' || rawExamScore100 == null || isNaN(Number(rawExamScore100))) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Invalid Exam Score (100).`);
+          return;
+        }
+
+        const derived = calculatePerformanceDerivedScores(rawClassScore, rawExamScore100);
+        if (derived.classScore < 0 || derived.classScore > derived.maxClassScore) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Class Score must be between 0 and ${derived.maxClassScore}.`);
+          return;
+        }
+        if (derived.examScore100 < 0 || derived.examScore100 > 100) {
+          failed++;
+          errors.push(`Row ${rowNumber}: Exam Score must be between 0 and 100.`);
+          return;
+        }
+
+        const payload = {
+          studentId: studentId,
+          studentName: studentName,
+          studentClass: studentClass,
+          term: term,
+          academicYear: academicYear,
+          course: course,
+          classScore: derived.classScore,
+          examScore100: derived.examScore100,
+          examScore60: derived.examScore60,
+          examScore50: derived.examScore50,
+          total: derived.total
+        };
+        if (importGuard.adminOverride) payload.__adminAcademicYearOverride = true;
+
+        const result = addPerformance(payload);
+        if (result && result.success) {
+          imported++;
+          return;
+        }
+
+        if (result && result.requiresAdminOverride) {
+          throw new Error(result.message || 'Admin confirmation required.');
+        }
+
+        if (result && result.message && /duplicate/i.test(result.message)) {
+          duplicates++;
+        } else {
+          failed++;
+        }
+        errors.push(`Row ${rowNumber}: ${(result && result.message) ? result.message : 'Import failed.'}`);
+      } catch (error) {
+        failed++;
+        errors.push(`Row ${rowNumber}: ${error.message}`);
+      }
+    });
+
+    safeLogAuditEvent(
+      'Import',
+      'Performance',
+      'BulkImport',
+      appendAcademicYearOverrideAuditDetails('Imported performance records in bulk', importGuard),
+      null,
+      buildAuditSnapshot({
+        totalRows: rows.length,
+        imported: imported,
+        failed: failed,
+        duplicates: duplicates,
+        academicYears: uniqueYears
+      })
+    );
+
+    return {
+      success: true,
+      imported: imported,
+      failed: failed,
+      duplicates: duplicates,
+      errors: errors
+    };
+  } catch (error) {
+    Logger.log('ERROR in importPerformance: ' + error.toString());
+    return { success: false, message: error.toString() };
+  }
+}
+
+function saveBulkPerformanceEntries(payload) {
+  try {
+    requireLogin();
+
+    const data = payload || {};
+    const studentClass = normalizePerformanceText(data.studentClass);
+    const term = normalizePerformanceText(data.term);
+    const academicYear = normalizePerformanceText(data.academicYear);
+    const course = normalizePerformanceText(data.course);
+    const records = Array.isArray(data.records) ? data.records : [];
+
+    if (!studentClass || !term || !academicYear || !course) {
+      return { success: false, message: 'Class, Term, Academic Year, and Course are required.' };
+    }
+
+    if (records.length === 0) {
+      return { success: false, message: 'No student performance rows were provided.' };
+    }
+
+    const bulkGuard = enforceAcademicYearCrudSecurity({
+      action: 'Update',
+      module: 'Performance',
+      recordId: `${studentClass}|${term}|${academicYear}|${course}`,
+      academicYear: academicYear,
+      newValue: buildAuditSnapshot({ studentClass: studentClass, term: term, academicYear: academicYear, course: course, rows: records.length }),
+      overrideConfirmed: data.__adminAcademicYearOverride === true
+    });
+    if (!bulkGuard.allowed) return bulkGuard;
+
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    let failed = 0;
+    let duplicates = 0;
+    const errors = [];
+
+    records.forEach(function(row, index) {
+      const rowNumber = index + 1;
+      try {
+        const studentId = normalizePerformanceText(row && row.studentId);
+        const studentName = normalizePerformanceText(row && row.studentName);
+        const performanceId = normalizePerformanceText(row && row.performanceId);
+        const rawClassScore = row && row.classScore;
+        const rawExamScore100 = row && row.examScore100;
+        const hasClassScore = rawClassScore !== '' && rawClassScore != null;
+        const hasExamScore = rawExamScore100 !== '' && rawExamScore100 != null;
+
+        if (!studentId || !studentName) {
+          skipped++;
+          return;
+        }
+
+        if (!hasClassScore && !hasExamScore) {
+          skipped++;
+          return;
+        }
+
+        if (!hasClassScore || isNaN(Number(rawClassScore))) {
+          failed++;
+          errors.push(`Row ${rowNumber} (${studentName}): Invalid Class Score.`);
+          return;
+        }
+
+        if (!hasExamScore || isNaN(Number(rawExamScore100))) {
+          failed++;
+          errors.push(`Row ${rowNumber} (${studentName}): Invalid Exam Score (100).`);
+          return;
+        }
+
+        const derived = calculatePerformanceDerivedScores(rawClassScore, rawExamScore100);
+        if (derived.classScore < 0 || derived.classScore > derived.maxClassScore) {
+          failed++;
+          errors.push(`Row ${rowNumber} (${studentName}): Class Score must be between 0 and ${derived.maxClassScore}.`);
+          return;
+        }
+        if (derived.examScore100 < 0 || derived.examScore100 > 100) {
+          failed++;
+          errors.push(`Row ${rowNumber} (${studentName}): Exam Score must be between 0 and 100.`);
+          return;
+        }
+
+        const perfPayload = {
+          studentId: studentId,
+          studentName: studentName,
+          studentClass: studentClass,
+          term: term,
+          academicYear: academicYear,
+          course: course,
+          classScore: derived.classScore,
+          examScore100: derived.examScore100,
+          examScore60: derived.examScore60,
+          examScore50: derived.examScore50,
+          total: derived.total
+        };
+        if (bulkGuard.adminOverride) perfPayload.__adminAcademicYearOverride = true;
+
+        let result;
+        if (performanceId) {
+          result = updatePerformance(performanceId, perfPayload);
+        } else {
+          result = addPerformance(perfPayload);
+        }
+
+        if (result && result.success) {
+          if (performanceId) updated++;
+          else created++;
+          return;
+        }
+
+        if (result && result.requiresAdminOverride) {
+          throw new Error(result.message || 'Admin confirmation required.');
+        }
+
+        if (result && result.message && /duplicate/i.test(result.message)) {
+          duplicates++;
+        } else {
+          failed++;
+        }
+        errors.push(`Row ${rowNumber} (${studentName}): ${(result && result.message) ? result.message : 'Save failed.'}`);
+      } catch (error) {
+        failed++;
+        errors.push(`Row ${rowNumber}: ${error.message}`);
+      }
+    });
+
+    try {
+      calculateAndSetRanks(SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Performance'), studentClass, term, academicYear, course);
+    } catch (rankError) {
+      Logger.log('Bulk performance rank recalculation failed: ' + rankError.message);
+    }
+
+    safeLogAuditEvent(
+      'Update',
+      'Performance',
+      `${studentClass}|${term}|${academicYear}|${course}`,
+      appendAcademicYearOverrideAuditDetails('Bulk saved performance records', bulkGuard),
+      null,
+      buildAuditSnapshot({
+        studentClass: studentClass,
+        term: term,
+        academicYear: academicYear,
+        course: course,
+        created: created,
+        updated: updated,
+        skipped: skipped,
+        failed: failed,
+        duplicates: duplicates,
+        totalRows: records.length
+      })
+    );
+
+    return {
+      success: true,
+      created: created,
+      updated: updated,
+      skipped: skipped,
+      failed: failed,
+      duplicates: duplicates,
+      errors: errors
+    };
+  } catch (error) {
+    Logger.log('ERROR in saveBulkPerformanceEntries: ' + error.toString());
+    return { success: false, message: error.toString() };
+  }
+}
+
 /**
  * Recalculate ranks for ALL performance records
  * Call this once to fix existing records that don't have ranks

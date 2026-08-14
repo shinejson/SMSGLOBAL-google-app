@@ -127,6 +127,8 @@
     </div>
     <div class="btn-group">
       <button class="action-btn" onclick="openAddModal()">+ Add Performance Record</button>
+      <button class="action-btn" style="background: #0ea5e9;" onclick="openBulkEntryModal()">🧮 Advanced Record Entry</button>
+      <button class="action-btn" style="background: #8b5cf6;" onclick="openPerformanceImportModal()">📥 Import Performance</button>
       <button class="action-btn" style="background: #10b981;" onclick="openTerminalReportModal()">📋 Terminal Report</button>
     </div>
   </div>
@@ -341,6 +343,131 @@
     </div>
   </div>
 
+  <!-- IMPORT PERFORMANCE MODAL -->
+  <div class="modal-backdrop" id="performanceImportModal">
+    <div class="modal-content" style="max-width: 760px;">
+      <div class="modal-header">
+        <h3>📥 Import Performance from CSV</h3>
+        <button class="modal-close" onclick="closePerformanceImportModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 20px; padding: 16px; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px;">
+          <p style="font-size: 13px; color: #5b21b6; margin-bottom: 8px;"><strong>CSV Format:</strong></p>
+          <p style="font-size: 12px; color: #6d28d9; line-height: 1.6;">
+            Columns required in order:<br>
+            <code style="background: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">Student ID, Student Name, Class, Term, Academic Year, Course, Class Score, Exam Score (100)</code>
+          </p>
+          <p style="font-size: 12px; color: #6d28d9; margin-top: 8px;">
+            <strong>Example:</strong><br>
+            <code style="background: white; padding: 2px 6px; border-radius: 4px; font-size: 11px;">STU-1001,John Doe,Grade 5,Term 1,2026-2027,Mathematics,42,78</code>
+          </p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top: 12px;">
+            <button type="button" onclick="downloadPerformanceTemplate()" style="padding: 6px 12px; background: #8b5cf6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+              📄 Download Blank CSV Template
+            </button>
+            <button type="button" onclick="downloadPerformanceSampleTemplate()" style="padding: 6px 12px; background: #7c3aed; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+              🧾 Download Sample Import Template
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="performanceCsvFileInput">Upload CSV File</label>
+          <input type="file" id="performanceCsvFileInput" accept=".csv" class="form-input" style="padding: 8px;">
+        </div>
+
+        <div id="performanceImportPreview" style="display:none; margin-top: 20px;">
+          <label class="form-label">Preview (First 5 rows)</label>
+          <div style="max-height: 260px; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <table style="width: 100%; font-size: 12px;">
+              <thead style="position: sticky; top: 0; background: #f8fafc;">
+                <tr>
+                  <th style="padding: 8px; text-align: left;">Row</th>
+                  <th style="padding: 8px; text-align: left;">Student ID</th>
+                  <th style="padding: 8px; text-align: left;">Student Name</th>
+                  <th style="padding: 8px; text-align: left;">Class</th>
+                  <th style="padding: 8px; text-align: left;">Term</th>
+                  <th style="padding: 8px; text-align: left;">Year</th>
+                  <th style="padding: 8px; text-align: left;">Course</th>
+                  <th style="padding: 8px; text-align: left;">Class Score</th>
+                  <th style="padding: 8px; text-align: left;">Exam (100)</th>
+                </tr>
+              </thead>
+              <tbody id="performanceImportPreviewBody"></tbody>
+            </table>
+          </div>
+          <p id="performanceImportSummary" style="margin-top: 12px; font-size: 13px; color: #64748b;"></p>
+        </div>
+
+        <div id="performanceImportResults" style="display:none; margin-top: 20px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closePerformanceImportModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="performanceImportBtn" onclick="processPerformanceImport()" disabled>Import Performance</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADVANCED BULK PERFORMANCE ENTRY MODAL -->
+  <div class="modal-backdrop" id="bulkPerformanceModal">
+    <div class="modal-content" style="max-width: 1100px; width: 96%;">
+      <div class="modal-header">
+        <h3>🧮 Advanced Record Performance</h3>
+        <button class="modal-close" onclick="closeBulkEntryModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom: 18px; padding: 14px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; color: #1e3a8a; font-size: 13px; line-height: 1.5;">
+          Select the academic year, class, term, and subject. All students in the selected class will appear below. Existing records for that same class, term, year, and subject will be pre-filled and updated when saved.
+        </div>
+
+        <div class="form-grid" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="form-group">
+            <label class="form-label" for="bulk_yearSelect">Academic Year</label>
+            <select id="bulk_yearSelect" class="form-select" onchange="maybeLoadBulkPerformanceGrid()">
+              <option value="" disabled selected>Select Year</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bulk_classSelect">Class</label>
+            <select id="bulk_classSelect" class="form-select" onchange="maybeLoadBulkPerformanceGrid()">
+              <option value="" disabled selected>Select Class</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bulk_termSelect">Term</label>
+            <select id="bulk_termSelect" class="form-select" onchange="maybeLoadBulkPerformanceGrid()">
+              <option value="" disabled selected>Select Term</option>
+              <option value="Term 1">Term 1</option>
+              <option value="Term 2">Term 2</option>
+              <option value="Term 3">Term 3</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bulk_courseSelect">Course / Subject</label>
+            <select id="bulk_courseSelect" class="form-select" onchange="maybeLoadBulkPerformanceGrid()">
+              <option value="" disabled selected>Select Course</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom: 12px;">
+          <div id="bulkPerformanceSummary" style="font-size: 13px; color: #64748b;">Select all filters to load students.</div>
+          <button type="button" class="btn btn-secondary" onclick="renderBulkPerformanceGrid()">Refresh Student List</button>
+        </div>
+
+        <div id="bulkPerformanceGridContainer" style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: auto; max-height: 58vh; background: white;">
+          <div style="padding: 30px; text-align:center; color:#64748b;">Select academic year, class, term, and subject to load students.</div>
+        </div>
+
+        <div id="bulkPerformanceResults" style="display:none; margin-top: 16px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeBulkEntryModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" id="bulkSaveBtn" onclick="processBulkPerformanceSave()" disabled>Save All Records</button>
+      </div>
+    </div>
+  </div>
+
   <!-- TERMINAL REPORT GENERATOR MODAL -->
   <div class="modal-backdrop" id="terminalReportModal">
     <div class="modal-content" style="max-width: 700px;">
@@ -426,6 +553,16 @@
 
     let performanceList = [];
     let allStudents = [];
+    let parsedPerformanceImportData = [];
+    let performanceImportPreviewRows = [];
+    let performanceImportValidationState = null;
+    let performanceImportSubmittedRows = [];
+    let performanceImportLastServerResult = null;
+    let knownClassNames = [];
+    let knownAcademicYears = [];
+    let knownCourseNames = [];
+    let activeAcademicYearValue = '';
+    let bulkPerformanceLastResult = null;
     let scorePercentages = {
       classScorePercentage: 50,
       examScorePercentage: 50,
@@ -448,7 +585,8 @@
         loadScorePercentages();
         
         loadDropdowns();
-      refreshData();
+        refreshData();
+        initializePerformanceImport();
       document.addEventListener('click', function(e) {
         const addContainer = document.getElementById('studentSearchInput') && document.getElementById('studentSearchInput').closest('.searchable-select-container');
         if (addContainer && !addContainer.contains(e.target)) {
@@ -650,10 +788,13 @@
         const addSelect = document.getElementById('classSelect');
         const editSelect = document.getElementById('edit_studentClass');
         const filter = document.getElementById('classFilter');
+        const bulkSelect = document.getElementById('bulk_classSelect');
+        knownClassNames = (classes || []).filter(Boolean);
         addSelect.innerHTML = '<option value="" disabled selected>Select Class</option>';
         editSelect.innerHTML = '<option value="" disabled>Select Class</option>';
+        if (bulkSelect) bulkSelect.innerHTML = '<option value="" disabled selected>Select Class</option>';
         classes.forEach(c => {
-          [addSelect, editSelect].forEach(sel => {
+          [addSelect, editSelect, bulkSelect].filter(Boolean).forEach(sel => {
             const o = document.createElement('option'); o.value = c; o.innerText = c; sel.appendChild(o);
           });
           const o = document.createElement('option'); o.value = c; o.innerText = c; filter.appendChild(o);
@@ -664,13 +805,16 @@
         const addSelect = document.getElementById('yearSelect');
         const editSelect = document.getElementById('edit_academicYear');
         const filter = document.getElementById('yearFilter');
+        const bulkSelect = document.getElementById('bulk_yearSelect');
         addSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
         editSelect.innerHTML = '<option value="" disabled>Select Year</option>';
+        if (bulkSelect) bulkSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
         const activeYears = years.filter(y => y.status === 'Active');
+        activeAcademicYearValue = activeYears.length ? activeYears[0].academicYear : '';
         
-        // Populate add/edit modals with active years and label them
+        // Populate add/edit/bulk modals with active years and label them
         activeYears.forEach(y => {
-          [addSelect, editSelect].forEach(sel => {
+          [addSelect, editSelect, bulkSelect].filter(Boolean).forEach(sel => {
             const o = document.createElement('option'); 
             o.value = y.academicYear; 
             o.innerText = y.academicYear + ' (Active)'; 
@@ -678,35 +822,38 @@
           });
         });
         
-        // Auto-select active year in modals if only one active year exists
-        if (activeYears.length === 1) {
-          addSelect.value = activeYears[0].academicYear;
-          editSelect.value = activeYears[0].academicYear;
+        // Default all modal year selectors to the active academic year
+        if (activeAcademicYearValue) {
+          addSelect.value = activeAcademicYearValue;
+          editSelect.value = activeAcademicYearValue;
+          if (bulkSelect) bulkSelect.value = activeAcademicYearValue;
         }
         
         // Populate filter with all years and auto-select active
-        let activeYear = null;
+        knownAcademicYears = (years || []).map(function(y) { return y.academicYear; }).filter(Boolean);
         years.forEach(y => {
           const o = document.createElement('option'); 
           o.value = y.academicYear; 
           o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : ''); 
           filter.appendChild(o);
-          if (y.status === 'Active') activeYear = y.academicYear;
         });
         
         // Auto-select active year in filter (apply after data loads)
-        if (activeYear) {
-          filter.value = activeYear;
+        if (activeAcademicYearValue) {
+          filter.value = activeAcademicYearValue;
         }
       }).withFailureHandler(function(err) { console.error('Error loading years:', err); }).getAcademicYearsData();
 
       google.script.run.withSuccessHandler(function(courses) {
         const addSelect = document.getElementById('courseSelect');
         const editSelect = document.getElementById('edit_course');
+        const bulkSelect = document.getElementById('bulk_courseSelect');
+        knownCourseNames = (courses || []).map(function(c) { return c.courseName; }).filter(Boolean);
         addSelect.innerHTML = '<option value="" disabled selected>Select Course</option>';
         editSelect.innerHTML = '<option value="" disabled>Select Course</option>';
+        if (bulkSelect) bulkSelect.innerHTML = '<option value="" disabled selected>Select Course</option>';
         courses.forEach(c => {
-          [addSelect, editSelect].forEach(sel => {
+          [addSelect, editSelect, bulkSelect].filter(Boolean).forEach(sel => {
             const o = document.createElement('option'); o.value = c.courseName; o.innerText = c.courseName; sel.appendChild(o);
           });
         });
@@ -717,11 +864,14 @@
       }).withFailureHandler(function(err) { console.error('Error loading students:', err); }).getStudentIdNamePairs();
     }
 
-    function refreshData() {
+    function refreshData(onComplete) {
       document.getElementById('loading').style.display = 'block';
       document.getElementById('performanceTable').style.display = 'none';
       google.script.run
-        .withSuccessHandler(renderTable)
+        .withSuccessHandler(function(data) {
+          renderTable(data);
+          if (typeof onComplete === 'function') onComplete(data);
+        })
         .withFailureHandler(function(err) {
           document.getElementById('loading').style.display = 'none';
           document.getElementById('performanceTable').style.display = 'table';
@@ -982,16 +1132,1031 @@
       return items;
     }
 
-    function showToast(msg, type) {
-      const t = document.getElementById('toast');
-      t.innerText = msg;
-      t.style.display = 'block';
-      if (type === 'success') t.style.background = '#10b981';
-      else if (type === 'error') t.style.background = '#ef4444';
-      else t.style.background = '#64748b';
-      clearTimeout(window._toastTimeout);
-      window._toastTimeout = setTimeout(() => { t.style.display = 'none'; }, 3500);
+    function normalizePerfText(value) {
+      return String(value || '').trim();
     }
+
+    function normalizePerfKey(value) {
+      return normalizePerfText(value).toLowerCase();
+    }
+
+    function initializePerformanceImport() {
+      const input = document.getElementById('performanceCsvFileInput');
+      if (!input || input.dataset.bound === 'true') return;
+      input.dataset.bound = 'true';
+      input.addEventListener('change', handlePerformanceImportFileSelect);
+    }
+
+    function openPerformanceImportModal() {
+      parsedPerformanceImportData = [];
+      performanceImportPreviewRows = [];
+      performanceImportValidationState = null;
+      performanceImportSubmittedRows = [];
+      performanceImportLastServerResult = null;
+      document.getElementById('performanceCsvFileInput').value = '';
+      document.getElementById('performanceImportPreview').style.display = 'none';
+      document.getElementById('performanceImportResults').style.display = 'none';
+      document.getElementById('performanceImportBtn').disabled = true;
+      document.getElementById('performanceImportModal').classList.add('active');
+    }
+
+    function closePerformanceImportModal() {
+      document.getElementById('performanceImportModal').classList.remove('active');
+    }
+
+    function downloadCsvFile(filename, lines) {
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function downloadPerformanceTemplate() {
+      downloadCsvFile('performance_import_template.csv', [
+        'Student ID,Student Name,Class,Term,Academic Year,Course,Class Score,Exam Score (100)'
+      ]);
+    }
+
+    function downloadPerformanceSampleTemplate() {
+      downloadCsvFile('performance_import_sample.csv', [
+        'Student ID,Student Name,Class,Term,Academic Year,Course,Class Score,Exam Score (100)',
+        'STU-1001,John Doe,Grade 5,Term 1,2026-2027,Mathematics,42,78',
+        'STU-1002,Jane Doe,Grade 5,Term 1,2026-2027,Mathematics,45,84',
+        'STU-1003,Peter Mensah,Grade 5,Term 1,2026-2027,Mathematics,39.5,72'
+      ]);
+    }
+
+    function parseCsvText(csvText) {
+      const rows = [];
+      let row = [];
+      let value = '';
+      let inQuotes = false;
+
+      for (let i = 0; i < csvText.length; i++) {
+        const char = csvText[i];
+        const nextChar = csvText[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && nextChar === '"') {
+            value += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+          continue;
+        }
+
+        if (char === ',' && !inQuotes) {
+          row.push(value.trim());
+          value = '';
+          continue;
+        }
+
+        if ((char === '\n' || char === '\r') && !inQuotes) {
+          if (char === '\r' && nextChar === '\n') i++;
+          row.push(value.trim());
+          const hasAnyValue = row.some(cell => String(cell || '').trim() !== '');
+          if (hasAnyValue) rows.push(row);
+          row = [];
+          value = '';
+          continue;
+        }
+
+        value += char;
+      }
+
+      if (inQuotes) {
+        throw new Error('CSV contains an unclosed quoted field.');
+      }
+
+      row.push(value.trim());
+      if (row.some(cell => String(cell || '').trim() !== '')) {
+        rows.push(row);
+      }
+
+      return rows;
+    }
+
+    function roundImportNumber(value) {
+      return Math.round((Number(value) || 0) * 10) / 10;
+    }
+
+    function normalizeImportTerm(value) {
+      const key = normalizePerfKey(value).replace(/\s+/g, '');
+      const termMap = {
+        term1: 'Term 1',
+        term2: 'Term 2',
+        term3: 'Term 3'
+      };
+      return termMap[key] || '';
+    }
+
+    function validatePerformanceImportRows(rows) {
+      const studentMap = new Map((allStudents || []).map(student => [normalizePerfKey(student.studentId), student]));
+      const classMap = new Map((knownClassNames || []).map(name => [normalizePerfKey(name), name]));
+      const yearMap = new Map((knownAcademicYears || []).map(year => [normalizePerfKey(year), year]));
+      const courseMap = new Map((knownCourseNames || []).map(name => [normalizePerfKey(name), name]));
+      const errors = [];
+      const invalidRows = [];
+      const validRows = [];
+      const seenKeys = new Set();
+
+      function addRowError(row, reason) {
+        const message = `Row ${row.rowNumber}: ${reason}`;
+        errors.push(message);
+        invalidRows.push({
+          rowNumber: row.rowNumber,
+          studentId: row.studentId || '',
+          studentName: row.studentName || '',
+          studentClass: row.studentClass || '',
+          term: row.term || '',
+          academicYear: row.academicYear || '',
+          course: row.course || '',
+          classScore: row.classScore || '',
+          examScore100: row.examScore100 || '',
+          error: reason
+        });
+      }
+
+      rows.forEach(function(row) {
+        const rowNumber = row.rowNumber;
+        const studentId = normalizePerfText(row.studentId);
+        const rawStudentName = normalizePerfText(row.studentName);
+        const rawStudentClass = normalizePerfText(row.studentClass);
+        const term = normalizeImportTerm(row.term);
+        const academicYear = yearMap.get(normalizePerfKey(row.academicYear)) || '';
+        const course = courseMap.get(normalizePerfKey(row.course)) || '';
+        const student = studentMap.get(normalizePerfKey(studentId));
+
+        if (!studentId) {
+          addRowError(row, 'Student ID is required.');
+          return;
+        }
+        if (!student) {
+          addRowError(row, 'Student ID not found in the system.');
+          return;
+        }
+
+        const studentName = normalizePerfText(student.fullName);
+        const studentClass = classMap.get(normalizePerfKey(student.studentClass)) || normalizePerfText(student.studentClass);
+
+        if (rawStudentName && normalizePerfKey(rawStudentName) !== normalizePerfKey(studentName)) {
+          addRowError(row, `Student Name does not match Student ID ${studentId}. Expected ${studentName}.`);
+          return;
+        }
+        if (rawStudentClass && normalizePerfKey(rawStudentClass) !== normalizePerfKey(studentClass)) {
+          addRowError(row, `Class does not match Student ID ${studentId}. Expected ${studentClass}.`);
+          return;
+        }
+        if (!studentName || !studentClass) {
+          addRowError(row, 'Student record is missing a valid name or class.');
+          return;
+        }
+        if (!term) {
+          addRowError(row, 'Term must be Term 1, Term 2, or Term 3.');
+          return;
+        }
+        if (!academicYear) {
+          addRowError(row, 'Academic Year was not found in the system.');
+          return;
+        }
+        if (!course) {
+          addRowError(row, 'Course / Subject was not found in the system.');
+          return;
+        }
+
+        const classScoreRaw = normalizePerfText(row.classScore);
+        const examScoreRaw = normalizePerfText(row.examScore100);
+        if (classScoreRaw === '' || isNaN(Number(classScoreRaw))) {
+          addRowError(row, 'Class Score must be a valid number.');
+          return;
+        }
+        if (examScoreRaw === '' || isNaN(Number(examScoreRaw))) {
+          addRowError(row, 'Exam Score (100) must be a valid number.');
+          return;
+        }
+
+        const classScore = roundImportNumber(classScoreRaw);
+        const examScore100 = roundImportNumber(examScoreRaw);
+        if (classScore < 0 || classScore > scorePercentages.classScorePercentage) {
+          addRowError(row, `Class Score must be between 0 and ${scorePercentages.classScorePercentage}.`);
+          return;
+        }
+        if (examScore100 < 0 || examScore100 > 100) {
+          addRowError(row, 'Exam Score (100) must be between 0 and 100.');
+          return;
+        }
+
+        const duplicateKey = [studentId, studentClass, term, academicYear, course].map(normalizePerfKey).join('|');
+        if (seenKeys.has(duplicateKey)) {
+          addRowError(row, 'Duplicate entry found in the CSV file for this student, class, term, academic year, and course.');
+          return;
+        }
+        seenKeys.add(duplicateKey);
+
+        validRows.push({
+          rowNumber: rowNumber,
+          studentId: student.studentId,
+          studentName: studentName,
+          studentClass: studentClass,
+          term: term,
+          academicYear: academicYear,
+          course: course,
+          classScore: classScore,
+          examScore100: examScore100
+        });
+      });
+
+      return {
+        totalRows: rows.length,
+        validRows: validRows,
+        invalidRows: invalidRows,
+        errors: errors
+      };
+    }
+
+    function escapeCsvValue(value) {
+      const str = String(value == null ? '' : value);
+      if (/[",\n\r]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    }
+
+    function escapePerformanceImportHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getPerformanceImportErrorRowNumber(message) {
+      const match = String(message || '').match(/Row\s+(\d+)/i);
+      return match ? Number(match[1]) : null;
+    }
+
+    function getPerformanceImportValidationErrorRowNumbers() {
+      return Array.from(new Set((((performanceImportValidationState && performanceImportValidationState.errors) || [])).map(function(message) {
+        return getPerformanceImportErrorRowNumber(message);
+      }).filter(function(rowNumber) {
+        return Number.isFinite(rowNumber) && rowNumber > 0;
+      })));
+    }
+
+    function getPerformanceImportServerErrorRowNumbers() {
+      return Array.from(new Set(((performanceImportLastServerResult && performanceImportLastServerResult.errors) || []).map(function(message) {
+        return getPerformanceImportErrorRowNumber(message);
+      }).filter(function(rowNumber) {
+        return Number.isFinite(rowNumber) && rowNumber > 0;
+      })));
+    }
+
+    function highlightPerformanceImportPreviewRows(rowNumbers) {
+      const rowSet = new Set((rowNumbers || []).map(Number));
+      document.querySelectorAll('#performanceImportPreviewBody tr').forEach(function(row) {
+        const rowNumber = Number(row.getAttribute('data-row-number'));
+        const shouldHighlight = rowSet.has(rowNumber);
+        row.style.background = shouldHighlight ? '#fef2f2' : '';
+        row.style.boxShadow = shouldHighlight ? 'inset 4px 0 0 #ef4444' : '';
+        row.querySelectorAll('td').forEach(function(cell) {
+          cell.style.background = shouldHighlight ? '#fef2f2' : '';
+        });
+      });
+    }
+
+    function scrollToPerformanceImportPreviewRow(rowNumber) {
+      displayPerformanceImportPreview();
+      const previewSection = document.getElementById('performanceImportPreview');
+      const row = document.querySelector(`#performanceImportPreviewBody tr[data-row-number="${rowNumber}"]`);
+      if (!row) {
+        showToast(`Preview row ${rowNumber} is not available.`, 'warning');
+        return;
+      }
+      if (previewSection) previewSection.style.display = 'block';
+      highlightPerformanceImportPreviewRows([rowNumber]);
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function downloadPerformanceImportErrorReport() {
+      const validation = performanceImportValidationState;
+      const invalidRows = validation && Array.isArray(validation.invalidRows) ? validation.invalidRows : [];
+      if (!invalidRows.length) {
+        showToast('There are no validation errors to export.', 'info');
+        return;
+      }
+
+      const lines = [
+        'Row Number,Student ID,Student Name,Class,Term,Academic Year,Course,Class Score,Exam Score (100),Error'
+      ];
+      invalidRows.forEach(function(row) {
+        lines.push([
+          row.rowNumber,
+          row.studentId,
+          row.studentName,
+          row.studentClass,
+          row.term,
+          row.academicYear,
+          row.course,
+          row.classScore,
+          row.examScore100,
+          row.error
+        ].map(escapeCsvValue).join(','));
+      });
+      downloadCsvFile('performance_import_validation_errors.csv', lines);
+    }
+
+    function downloadPerformanceImportServerErrorReport() {
+      const result = performanceImportLastServerResult;
+      const errors = result && Array.isArray(result.errors) ? result.errors : [];
+      if (!errors.length) {
+        showToast('There are no server import failures to export.', 'info');
+        return;
+      }
+
+      const submittedRowsByNumber = new Map((performanceImportSubmittedRows || []).map(function(row) {
+        return [Number(row.rowNumber), row];
+      }));
+      const lines = [
+        'Row Number,Student ID,Student Name,Class,Term,Academic Year,Course,Class Score,Exam Score (100),Error'
+      ];
+
+      errors.forEach(function(message) {
+        const rowNumber = getPerformanceImportErrorRowNumber(message);
+        const row = submittedRowsByNumber.get(rowNumber) || {};
+        const reason = rowNumber
+          ? String(message || '').replace(new RegExp(`^Row\\s+${rowNumber}:?\\s*`, 'i'), '')
+          : String(message || '');
+        lines.push([
+          rowNumber || '',
+          row.studentId || '',
+          row.studentName || '',
+          row.studentClass || '',
+          row.term || '',
+          row.academicYear || '',
+          row.course || '',
+          row.classScore || '',
+          row.examScore100 || '',
+          reason
+        ].map(escapeCsvValue).join(','));
+      });
+
+      downloadCsvFile('performance_import_server_failures.csv', lines);
+    }
+
+    function renderPerformanceImportClientValidation(validation) {
+      const box = document.getElementById('performanceImportResults');
+      if (!box) return;
+      box.style.display = 'block';
+      const issueCount = (validation.errors || []).length;
+      box.innerHTML = `
+        <div style="padding: 14px 16px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom: 8px;">
+            <div style="font-weight: 700; color: #9a3412;">CSV Validation</div>
+            ${issueCount ? '<button type="button" onclick="downloadPerformanceImportErrorReport()" style="padding: 6px 10px; background: #ea580c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">⬇️ Download Error Report CSV</button>' : ''}
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; font-size: 13px; color:#7c2d12; margin-bottom: 10px;">
+            <div><strong>Total Rows:</strong> ${validation.totalRows || 0}</div>
+            <div><strong>Valid Rows:</strong> ${(validation.validRows || []).length}</div>
+            <div><strong>Issues:</strong> ${issueCount}</div>
+          </div>
+          ${issueCount
+            ? `<div style="font-size:12px; color:#b91c1c; margin-bottom:8px;">Validation issues found. Click a message to jump to that preview row, or download the error report CSV, fix the rows, and re-upload.</div>
+               <div style="font-size:12px; color:#b91c1c; max-height:160px; overflow:auto; display:flex; flex-direction:column; gap:6px;">${validation.errors.map(function(message) {
+                 const rowNumber = getPerformanceImportErrorRowNumber(message);
+                 const escapedMessage = escapePerformanceImportHtml(message);
+                 return rowNumber
+                   ? `<button type="button" onclick="scrollToPerformanceImportPreviewRow(${rowNumber})" style="text-align:left; border:1px solid #fdba74; background:#fff7ed; color:#c2410c; border-radius:6px; padding:8px 10px; cursor:pointer; font-size:12px;">${escapedMessage}</button>`
+                   : `<div style="border:1px solid #fdba74; background:#fff7ed; color:#c2410c; border-radius:6px; padding:8px 10px;">${escapedMessage}</div>`;
+               }).join('')}</div>`
+            : '<div style="font-size:12px; color:#166534;">CSV validation passed. Ready to import.</div>'}
+        </div>`;
+    }
+
+    function handlePerformanceImportFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file) {
+        parsedPerformanceImportData = [];
+        performanceImportPreviewRows = [];
+        performanceImportValidationState = null;
+        performanceImportSubmittedRows = [];
+        performanceImportLastServerResult = null;
+        document.getElementById('performanceImportPreview').style.display = 'none';
+        document.getElementById('performanceImportResults').style.display = 'none';
+        document.getElementById('performanceImportBtn').disabled = true;
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const csvRows = parseCsvText(event.target.result || '');
+          if (csvRows.length < 2) {
+            showToast('CSV file must contain a header row and at least one data row.', 'error');
+            document.getElementById('performanceImportBtn').disabled = true;
+            return;
+          }
+
+          const headers = csvRows[0].map(h => h.trim());
+          const normalizeHeader = h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+          const headerMap = headers.reduce((acc, header, idx) => {
+            acc[normalizeHeader(header)] = idx;
+            return acc;
+          }, {});
+
+          const requiredHeaders = {
+            studentid: ['studentid'],
+            studentname: ['studentname'],
+            class: ['class'],
+            term: ['term'],
+            academicyear: ['academicyear'],
+            course: ['course', 'subject'],
+            classscore: ['classscore'],
+            examscore100: ['examscore100', 'examscore']
+          };
+
+          const resolvedIndexes = {};
+          for (const key in requiredHeaders) {
+            const aliases = requiredHeaders[key];
+            const match = aliases.find(alias => headerMap[alias] !== undefined);
+            if (!match) {
+              showToast('CSV headers do not match the expected performance import format.', 'error');
+              document.getElementById('performanceImportBtn').disabled = true;
+              return;
+            }
+            resolvedIndexes[key] = headerMap[match];
+          }
+
+          const parsedRows = csvRows.slice(1).map((cols, idx) => ({
+            rowNumber: idx + 2,
+            studentId: cols[resolvedIndexes.studentid] || '',
+            studentName: cols[resolvedIndexes.studentname] || '',
+            studentClass: cols[resolvedIndexes.class] || '',
+            term: cols[resolvedIndexes.term] || '',
+            academicYear: cols[resolvedIndexes.academicyear] || '',
+            course: cols[resolvedIndexes.course] || '',
+            classScore: cols[resolvedIndexes.classscore] || '',
+            examScore100: cols[resolvedIndexes.examscore100] || ''
+          })).filter(row => row.studentId || row.studentName || row.course || row.term || row.academicYear);
+
+          if (!parsedRows.length) {
+            showToast('No valid performance rows found in the CSV file.', 'error');
+            document.getElementById('performanceImportBtn').disabled = true;
+            return;
+          }
+
+          performanceImportLastServerResult = null;
+          performanceImportSubmittedRows = [];
+          performanceImportValidationState = validatePerformanceImportRows(parsedRows);
+          parsedPerformanceImportData = performanceImportValidationState.validRows.slice();
+          performanceImportPreviewRows = parsedRows.slice();
+          displayPerformanceImportPreview();
+          renderPerformanceImportClientValidation(performanceImportValidationState);
+
+          const hasIssues = (performanceImportValidationState.errors || []).length > 0;
+          document.getElementById('performanceImportBtn').disabled = hasIssues || !parsedPerformanceImportData.length;
+          if (hasIssues) {
+            showToast('CSV validation found issues. Fix the file and upload again.', 'warning');
+          }
+        } catch (err) {
+          console.error('Performance CSV parse error:', err);
+          showToast('Error parsing CSV file: ' + err.message, 'error');
+          document.getElementById('performanceImportBtn').disabled = true;
+        }
+      };
+      reader.onerror = function() {
+        showToast('Error reading CSV file.', 'error');
+        document.getElementById('performanceImportBtn').disabled = true;
+      };
+      reader.readAsText(file);
+    }
+
+    function displayPerformanceImportPreview() {
+      const previewBody = document.getElementById('performanceImportPreviewBody');
+      previewBody.innerHTML = '';
+      const sourceRows = (performanceImportSubmittedRows && performanceImportSubmittedRows.length)
+        ? performanceImportSubmittedRows
+        : performanceImportPreviewRows;
+      const validationRowNumbers = getPerformanceImportValidationErrorRowNumbers();
+      const failedRowNumbers = getPerformanceImportServerErrorRowNumbers();
+      const highlightedRowNumbers = Array.from(new Set(validationRowNumbers.concat(failedRowNumbers)));
+      const highlightedRowSet = new Set(highlightedRowNumbers);
+      const failedRowSet = new Set(failedRowNumbers);
+      const validationRowSet = new Set(validationRowNumbers);
+      const rowsToDisplay = sourceRows.filter(function(row, index) {
+        return index < 5 || highlightedRowSet.has(Number(row.rowNumber));
+      });
+
+      rowsToDisplay.forEach(function(row) {
+        const rowNumber = Number(row.rowNumber);
+        const isHighlighted = highlightedRowSet.has(rowNumber);
+        const isFailed = failedRowSet.has(rowNumber);
+        const isValidationIssue = validationRowSet.has(rowNumber);
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-row-number', row.rowNumber || '');
+        tr.innerHTML = `
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${row.rowNumber || ''}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${escapePerformanceImportHtml(row.studentId)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${escapePerformanceImportHtml(row.studentName)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${escapePerformanceImportHtml(row.studentClass)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${escapePerformanceImportHtml(row.term)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${escapePerformanceImportHtml(row.academicYear)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${escapePerformanceImportHtml(row.course)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${escapePerformanceImportHtml(row.classScore)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #f1f5f9;">${escapePerformanceImportHtml(row.examScore100)}</td>`;
+        previewBody.appendChild(tr);
+        if (isHighlighted) {
+          tr.style.background = isFailed ? '#fef2f2' : '#fff7ed';
+          tr.style.boxShadow = `inset 4px 0 0 ${isFailed ? '#ef4444' : '#f97316'}`;
+          tr.querySelectorAll('td').forEach(function(cell) {
+            cell.style.background = isFailed ? '#fef2f2' : '#fff7ed';
+          });
+        }
+        if (isValidationIssue && !isFailed) {
+          tr.setAttribute('title', 'Client-side validation issue');
+        } else if (isFailed) {
+          tr.setAttribute('title', 'Server-side import failure');
+        }
+      });
+
+      const validation = performanceImportValidationState || { validRows: parsedPerformanceImportData, errors: [] };
+      const issueCount = (validation.errors || []).length;
+      const importSummary = document.getElementById('performanceImportSummary');
+      if (failedRowNumbers.length) {
+        importSummary.innerText = `${sourceRows.length} row(s) submitted • ${failedRowNumbers.length} failed row(s) highlighted in preview.`;
+      } else if (validationRowNumbers.length) {
+        importSummary.innerText = `${sourceRows.length} row(s) parsed • ${validationRowNumbers.length} invalid row(s) highlighted in preview.`;
+      } else {
+        importSummary.innerText = issueCount
+          ? `${(validation.validRows || []).length} valid row(s), ${issueCount} issue(s) found. Fix the CSV and upload again.`
+          : `${(validation.validRows || []).length} row(s) ready for import.`;
+      }
+      document.getElementById('performanceImportPreview').style.display = 'block';
+      highlightPerformanceImportPreviewRows(highlightedRowNumbers);
+    }
+
+    function renderPerformanceImportResults(res) {
+      const box = document.getElementById('performanceImportResults');
+      const errors = (res && res.errors) || [];
+      performanceImportLastServerResult = res || null;
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div style="padding: 14px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom: 8px;">
+            <div style="font-weight: 700; color: #0f172a;">Import Summary</div>
+            ${errors.length ? '<button type="button" onclick="downloadPerformanceImportServerErrorReport()" style="padding: 6px 10px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">⬇️ Download Server Failure CSV</button>' : ''}
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; font-size: 13px; color:#334155; margin-bottom: 10px;">
+            <div><strong>Imported:</strong> ${res.imported || 0}</div>
+            <div><strong>Failed:</strong> ${res.failed || 0}</div>
+            <div><strong>Duplicates:</strong> ${res.duplicates || 0}</div>
+            <div><strong>Total Rows:</strong> ${performanceImportSubmittedRows.length || parsedPerformanceImportData.length}</div>
+          </div>
+          ${errors.length
+            ? `<div style="font-size:12px; color:#b91c1c; margin-bottom:8px;">Some rows failed during server import. Click a message to jump to that preview row, or download the server failure CSV to fix and re-import.</div>
+               <div style="font-size:12px; color:#b91c1c; max-height:140px; overflow:auto; display:flex; flex-direction:column; gap:6px;">${errors.map(function(message) {
+                 const rowNumber = getPerformanceImportErrorRowNumber(message);
+                 const escapedMessage = escapePerformanceImportHtml(message);
+                 return rowNumber
+                   ? `<button type="button" onclick="scrollToPerformanceImportPreviewRow(${rowNumber})" style="text-align:left; border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:6px; padding:8px 10px; cursor:pointer; font-size:12px;">${escapedMessage}</button>`
+                   : `<div style="border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:6px; padding:8px 10px;">${escapedMessage}</div>`;
+               }).join('')}</div>`
+            : '<div style="font-size:12px; color:#166534;">No row-level errors.</div>'}
+        </div>`;
+    }
+
+    function processPerformanceImport() {
+      if (!parsedPerformanceImportData.length) {
+        showToast('Please choose a CSV file first.', 'warning');
+        return;
+      }
+      const btn = document.getElementById('performanceImportBtn');
+      btn.disabled = true;
+      btn.innerText = 'Importing...';
+
+      function submitImport(rows) {
+        performanceImportSubmittedRows = rows.map(function(row) { return Object.assign({}, row); });
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.requiresAdminOverride && !rows.every(r => r.__adminAcademicYearOverride)) {
+              const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+              if (!proceed) {
+                btn.disabled = false;
+                btn.innerText = 'Import Performance';
+                showToast('Performance import cancelled.', 'warning');
+                return;
+              }
+              rows.forEach(r => { r.__adminAcademicYearOverride = true; });
+              submitImport(rows);
+              return;
+            }
+            btn.disabled = false;
+            btn.innerText = 'Import Performance';
+            if (res && res.success) {
+              renderPerformanceImportResults(res);
+              displayPerformanceImportPreview();
+              refreshData();
+              showToast(`Performance import completed. Imported ${res.imported || 0} row(s).`, 'success');
+            } else {
+              showToast((res && res.message) ? res.message : 'Performance import failed.', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerText = 'Import Performance';
+            showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error');
+          })
+          .importPerformance(rows);
+      }
+
+      submitImport(parsedPerformanceImportData.map(row => Object.assign({}, row)));
+    }
+
+    function escapeBulkResultHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getBulkErrorRowNumber(message) {
+      const match = String(message || '').match(/Row\s+(\d+)/i);
+      return match ? Number(match[1]) : null;
+    }
+
+    function extractBulkErrorRowNumbers(errors) {
+      return Array.from(new Set((errors || []).map(function(message) {
+        return getBulkErrorRowNumber(message);
+      }).filter(function(rowNumber) {
+        return Number.isFinite(rowNumber) && rowNumber > 0;
+      })));
+    }
+
+    function scrollToBulkErrorRow(rowNumber) {
+      const row = document.querySelector(`#bulkPerformanceGridContainer tbody tr[data-row-number="${rowNumber}"]`);
+      if (!row) return;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const firstEditableInput = row.querySelector('.bulk-class-score, .bulk-exam-score100');
+      if (firstEditableInput) {
+        try {
+          firstEditableInput.focus({ preventScroll: true });
+        } catch (err) {
+          firstEditableInput.focus();
+        }
+      }
+    }
+
+    function clearBulkRowHighlight(row) {
+      if (!row) return;
+      delete row.dataset.serverError;
+      row.style.background = '';
+      row.style.boxShadow = '';
+      row.querySelectorAll('td').forEach(function(cell) {
+        cell.style.background = '';
+      });
+      row.querySelectorAll('.bulk-class-score, .bulk-exam-score100').forEach(function(input) {
+        input.style.borderColor = '';
+      });
+    }
+
+    function clearBulkRowHighlights() {
+      document.querySelectorAll('#bulkPerformanceGridContainer tbody tr').forEach(function(row) {
+        clearBulkRowHighlight(row);
+      });
+    }
+
+    function applyBulkErrorHighlights(res) {
+      clearBulkRowHighlights();
+      const rowNumbers = extractBulkErrorRowNumbers(res && res.errors);
+      if (!rowNumbers.length) return;
+
+      rowNumbers.forEach(function(rowNumber) {
+        const row = document.querySelector(`#bulkPerformanceGridContainer tbody tr[data-row-number="${rowNumber}"]`);
+        if (!row) return;
+        row.dataset.serverError = 'true';
+        row.style.background = '#fef2f2';
+        row.style.boxShadow = 'inset 4px 0 0 #ef4444';
+        row.querySelectorAll('td').forEach(function(cell) {
+          cell.style.background = '#fef2f2';
+        });
+        row.querySelectorAll('.bulk-class-score, .bulk-exam-score100').forEach(function(input) {
+          input.style.borderColor = '#ef4444';
+        });
+      });
+    }
+
+    function clearBulkPerformanceResults() {
+      bulkPerformanceLastResult = null;
+      clearBulkRowHighlights();
+      const box = document.getElementById('bulkPerformanceResults');
+      if (!box) return;
+      box.style.display = 'none';
+      box.innerHTML = '';
+    }
+
+    function removeBulkResultMessagesForRow(rowNumber) {
+      if (!bulkPerformanceLastResult || !Array.isArray(bulkPerformanceLastResult.errors)) return;
+      const rowPattern = new RegExp(`^Row\\s+${rowNumber}(\\s|:|$)`, 'i');
+      const removedMessages = bulkPerformanceLastResult.errors.filter(function(message) {
+        return rowPattern.test(String(message || ''));
+      });
+      if (!removedMessages.length) return;
+
+      bulkPerformanceLastResult.errors = bulkPerformanceLastResult.errors.filter(function(message) {
+        return !rowPattern.test(String(message || ''));
+      });
+
+      removedMessages.forEach(function(message) {
+        if (/duplicate/i.test(String(message || ''))) {
+          bulkPerformanceLastResult.duplicates = Math.max(0, (Number(bulkPerformanceLastResult.duplicates) || 0) - 1);
+        } else {
+          bulkPerformanceLastResult.failed = Math.max(0, (Number(bulkPerformanceLastResult.failed) || 0) - 1);
+        }
+      });
+
+      renderBulkPerformanceResults(bulkPerformanceLastResult);
+    }
+
+    function renderBulkPerformanceResults(res) {
+      const box = document.getElementById('bulkPerformanceResults');
+      const errors = (res && res.errors) || [];
+      const remainingIssues = Math.max(0, (Number(res && res.failed) || 0) + (Number(res && res.duplicates) || 0));
+      const hadPreviousIssues = !!(res && (res._hadIssues || remainingIssues > 0 || errors.length > 0));
+      if (res) {
+        res._hadIssues = hadPreviousIssues;
+      }
+      bulkPerformanceLastResult = res || null;
+      if (!box) return;
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div style="padding: 14px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom: 8px;">
+            <div style="font-weight: 700; color: #0f172a;">Bulk Save Summary</div>
+            ${hadPreviousIssues ? `<div style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; background:${remainingIssues > 0 ? '#fef3c7' : '#dcfce7'}; color:${remainingIssues > 0 ? '#92400e' : '#166534'}; border:1px solid ${remainingIssues > 0 ? '#fcd34d' : '#86efac'};">${remainingIssues} issue${remainingIssues === 1 ? '' : 's'} remaining</div>` : ''}
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; font-size: 13px; color:#334155; margin-bottom: 10px;">
+            <div><strong>Created:</strong> ${res.created || 0}</div>
+            <div><strong>Updated:</strong> ${res.updated || 0}</div>
+            <div><strong>Skipped:</strong> ${res.skipped || 0}</div>
+            <div><strong>Failed:</strong> ${res.failed || 0}</div>
+            <div><strong>Duplicates:</strong> ${res.duplicates || 0}</div>
+          </div>
+          ${errors.length
+            ? `<div style="font-size:12px; color:#b91c1c; margin-bottom:8px;">Rows with issues are highlighted below. Click a message to jump to that row.</div>
+               <div style="font-size:12px; color:#b91c1c; max-height:160px; overflow:auto; display:flex; flex-direction:column; gap:6px;">${errors.map(function(message) {
+                 const rowNumber = getBulkErrorRowNumber(message);
+                 const escapedMessage = escapeBulkResultHtml(message);
+                 return rowNumber
+                   ? `<button type="button" onclick="scrollToBulkErrorRow(${rowNumber})" style="text-align:left; border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:6px; padding:8px 10px; cursor:pointer; font-size:12px;">${escapedMessage}</button>`
+                   : `<div style="border:1px solid #fecaca; background:#fff1f2; color:#b91c1c; border-radius:6px; padding:8px 10px;">${escapedMessage}</div>`;
+               }).join('')}</div>`
+            : hadPreviousIssues
+              ? '<div style="font-size:12px; color:#b45309;">All row-level messages have been cleared after edits. Save again to validate the updated rows.</div>'
+              : '<div style="font-size:12px; color:#166534;">No row-level errors.</div>'}
+        </div>`;
+      applyBulkErrorHighlights(res);
+    }
+
+    function openBulkEntryModal() {
+      clearBulkPerformanceResults();
+      const bulkYearSelect = document.getElementById('bulk_yearSelect');
+      if (bulkYearSelect && activeAcademicYearValue) {
+        bulkYearSelect.value = activeAcademicYearValue;
+      }
+      document.getElementById('bulkPerformanceSummary').innerText = 'Select class, term, and subject to load students for the active academic year.';
+      document.getElementById('bulkPerformanceGridContainer').innerHTML = '<div style="padding: 30px; text-align:center; color:#64748b;">Select class, term, and subject to load students for the active academic year.</div>';
+      document.getElementById('bulkSaveBtn').disabled = true;
+      document.getElementById('bulkPerformanceModal').classList.add('active');
+    }
+
+    function closeBulkEntryModal() {
+      clearBulkPerformanceResults();
+      document.getElementById('bulkPerformanceModal').classList.remove('active');
+    }
+
+    function maybeLoadBulkPerformanceGrid() {
+      const year = document.getElementById('bulk_yearSelect').value;
+      const cls = document.getElementById('bulk_classSelect').value;
+      const term = document.getElementById('bulk_termSelect').value;
+      const course = document.getElementById('bulk_courseSelect').value;
+      if (year && cls && term && course) {
+        renderBulkPerformanceGrid();
+      }
+    }
+
+    function findExistingBulkPerformanceRecord(records, student) {
+      return (records || []).find(record => {
+        const sameStudentId = normalizePerfKey(record.studentId) && normalizePerfKey(student.studentId)
+          ? normalizePerfKey(record.studentId) === normalizePerfKey(student.studentId)
+          : false;
+        const sameStudentName = normalizePerfKey(record.studentName) === normalizePerfKey(student.fullName);
+        return sameStudentId || sameStudentName;
+      }) || null;
+    }
+
+    function renderBulkPerformanceGrid() {
+      const year = document.getElementById('bulk_yearSelect').value;
+      const cls = document.getElementById('bulk_classSelect').value;
+      const term = document.getElementById('bulk_termSelect').value;
+      const course = document.getElementById('bulk_courseSelect').value;
+      const container = document.getElementById('bulkPerformanceGridContainer');
+      const summary = document.getElementById('bulkPerformanceSummary');
+      const saveBtn = document.getElementById('bulkSaveBtn');
+
+      if (!year || !cls || !term || !course) {
+        clearBulkPerformanceResults();
+        summary.innerText = 'Select all filters to load students.';
+        container.innerHTML = '<div style="padding: 30px; text-align:center; color:#64748b;">Select academic year, class, term, and subject to load students.</div>';
+        saveBtn.disabled = true;
+        return;
+      }
+
+      const studentsInClass = allStudents
+        .filter(student => normalizePerfKey(student.studentClass) === normalizePerfKey(cls))
+        .sort((a, b) => String(a.fullName || '').localeCompare(String(b.fullName || '')));
+
+      if (!studentsInClass.length) {
+        clearBulkPerformanceResults();
+        summary.innerText = 'No students found in the selected class.';
+        container.innerHTML = '<div style="padding: 30px; text-align:center; color:#64748b;">No students found in this class.</div>';
+        saveBtn.disabled = true;
+        return;
+      }
+
+      const existingRecords = performanceList.filter(record =>
+        normalizePerfKey(record.studentClass) === normalizePerfKey(cls) &&
+        normalizePerfKey(record.term) === normalizePerfKey(term) &&
+        normalizePerfKey(record.academicYear) === normalizePerfKey(year) &&
+        normalizePerfKey(record.course) === normalizePerfKey(course)
+      );
+
+      let existingCount = 0;
+      let html = `
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">
+            <tr>
+              <th style="padding: 10px; text-align:left; border-bottom:1px solid #e2e8f0;">Student ID</th>
+              <th style="padding: 10px; text-align:left; border-bottom:1px solid #e2e8f0;">Student Name</th>
+              <th style="padding: 10px; text-align:left; border-bottom:1px solid #e2e8f0;">Status</th>
+              <th style="padding: 10px; text-align:left; border-bottom:1px solid #e2e8f0;">Class Score (${scorePercentages.classScorePercentage}%)</th>
+              <th style="padding: 10px; text-align:left; border-bottom:1px solid #e2e8f0;">Exam Score (100)</th>
+              <th style="padding: 10px; text-align:left; border-bottom:1px solid #e2e8f0;">Exam Score (${scorePercentages.examScorePercentage}%)</th>
+              <th style="padding: 10px; text-align:left; border-bottom:1px solid #e2e8f0;">Total</th>
+            </tr>
+          </thead>
+          <tbody>`;
+
+      studentsInClass.forEach((student, index) => {
+        const existing = findExistingBulkPerformanceRecord(existingRecords, student);
+        if (existing) existingCount++;
+        const examWeighted = existing ? (existing.examScore50 !== undefined ? existing.examScore50 : existing.examScore60 || '') : '';
+        html += `
+          <tr data-index="${index}" data-row-number="${index + 1}" data-performance-id="${existing ? (existing.performanceId || '') : ''}" data-student-id="${student.studentId}" data-student-name="${student.fullName}" style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding: 10px;">${student.studentId}</td>
+            <td style="padding: 10px;">${student.fullName}</td>
+            <td style="padding: 10px;"><span style="display:inline-block; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; background:${existing ? '#dbeafe' : '#ecfccb'}; color:${existing ? '#1d4ed8' : '#3f6212'};">${existing ? 'Existing' : 'New'}</span></td>
+            <td style="padding: 10px;"><input type="number" step="0.1" min="0" max="${scorePercentages.classScorePercentage}" class="form-input bulk-class-score" value="${existing ? (existing.classScore ?? '') : ''}" style="width:110px;" oninput="calculateBulkRow(this.closest('tr'))"></td>
+            <td style="padding: 10px;"><input type="number" step="0.1" min="0" max="100" class="form-input bulk-exam-score100" value="${existing ? (existing.examScore100 ?? '') : ''}" style="width:110px;" oninput="calculateBulkRow(this.closest('tr'))"></td>
+            <td style="padding: 10px;"><input type="number" class="form-input bulk-exam-weighted" value="${examWeighted}" style="width:110px; background:#f8fafc;" readonly></td>
+            <td style="padding: 10px;"><input type="number" class="form-input bulk-total" value="${existing ? (existing.total ?? '') : ''}" style="width:110px; background:#f8fafc; font-weight:700;" readonly></td>
+          </tr>`;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+      summary.innerText = `${studentsInClass.length} student(s) loaded • ${existingCount} existing record(s) prefilled • ${studentsInClass.length - existingCount} new row(s)`;
+      saveBtn.disabled = false;
+
+      container.querySelectorAll('tbody tr').forEach(row => calculateBulkRow(row));
+      if (bulkPerformanceLastResult) {
+        applyBulkErrorHighlights(bulkPerformanceLastResult);
+      }
+    }
+
+    function calculateBulkRow(row) {
+      if (!row) return;
+      if (row.dataset.serverError === 'true') {
+        const rowNumber = Number(row.getAttribute('data-row-number'));
+        clearBulkRowHighlight(row);
+        if (rowNumber) {
+          removeBulkResultMessagesForRow(rowNumber);
+        }
+      }
+      const classInput = row.querySelector('.bulk-class-score');
+      const examInput = row.querySelector('.bulk-exam-score100');
+      const weightedInput = row.querySelector('.bulk-exam-weighted');
+      const totalInput = row.querySelector('.bulk-total');
+      const classScore = parseFloat(classInput.value);
+      const examScore100 = parseFloat(examInput.value);
+      const validClass = !isNaN(classScore) && classScore >= 0 && classScore <= scorePercentages.classScorePercentage;
+      const validExam = !isNaN(examScore100) && examScore100 >= 0 && examScore100 <= 100;
+
+      classInput.style.borderColor = (classInput.value && !validClass) ? '#ef4444' : '';
+      examInput.style.borderColor = (examInput.value && !validExam) ? '#ef4444' : '';
+
+      if (validClass && validExam) {
+        const weighted = Math.round((examScore100 * scorePercentages.examScoreDecimal) * 10) / 10;
+        const total = Math.round((classScore + weighted) * 10) / 10;
+        weightedInput.value = weighted;
+        totalInput.value = total;
+      } else {
+        weightedInput.value = '';
+        totalInput.value = '';
+      }
+    }
+
+    function processBulkPerformanceSave() {
+      const year = document.getElementById('bulk_yearSelect').value;
+      const cls = document.getElementById('bulk_classSelect').value;
+      const term = document.getElementById('bulk_termSelect').value;
+      const course = document.getElementById('bulk_courseSelect').value;
+      const rows = Array.from(document.querySelectorAll('#bulkPerformanceGridContainer tbody tr'));
+      const btn = document.getElementById('bulkSaveBtn');
+
+      if (!year || !cls || !term || !course) {
+        showToast('Please select Academic Year, Class, Term, and Course first.', 'warning');
+        return;
+      }
+
+      const payload = {
+        academicYear: year,
+        studentClass: cls,
+        term: term,
+        course: course,
+        records: rows.map(row => ({
+          performanceId: row.getAttribute('data-performance-id') || '',
+          studentId: row.getAttribute('data-student-id') || '',
+          studentName: row.getAttribute('data-student-name') || '',
+          classScore: row.querySelector('.bulk-class-score').value,
+          examScore100: row.querySelector('.bulk-exam-score100').value
+        }))
+      };
+
+      const hasAnyInput = payload.records.some(row => row.classScore !== '' || row.examScore100 !== '');
+      if (!hasAnyInput) {
+        showToast('Enter at least one score before saving.', 'warning');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = 'Saving...';
+
+      function submitBulk(data) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (res && res.requiresAdminOverride && !data.__adminAcademicYearOverride) {
+              const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+              if (!proceed) {
+                btn.disabled = false;
+                btn.innerText = 'Save All Records';
+                showToast('Bulk performance save cancelled.', 'warning');
+                return;
+              }
+              data.__adminAcademicYearOverride = true;
+              submitBulk(data);
+              return;
+            }
+            btn.disabled = false;
+            btn.innerText = 'Save All Records';
+            if (res && res.success) {
+              const hasIssues = (res.failed || 0) > 0 || (res.duplicates || 0) > 0 || ((res.errors || []).length > 0);
+              renderBulkPerformanceResults(res);
+              refreshData(function() {
+                if (hasIssues) {
+                  renderBulkPerformanceGrid();
+                } else {
+                  closeBulkEntryModal();
+                }
+              });
+              showToast(
+                hasIssues
+                  ? `Bulk save completed with issues. Created: ${res.created || 0}, Updated: ${res.updated || 0}, Failed: ${res.failed || 0}, Duplicates: ${res.duplicates || 0}.`
+                  : `Bulk save completed. Created: ${res.created || 0}, Updated: ${res.updated || 0}, Skipped: ${res.skipped || 0}.`,
+                hasIssues ? 'warning' : 'success'
+              );
+            } else {
+              showToast((res && res.message) ? res.message : 'Bulk save failed.', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerText = 'Save All Records';
+            showToast('Error: ' + (err && err.message ? err.message : 'Unknown'), 'error');
+          })
+          .saveBulkPerformanceEntries(data);
+      }
+
+      submitBulk(payload);
+    }
+
 
     function openTerminalReportModal() {
       const reportClassSelect = document.getElementById('reportClass');
@@ -1201,7 +2366,5 @@
       URL.revokeObjectURL(url);
     }
   </script>
-  <!-- GLOBAL TOAST NOTIFICATION CONTAINER -->
-  <div id="toast" style="position:fixed; right:24px; bottom:24px; z-index:99999; display:none; padding:14px 22px; border-radius:10px; color:white; font-weight:600; font-size:14px; box-shadow:0 10px 25px -5px rgba(0, 0, 0, 0.3); transition:all 0.3s ease;"></div>
 </body>
 </html>
