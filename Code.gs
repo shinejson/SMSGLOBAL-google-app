@@ -523,7 +523,7 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
     totalStudents = 0;
   }
 
-  // Count active courses
+  // Count active courses - independent of academic year and date filters
   let activeCourses = 0;
   const coursesSheet = ss.getSheetByName("Courses");
   if (coursesSheet) {
@@ -534,11 +534,9 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
         (row) => {
           const id = String(row[0]).trim();
           const status = String(row[5] || row[4] || '').trim().toLowerCase();
-          const cYear = row[2] || '';
-          const cTerm = row[3] || '';
           if (id === '') return false;
           if (status !== 'active') return false;
-          return matchYT(cYear, cTerm);
+          return true; // Count all active courses regardless of year/term
         }
       ).length;
     }
