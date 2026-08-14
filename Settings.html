@@ -2602,15 +2602,32 @@
     }
     
     // Enhance the activateTab function to initialize audit logs when the tab is activated
-    const originalActivateTab = activateTab;
-    activateTab = function(tabName, persist, updateHash) {
-      originalActivateTab(tabName, persist, updateHash);
-      
-      // If audit logs tab is activated, initialize it
-      if (tabName === 'auditlogs') {
-        initializeAuditLogsTab();
+    (function() {
+      const originalActivateTab = window.activateTab;
+      if (originalActivateTab) {
+        window.activateTab = function(tabName, persist, updateHash) {
+          originalActivateTab(tabName, persist, updateHash);
+          
+          // If audit logs tab is activated, initialize it
+          if (tabName === 'auditlogs') {
+            // Use setTimeout to ensure the tab is fully rendered
+            setTimeout(function() {
+              initializeAuditLogsTab();
+            }, 100);
+          }
+        };
       }
-    };
+    })();
+    
+    // Also initialize if the page loads directly on the audit logs tab
+    document.addEventListener('DOMContentLoaded', function() {
+      const hash = window.location.hash.substring(1);
+      if (hash === 'auditlogs') {
+        setTimeout(function() {
+          initializeAuditLogsTab();
+        }, 500);
+      }
+    });
   </script>
 </body>
 </html>
