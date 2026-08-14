@@ -1636,7 +1636,19 @@
 
         const paid = stats.totalPaid || 0;
         const unpaid = stats.totalUnpaid || 0;
+        const totalInvoiced = stats.totalInvoiced || 0;
         const chartData = [paid, unpaid];
+
+        // If no data, show a message
+        if (totalInvoiced === 0) {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.font = '14px Inter, sans-serif';
+          ctx.fillStyle = '#94a3b8';
+          ctx.textAlign = 'center';
+          ctx.fillText('No billing data available', canvas.width / 2, canvas.height / 2);
+          return;
+        }
 
         if (!canvas._chartInstance) {
           canvas._chartInstance = new Chart(canvas, {
@@ -1647,7 +1659,8 @@
                 {
                   data: chartData,
                   backgroundColor: ['#10b981', '#ef4444'],
-                  borderColor: 'transparent',
+                  borderColor: '#ffffff',
+                  borderWidth: 2,
                 },
               ],
             },
@@ -1660,21 +1673,73 @@
                   labels: {
                     boxWidth: 12,
                     padding: 16,
-                    font: { size: 12 },
+                    font: { size: 12, family: 'Inter' },
+                    color: document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#475569',
+                    usePointStyle: true,
+                    pointStyle: 'circle',
                   },
                 },
                 tooltip: {
+                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                  titleColor: '#f1f5f9',
+                  bodyColor: '#cbd5e1',
+                  padding: 12,
+                  cornerRadius: 8,
+                  displayColors: true,
                   callbacks: {
                     label: function(context) {
-                      return context.label + ': GHS ' + Number(context.parsed).toFixed(2);
+                      const value = Number(context.parsed);
+                      const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                      const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                      return context.label + ': GHS ' + value.toFixed(2) + ' (' + percentage + '%)';
                     },
+                    afterLabel: function(context) {
+                      const invoiceCount = stats.invoiceCount || 0;
+                      if (context.dataIndex === 0) {
+                        return 'Total invoiced: GHS ' + totalInvoiced.toFixed(2);
+                      }
+                      return invoiceCount + ' invoice(s) total';
+                    }
                   },
                 },
               },
             },
+            plugins: [{
+              id: 'centerText',
+              beforeDraw: function(chart) {
+                const width = chart.width;
+                const height = chart.height;
+                const ctx = chart.ctx;
+                ctx.restore();
+                
+                const fontSize = (height / 160).toFixed(2);
+                ctx.font = 'bold ' + fontSize + 'em Inter, sans-serif';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = document.body.classList.contains('dark-mode') ? '#f1f5f9' : '#0f172a';
+                
+                const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                const paidPercent = total > 0 ? ((paid / total) * 100).toFixed(0) : 0;
+                const text = paidPercent + '%';
+                const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                const textY = height / 2 - 10;
+                
+                ctx.fillText(text, textX, textY);
+                
+                ctx.font = (fontSize * 0.5) + 'em Inter, sans-serif';
+                ctx.fillStyle = document.body.classList.contains('dark-mode') ? '#94a3b8' : '#64748b';
+                const subtext = 'Paid';
+                const subtextX = Math.round((width - ctx.measureText(subtext).width) / 2);
+                const subtextY = textY + 20;
+                
+                ctx.fillText(subtext, subtextX, subtextY);
+                ctx.save();
+              }
+            }]
           });
         } else {
           canvas._chartInstance.data.datasets[0].data = chartData;
+          canvas._chartInstance.options.plugins.legend.labels.color = 
+            document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#475569';
           canvas._chartInstance.update();
         }
       }
