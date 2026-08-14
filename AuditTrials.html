@@ -929,7 +929,365 @@
 
  
   <script>
-  <?!= ('AuditTrials') ?>
+    // Global variables
+    let allLogs = [];
+    let filteredLogs = [];
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadAuditLogs();
+    });
+
+    // Load audit logs
+    function loadAuditLogs() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('logsTable').style.display = 'none';
+
+      google.script.run
+        .withSuccessHandler(function(logs) {
+          allLogs = logs || [];
+          filteredLogs = allLogs;
+          renderLogs();
+          populateFilters();
+          updateStats();
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('logsTable').style.display = 'table';
+        })
+        .withFailureHandler(function(error) {
+          showToast('Error', 'Failed to load audit logs: ' + error.message, 'error');
+          document.getElementById('loading').style.display = 'none';
+        })
+        .getAuditLogs();
+    }
+
+    // Render logs in table
+    function renderLogs() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      if (filteredLogs.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7">
+              <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <h4>No Audit Logs Found</h4>
+                <p>No logs match your current filters.</p>
+              </div>
+            </td>
+          </tr>
+        `;
+        document.getElementById('logCount').textContent = '0';
+        return;
+      }
+
+      filteredLogs.forEach(function(log) {
+        const tr = document.createElement('tr');
+        
+        const actionClass = getActionClass(log.action);
+        const timelineClass = getTimelineClass(log.action);
+        
+        tr.innerHTML = `
+          <td>${formatTimestamp(log.timestamp)}</td>
+          <td>
+            <div class="user-badge">
+              <div class="user-avatar">${getInitials(log.user)}</div>
+              <span>${log.user}</span>
+            </div>
+          </td>
+          <td>
+            <span class="timeline-indicator ${timelineClass}"></span>
+            <span class="badge ${actionClass}">${log.action}</span>
+          </td>
+          <td>${log.module}</td>
+          <td>${truncateText(log.details || '-', 50)}</td>
+          <td>${log.ipAddress || '-'}</td>
+          <td>
+            <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick='viewDetails(${JSON.stringify(log).replace(/'/g, "\\'")})'>
+              View
+            </button>
+          </td>
+        `;
+        
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('logCount').textContent = filteredLogs.length;
+    }
+
+    // Filter logs
+    function filterLogs() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      const dateFrom = document.getElementById('filterDateFrom').value;
+      const dateTo = document.getElementById('filterDateTo').value;
+      const action = document.getElementById('filterAction').value;
+      const user = document.getElementById('filterUser').value;
+      const module = document.getElementById('filterModule').value;
+
+      filteredLogs = allLogs.filter(function(log) {
+        // Search filter
+        if (searchTerm && !JSON.stringify(log).toLowerCase().includes(searchTerm)) {
+          return false;
+        }
+
+        // Date range filter
+        if (dateFrom || dateTo) {
+          const logDate = new Date(log.timestamp);
+          if (dateFrom && logDate < new Date(dateFrom)) return false;
+          if (dateTo && logDate > new Date(dateTo + 'T23:59:59')) return false;
+        }
+
+        // Action filter
+        if (action && log.action !== action) return false;
+
+        // User filter
+        if (user && log.user !== user) return false;
+
+        // Module filter
+        if (module && log.module !== module) return false;
+
+        return true;
+      });
+
+      renderLogs();
+    }
+
+    // Populate filter dropdowns
+    function populateFilters() {
+      // Users
+      const users = [...new Set(allLogs.map(log => log.user))].sort();
+      const userSelect = document.getElementById('filterUser');
+      userSelect.innerHTML = '<option value="">All Users</option>';
+      users.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user;
+        option.textContent = user;
+        userSelect.appendChild(option);
+      });
+
+      // Modules
+      const modules = [...new Set(allLogs.map(log => log.module))].sort();
+      const moduleSelect = document.getElementById('filterModule');
+      moduleSelect.innerHTML = '<option value="">All Modules</option>';
+      modules.forEach(module => {
+        const option = document.createElement('option');
+        option.value = module;
+        option.textContent = module;
+        moduleSelect.appendChild(option);
+      });
+    }
+
+    // Update statistics
+    function updateStats() {
+      document.getElementById('statTotal').textContent = allLogs.length;
+
+      // Today's logs
+      const today = new Date().toDateString();
+      const todayLogs = allLogs.filter(log => new Date(log.timestamp).toDateString() === today);
+      document.getElementById('statToday').textContent = todayLogs.length;
+
+      // Unique users
+      const uniqueUsers = new Set(allLogs.map(log => log.user)).size;
+      document.getElementById('statUsers').textContent = uniqueUsers;
+
+      // Deletions
+      const deletions = allLogs.filter(log => log.action === 'Delete').length;
+      document.getElementById('statDeletions').textContent = deletions;
+    }
+
+    // Helper functions
+    function getActionClass(action) {
+      const classes = {
+        'Create': 'badge-create',
+        'Update': 'badge-update',
+        'Delete': 'badge-delete',
+        'View': 'badge-view',
+        'Login': 'badge-login',
+        'Logout': 'badge-logout',
+        'Export': 'badge-export',
+        'Import': 'badge-import'
+      };
+      return classes[action] || 'badge-other';
+    }
+
+    function getTimelineClass(action) {
+      const classes = {
+        'Create': 'timeline-create',
+        'Update': 'timeline-update',
+        'Delete': 'timeline-delete',
+        'View': 'timeline-view'
+      };
+      return classes[action] || 'timeline-other';
+    }
+
+    function getInitials(name) {
+      if (!name) return '?';
+      const parts = name.split(' ');
+      return parts.map(p => p[0]).join('').substring(0, 2).toUpperCase();
+    }
+
+    function formatTimestamp(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function truncateText(text, maxLength) {
+      if (!text || text.length <= maxLength) return text;
+      return text.substring(0, maxLength) + '...';
+    }
+
+    // View details modal
+    function viewDetails(log) {
+      const content = document.getElementById('detailContent');
+      content.innerHTML = `
+        <div class="detail-row">
+          <div class="detail-label">Timestamp</div>
+          <div class="detail-value">${formatTimestamp(log.timestamp)}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">User</div>
+          <div class="detail-value">${log.user}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Action</div>
+          <div class="detail-value"><span class="badge ${getActionClass(log.action)}">${log.action}</span></div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Module</div>
+          <div class="detail-value">${log.module}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Record ID</div>
+          <div class="detail-value">${log.recordId || '-'}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">Details</div>
+          <div class="detail-value">${log.details || '-'}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">IP Address</div>
+          <div class="detail-value">${log.ipAddress || '-'}</div>
+        </div>
+        ${log.oldValue ? `
+        <div class="detail-row">
+          <div class="detail-label">Old Value</div>
+          <div class="detail-value"><pre>${JSON.stringify(log.oldValue, null, 2)}</pre></div>
+        </div>
+        ` : ''}
+        ${log.newValue ? `
+        <div class="detail-row">
+          <div class="detail-label">New Value</div>
+          <div class="detail-value"><pre>${JSON.stringify(log.newValue, null, 2)}</pre></div>
+        </div>
+        ` : ''}
+      `;
+      
+      document.getElementById('detailModal').classList.add('active');
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detailModal').classList.remove('active');
+    }
+
+    // Clear logs modal
+    function openClearModal() {
+      document.getElementById('clearModal').classList.add('active');
+    }
+
+    function closeClearModal() {
+      document.getElementById('clearModal').classList.remove('active');
+    }
+
+    function clearOldLogs() {
+      const days = parseInt(document.getElementById('clearDays').value);
+      
+      if (!days || days < 1) {
+        showToast('Invalid Input', 'Please enter a valid number of days', 'error');
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to delete all logs older than ${days} days? This action cannot be undone.`)) {
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showToast('Success', result.message, 'success');
+          closeClearModal();
+          loadAuditLogs();
+        })
+        .withFailureHandler(function(error) {
+          showToast('Error', 'Failed to clear logs: ' + error.message, 'error');
+        })
+        .clearOldAuditLogs(days);
+    }
+
+    // Refresh logs
+    function refreshLogs() {
+      loadAuditLogs();
+      showToast('Refreshed', 'Audit logs refreshed successfully', 'success');
+    }
+
+    // Export to Excel
+    function exportLogs() {
+      if (typeof XLSX === 'undefined') {
+        showToast('Error', 'Excel export library not loaded', 'error');
+        return;
+      }
+
+      const data = filteredLogs.map(log => ({
+        'Timestamp': formatTimestamp(log.timestamp),
+        'User': log.user,
+        'Action': log.action,
+        'Module': log.module,
+        'Record ID': log.recordId || '',
+        'Details': log.details || '',
+        'IP Address': log.ipAddress || ''
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Audit Logs');
+      
+      const filename = 'AuditLogs_' + new Date().toISOString().split('T')[0] + '.xlsx';
+      XLSX.writeFile(wb, filename);
+      
+      showToast('Success', 'Audit logs exported successfully', 'success');
+    }
+
+    // Toast notification
+    function showToast(title, message, type) {
+      const container = document.getElementById('toastContainer');
+      
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      
+      const iconText = type === 'success' ? '✓' : '✕';
+      const iconClass = type === 'success' ? 'success' : 'error';
+      
+      toast.innerHTML = `
+        <div class="toast-icon ${iconClass}">${iconText}</div>
+        <div class="toast-body">
+          <div class="toast-title">${title}</div>
+          <div class="toast-message">${message}</div>
+        </div>
+      `;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => toast.classList.add('active'), 10);
+      
+      setTimeout(() => {
+        toast.classList.remove('active');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
   </script>
 </body>
 </html>
