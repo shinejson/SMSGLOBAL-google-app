@@ -278,10 +278,7 @@
       font-weight: 600;
     }
     .items-popover {
-      position: absolute;
-      bottom: 100%;
-      left: 0;
-      margin-bottom: 8px;
+      position: fixed;
       background: white;
       border: 1px solid #e2e8f0;
       border-radius: 10px;
@@ -291,6 +288,7 @@
       max-width: 400px;
       z-index: 1000;
       display: none;
+      transform: translateY(-8px);
     }
     .items-popover.active {
       display: block;
@@ -859,7 +857,7 @@
       filterTable();
     }
 
-    // Toggle items popover
+    // Toggle items popover with smart positioning
     let currentPopover = null;
     function toggleItemsPopover(popoverId, event) {
       event.stopPropagation();
@@ -872,8 +870,39 @@
       }
       
       // Toggle this popover
+      const isOpening = !popover.classList.contains('active');
       popover.classList.toggle('active');
       currentPopover = popover.classList.contains('active') ? popover : null;
+      
+      // Position the popover smartly
+      if (isOpening) {
+        const trigger = event.currentTarget;
+        const triggerRect = trigger.getBoundingClientRect();
+        const popoverHeight = popover.offsetHeight;
+        const viewportHeight = window.innerHeight;
+        const spaceAbove = triggerRect.top;
+        const spaceBelow = viewportHeight - triggerRect.bottom;
+        
+        // Decide whether to show above or below
+        if (spaceAbove > popoverHeight + 20 || spaceAbove > spaceBelow) {
+          // Show above
+          popover.style.top = (triggerRect.top - popoverHeight - 8) + 'px';
+        } else {
+          // Show below
+          popover.style.top = (triggerRect.bottom + 8) + 'px';
+        }
+        
+        // Horizontal positioning
+        popover.style.left = triggerRect.left + 'px';
+        
+        // Ensure popover stays within viewport horizontally
+        setTimeout(() => {
+          const popoverRect = popover.getBoundingClientRect();
+          if (popoverRect.right > window.innerWidth - 20) {
+            popover.style.left = (window.innerWidth - popoverRect.width - 20) + 'px';
+          }
+        }, 0);
+      }
     }
 
     // Close popover when clicking outside
