@@ -597,11 +597,15 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
     }
   }
 
-  // Invoices and Payments filtered by year/term
+  // Invoices and Payments filtered by year/term (not by date for billing snapshot)
   let invoiceCount = 0;
   let totalInvoiced = 0;
   let totalPaid = 0;
   let totalUnpaid = 0;
+  
+  // Class-based payment statistics (independent of date filter)
+  const classPaymentStats = {};
+  
   try {
     const invoices = typeof getInvoicesData === 'function' ? getInvoicesData() : [];
     const payments = typeof getPaymentsData === 'function' ? getPaymentsData() : [];
@@ -614,6 +618,40 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
 
     totalPaid = filteredPayments.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
     totalUnpaid = Math.max(0, totalInvoiced - totalPaid);
+    
+    // Build class payment statistics (using year/term filters, but NOT date filter)
+    const allStudents = typeof getStudentsData === 'function' ? getStudentsData() : [];
+    const yearTermInvoices = invoices.filter(inv => matchYT(inv.academicYear, inv.term));
+    const yearTermPayments = payments.filter(p => matchYT(p.academicYear, p.term));
+    
+    // Get unique students who have made payments
+    const paidStudentIds = new Set();
+    yearTermPayments.forEach(p => {
+      if (p.studentId) {
+        paidStudentIds.add(String(p.studentId).trim());
+      }
+    });
+    
+    // Group students by class
+    allStudents.forEach(student => {
+      const className = String(student.class || student.Class || student['Class Name'] || '').trim() || 'Unassigned';
+      const studentId = String(student.studentId || '').trim();
+      
+      if (!classPaymentStats[className]) {
+        classPaymentStats[className] = {
+          totalStudents: 0,
+          paidStudents: 0
+        };
+      }
+      
+      classPaymentStats[className].totalStudents += 1;
+      
+      // Check if this student has made payment
+      if (paidStudentIds.has(studentId)) {
+        classPaymentStats[className].paidStudents += 1;
+      }
+    });
+    
   } catch (e) {
     totalInvoiced = 0;
     totalPaid = 0;
@@ -631,6 +669,7 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
     totalUnpaid: totalUnpaid,
     attendanceTrend: attendanceTrend,
     studentClassCounts: studentClassCounts,
+    classPaymentStats: classPaymentStats,
   };
 }
 

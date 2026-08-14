@@ -928,7 +928,7 @@
 
       <div class="dashboard-charts">
         <div class="chart-card">
-          <h3>💰 Billing Snapshot</h3>
+          <h3>💰 Payment Status by Class</h3>
           <canvas id="billingChart"></canvas>
         </div>
         <div class="chart-card">
@@ -1634,45 +1634,97 @@
         const canvas = document.getElementById('billingChart');
         if (!canvas || typeof Chart === 'undefined') return;
 
-        const paid = stats.totalPaid || 0;
-        const unpaid = stats.totalUnpaid || 0;
-        const totalInvoiced = stats.totalInvoiced || 0;
-        const chartData = [paid, unpaid];
-
+        const classPaymentStats = stats.classPaymentStats || {};
+        const classes = Object.keys(classPaymentStats).sort();
+        
         // If no data, show a message
-        if (totalInvoiced === 0) {
+        if (classes.length === 0) {
+          if (canvas._chartInstance) {
+            canvas._chartInstance.destroy();
+            canvas._chartInstance = null;
+          }
           const ctx = canvas.getContext('2d');
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.font = '14px Inter, sans-serif';
           ctx.fillStyle = '#94a3b8';
           ctx.textAlign = 'center';
-          ctx.fillText('No billing data available', canvas.width / 2, canvas.height / 2);
+          ctx.fillText('No payment data available', canvas.width / 2, canvas.height / 2);
           return;
         }
 
+        const totalStudentsData = classes.map(cls => classPaymentStats[cls].totalStudents);
+        const paidStudentsData = classes.map(cls => classPaymentStats[cls].paidStudents);
+        const unpaidStudentsData = classes.map(cls => 
+          classPaymentStats[cls].totalStudents - classPaymentStats[cls].paidStudents
+        );
+
         if (!canvas._chartInstance) {
           canvas._chartInstance = new Chart(canvas, {
-            type: 'doughnut',
+            type: 'bar',
             data: {
-              labels: ['Paid', 'Unpaid'],
+              labels: classes,
               datasets: [
                 {
-                  data: chartData,
-                  backgroundColor: ['#10b981', '#ef4444'],
-                  borderColor: '#ffffff',
-                  borderWidth: 2,
+                  label: 'Paid Students',
+                  data: paidStudentsData,
+                  backgroundColor: '#10b981',
+                  borderColor: '#059669',
+                  borderWidth: 1,
+                  borderRadius: 4,
+                },
+                {
+                  label: 'Unpaid Students',
+                  data: unpaidStudentsData,
+                  backgroundColor: '#ef4444',
+                  borderColor: '#dc2626',
+                  borderWidth: 1,
+                  borderRadius: 4,
                 },
               ],
             },
             options: {
               maintainAspectRatio: false,
-              cutout: '65%',
+              responsive: true,
+              interaction: {
+                mode: 'index',
+                intersect: false,
+              },
+              scales: {
+                x: {
+                  stacked: true,
+                  grid: {
+                    display: false,
+                  },
+                  ticks: {
+                    color: document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#475569',
+                    font: { size: 11, family: 'Inter' },
+                  },
+                },
+                y: {
+                  stacked: true,
+                  beginAtZero: true,
+                  grid: {
+                    color: document.body.classList.contains('dark-mode') ? '#334155' : '#f1f5f9',
+                  },
+                  ticks: {
+                    color: document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#475569',
+                    font: { size: 11, family: 'Inter' },
+                    stepSize: 1,
+                  },
+                  title: {
+                    display: true,
+                    text: 'Number of Students',
+                    color: document.body.classList.contains('dark-mode') ? '#94a3b8' : '#64748b',
+                    font: { size: 12, family: 'Inter', weight: '500' },
+                  },
+                },
+              },
               plugins: {
                 legend: {
                   position: 'bottom',
                   labels: {
                     boxWidth: 12,
-                    padding: 16,
+                    padding: 12,
                     font: { size: 12, family: 'Inter' },
                     color: document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#475569',
                     usePointStyle: true,
@@ -1687,59 +1739,39 @@
                   cornerRadius: 8,
                   displayColors: true,
                   callbacks: {
-                    label: function(context) {
-                      const value = Number(context.parsed);
-                      const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                      const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                      return context.label + ': GHS ' + value.toFixed(2) + ' (' + percentage + '%)';
+                    title: function(context) {
+                      return 'Class: ' + context[0].label;
                     },
-                    afterLabel: function(context) {
-                      const invoiceCount = stats.invoiceCount || 0;
-                      if (context.dataIndex === 0) {
-                        return 'Total invoiced: GHS ' + totalInvoiced.toFixed(2);
-                      }
-                      return invoiceCount + ' invoice(s) total';
+                    label: function(context) {
+                      const className = context.label;
+                      const total = classPaymentStats[className].totalStudents;
+                      const value = context.parsed.y;
+                      const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                      return context.dataset.label + ': ' + value + ' (' + percentage + '%)';
+                    },
+                    afterBody: function(context) {
+                      const className = context[0].label;
+                      const total = classPaymentStats[className].totalStudents;
+                      return ['', 'Total Students: ' + total];
                     }
                   },
                 },
               },
             },
-            plugins: [{
-              id: 'centerText',
-              beforeDraw: function(chart) {
-                const width = chart.width;
-                const height = chart.height;
-                const ctx = chart.ctx;
-                ctx.restore();
-                
-                const fontSize = (height / 160).toFixed(2);
-                ctx.font = 'bold ' + fontSize + 'em Inter, sans-serif';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = document.body.classList.contains('dark-mode') ? '#f1f5f9' : '#0f172a';
-                
-                const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                const paidPercent = total > 0 ? ((paid / total) * 100).toFixed(0) : 0;
-                const text = paidPercent + '%';
-                const textX = Math.round((width - ctx.measureText(text).width) / 2);
-                const textY = height / 2 - 10;
-                
-                ctx.fillText(text, textX, textY);
-                
-                ctx.font = (fontSize * 0.5) + 'em Inter, sans-serif';
-                ctx.fillStyle = document.body.classList.contains('dark-mode') ? '#94a3b8' : '#64748b';
-                const subtext = 'Paid';
-                const subtextX = Math.round((width - ctx.measureText(subtext).width) / 2);
-                const subtextY = textY + 20;
-                
-                ctx.fillText(subtext, subtextX, subtextY);
-                ctx.save();
-              }
-            }]
           });
         } else {
-          canvas._chartInstance.data.datasets[0].data = chartData;
-          canvas._chartInstance.options.plugins.legend.labels.color = 
-            document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#475569';
+          canvas._chartInstance.data.labels = classes;
+          canvas._chartInstance.data.datasets[0].data = paidStudentsData;
+          canvas._chartInstance.data.datasets[1].data = unpaidStudentsData;
+          
+          // Update colors for dark mode
+          const isDarkMode = document.body.classList.contains('dark-mode');
+          canvas._chartInstance.options.scales.x.ticks.color = isDarkMode ? '#cbd5e1' : '#475569';
+          canvas._chartInstance.options.scales.y.ticks.color = isDarkMode ? '#cbd5e1' : '#475569';
+          canvas._chartInstance.options.scales.y.grid.color = isDarkMode ? '#334155' : '#f1f5f9';
+          canvas._chartInstance.options.scales.y.title.color = isDarkMode ? '#94a3b8' : '#64748b';
+          canvas._chartInstance.options.plugins.legend.labels.color = isDarkMode ? '#cbd5e1' : '#475569';
+          
           canvas._chartInstance.update();
         }
       }
