@@ -525,7 +525,8 @@
       align-items: center;
       flex-wrap: wrap;
     }
-    .filter-controls select {
+    .filter-controls select,
+    .filter-controls input[type="date"] {
       min-width: 160px;
       padding: 8px 14px;
       border-radius: 8px;
@@ -536,7 +537,8 @@
       outline: none;
       transition: border-color 0.2s;
     }
-    .filter-controls select:focus {
+    .filter-controls select:focus,
+    .filter-controls input[type="date"]:focus {
       border-color: #3b82f6;
     }
     body.dark-mode .dashboard-filter-bar {
@@ -546,10 +548,12 @@
     body.dark-mode .filter-title {
       color: #f1f5f9;
     }
-    body.dark-mode .filter-controls select {
+    body.dark-mode .filter-controls select,
+    body.dark-mode .filter-controls input[type="date"] {
       background: #0f172a;
       border-color: #334155;
       color: #f1f5f9;
+      color-scheme: dark;
     }
 
     .search-bar {
@@ -894,6 +898,7 @@
             <option value="Term 2">Term 2</option>
             <option value="Term 3">Term 3</option>
           </select>
+          <input type="date" id="dashDateFilter" class="form-input" onchange="loadDashboardStatsWithFilters()" />
         </div>
       </div>
 
@@ -1531,17 +1536,53 @@
             const select = document.getElementById('dashYearFilter');
             if (!select || !years) return;
             select.innerHTML = '<option value="">All Academic Years</option>';
+            let activeYear = null;
             years.forEach(function(item) {
               const y = typeof item === 'object' ? (item.academicYear || item.year) : item;
+              const status = typeof item === 'object' ? (item.status || '').trim() : '';
               if (y) {
                 const opt = document.createElement('option');
                 opt.value = y;
-                opt.textContent = y + (item.status === 'Active' ? ' (Active)' : '');
+                opt.textContent = y + (status.toLowerCase() === 'active' ? ' (Active)' : '');
                 select.appendChild(opt);
+                
+                // Track the active year
+                if (status.toLowerCase() === 'active' && !activeYear) {
+                  activeYear = y;
+                }
               }
             });
+            
+            // Select the active year by default
+            if (activeYear) {
+              select.value = activeYear;
+            }
+            
+            // Set current date in the date filter
+            const dateInput = document.getElementById('dashDateFilter');
+            if (dateInput) {
+              const today = new Date();
+              const year = today.getFullYear();
+              const month = String(today.getMonth() + 1).padStart(2, '0');
+              const day = String(today.getDate()).padStart(2, '0');
+              dateInput.value = year + '-' + month + '-' + day;
+            }
+            
+            // Trigger the filter to load data with active year and current date
+            loadDashboardStatsWithFilters();
           })
-          .withFailureHandler(function() {})
+          .withFailureHandler(function() {
+            // If academic years fail to load, still set current date and load stats
+            const dateInput = document.getElementById('dashDateFilter');
+            if (dateInput) {
+              const today = new Date();
+              const year = today.getFullYear();
+              const month = String(today.getMonth() + 1).padStart(2, '0');
+              const day = String(today.getDate()).padStart(2, '0');
+              dateInput.value = year + '-' + month + '-' + day;
+            }
+            loadDashboardStatsWithFilters();
+          })
           .getAcademicYearsData();
       })();
 
@@ -1549,8 +1590,10 @@
       window.loadDashboardStatsWithFilters = function() {
         const yearSelect = document.getElementById('dashYearFilter');
         const termSelect = document.getElementById('dashTermFilter');
+        const dateInput = document.getElementById('dashDateFilter');
         const year = yearSelect ? yearSelect.value : '';
         const term = termSelect ? termSelect.value : '';
+        const date = dateInput ? dateInput.value : '';
 
         google.script.run
           .withSuccessHandler(function(stats) {
@@ -1575,11 +1618,11 @@
             console.error('Stats error:', err);
             renderDashboardCharts({ attendanceTrend: [], studentClassCounts: {} });
           })
-          .getDashboardStats(year, term);
+          .getDashboardStats(year, term, date);
       };
 
-      // 3. Initial load of Dashboard Stats
-      loadDashboardStatsWithFilters();
+      // 3. Initial load of Dashboard Stats - will be triggered by loadAcademicYearsForDashboard()
+      // loadDashboardStatsWithFilters(); // Removed to prevent duplicate loads
 
       function renderDashboardCharts(stats) {
         renderBillingChart(stats);

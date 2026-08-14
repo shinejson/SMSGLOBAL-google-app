@@ -430,13 +430,26 @@ function getSheetNames() {
 
 // Function to get the dashboard data (Mocking data since your screenshot is empty)
 // You can replace these numbers with real formulas later.
-function getDashboardStats(selectedYear, selectedTerm) {
+function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
   requireLogin();
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   const normYear = selectedYear ? String(selectedYear).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
   const normTerm = selectedTerm ? String(selectedTerm).trim().toLowerCase() : '';
+  
+  // Parse selected date if provided
+  let filterDate = null;
+  if (selectedDate) {
+    try {
+      filterDate = new Date(selectedDate);
+      if (isNaN(filterDate.getTime())) {
+        filterDate = null;
+      }
+    } catch (e) {
+      filterDate = null;
+    }
+  }
 
   function matchYT(itemYear, itemTerm) {
     if (normYear) {
@@ -448,6 +461,23 @@ function getDashboardStats(selectedYear, selectedTerm) {
       if (t && t !== normTerm && !t.includes(normTerm) && !normTerm.includes(t)) return false;
     }
     return true;
+  }
+  
+  function matchDate(itemDate) {
+    if (!filterDate) return true;
+    if (!itemDate) return false;
+    
+    try {
+      const compareDate = new Date(itemDate);
+      if (isNaN(compareDate.getTime())) return false;
+      
+      // Match if the dates are on the same day
+      return compareDate.getFullYear() === filterDate.getFullYear() &&
+             compareDate.getMonth() === filterDate.getMonth() &&
+             compareDate.getDate() === filterDate.getDate();
+    } catch (e) {
+      return false;
+    }
   }
 
   // Count total students and class breakdown
@@ -464,7 +494,7 @@ function getDashboardStats(selectedYear, selectedTerm) {
       try {
         const att = typeof getAttendanceData === 'function' ? getAttendanceData() : [];
         att.forEach(r => {
-          if (matchYT(r.academicYear, r.term) && r.studentId) {
+          if (matchYT(r.academicYear, r.term) && matchDate(r.date) && r.studentId) {
             activeStudentIds.add(String(r.studentId).trim());
           }
         });
@@ -473,7 +503,7 @@ function getDashboardStats(selectedYear, selectedTerm) {
       try {
         const pay = typeof getPaymentsData === 'function' ? getPaymentsData() : [];
         pay.forEach(p => {
-          if (matchYT(p.academicYear, p.term) && p.studentId) {
+          if (matchYT(p.academicYear, p.term) && matchDate(p.paymentDate || p.date) && p.studentId) {
             activeStudentIds.add(String(p.studentId).trim());
           }
         });
@@ -522,7 +552,7 @@ function getDashboardStats(selectedYear, selectedTerm) {
     const lastRow = attendanceSheet.getLastRow();
     if (lastRow >= 3) {
       const attendanceData = typeof getAttendanceData === 'function' ? getAttendanceData() : [];
-      const validRecords = attendanceData.filter((row) => matchYT(row.academicYear, row.term));
+      const validRecords = attendanceData.filter((row) => matchYT(row.academicYear, row.term) && matchDate(row.date));
 
       if (validRecords.length > 0) {
         // Use the first status from settings as the "present" equivalent
@@ -578,8 +608,8 @@ function getDashboardStats(selectedYear, selectedTerm) {
     const invoices = typeof getInvoicesData === 'function' ? getInvoicesData() : [];
     const payments = typeof getPaymentsData === 'function' ? getPaymentsData() : [];
 
-    const filteredInvoices = invoices.filter(inv => matchYT(inv.academicYear, inv.term));
-    const filteredPayments = payments.filter(p => matchYT(p.academicYear, p.term));
+    const filteredInvoices = invoices.filter(inv => matchYT(inv.academicYear, inv.term) && matchDate(inv.invoiceDate || inv.date));
+    const filteredPayments = payments.filter(p => matchYT(p.academicYear, p.term) && matchDate(p.paymentDate || p.date));
 
     invoiceCount = filteredInvoices.length;
     totalInvoiced = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.amountDue) || 0), 0);
