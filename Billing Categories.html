@@ -232,6 +232,133 @@
     body.dark-mode .item-checkbox-row:hover { background: #1e293b; }
     body.dark-mode .item-checkbox-label { color: #f1f5f9; }
     body.dark-mode .item-checkbox-price { color: #94a3b8; }
+
+    /* --- ITEMS COLUMN TRUNCATION & POPOVER --- */
+    .items-cell {
+      position: relative;
+      max-width: 200px;
+    }
+    .items-truncated {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .items-truncated:hover {
+      background: #f1f5f9;
+    }
+    body.dark-mode .items-truncated:hover {
+      background: #334155;
+    }
+    .items-preview {
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      color: #475569;
+    }
+    body.dark-mode .items-preview {
+      color: #cbd5e1;
+    }
+    .items-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      background: #3b82f6;
+      color: white;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .items-popover {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 8px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1);
+      padding: 12px;
+      min-width: 280px;
+      max-width: 400px;
+      z-index: 1000;
+      display: none;
+    }
+    .items-popover.active {
+      display: block;
+    }
+    body.dark-mode .items-popover {
+      background: #1e293b;
+      border-color: #334155;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.4);
+    }
+    .items-popover-header {
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    body.dark-mode .items-popover-header {
+      color: #94a3b8;
+      border-bottom-color: #334155;
+    }
+    .items-popover-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .items-popover-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .items-popover-list::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 3px;
+    }
+    body.dark-mode .items-popover-list::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .items-popover-list::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    body.dark-mode .items-popover-list::-webkit-scrollbar-thumb {
+      background: #475569;
+    }
+    .items-popover-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      background: #f8fafc;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #1e293b;
+    }
+    body.dark-mode .items-popover-item {
+      background: #0f172a;
+      color: #f1f5f9;
+    }
+    .items-popover-bullet {
+      width: 6px;
+      height: 6px;
+      background: #3b82f6;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -683,13 +810,34 @@
       }
 
       catList.forEach(row => {
+        const itemsArray = row.items ? row.items.split(',').map(i => i.trim()).filter(i => i) : [];
+        const itemsCount = itemsArray.length;
+        const firstItem = itemsArray[0] || '';
+        const itemsId = 'items-' + row.id.replace(/[^a-zA-Z0-9]/g, '');
+        
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td><strong>${row.id}</strong></td>
           <td>${row.academicYear}</td>
           <td>${row.terms}</td>
           <td>${row.category}</td>
-          <td style="max-width: 200px; white-space: normal; word-break: break-word;">${row.items}</td>
+          <td class="items-cell">
+            <div class="items-truncated" onclick="toggleItemsPopover('${itemsId}', event)">
+              <span class="items-preview">${firstItem}${itemsCount > 1 ? '...' : ''}</span>
+              ${itemsCount > 1 ? `<span class="items-badge">${itemsCount}</span>` : ''}
+            </div>
+            <div class="items-popover" id="${itemsId}">
+              <div class="items-popover-header">Billing Items (${itemsCount})</div>
+              <div class="items-popover-list">
+                ${itemsArray.map(item => `
+                  <div class="items-popover-item">
+                    <div class="items-popover-bullet"></div>
+                    <span>${item}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </td>
           <td><strong>GHS ${row.totalAmount.toFixed(2)}</strong></td>
           <td>GHS ${row.nursery.toFixed(2)}</td>
           <td>${row.date}</td>
@@ -710,6 +858,31 @@
       populateFilterOptions();
       filterTable();
     }
+
+    // Toggle items popover
+    let currentPopover = null;
+    function toggleItemsPopover(popoverId, event) {
+      event.stopPropagation();
+      const popover = document.getElementById(popoverId);
+      if (!popover) return;
+      
+      // Close current popover if different
+      if (currentPopover && currentPopover !== popover) {
+        currentPopover.classList.remove('active');
+      }
+      
+      // Toggle this popover
+      popover.classList.toggle('active');
+      currentPopover = popover.classList.contains('active') ? popover : null;
+    }
+
+    // Close popover when clicking outside
+    document.addEventListener('click', function(event) {
+      if (currentPopover && !event.target.closest('.items-cell')) {
+        currentPopover.classList.remove('active');
+        currentPopover = null;
+      }
+    });
 
     function populateFilterOptions() {
       const yearSelect = document.getElementById('yearFilter');
