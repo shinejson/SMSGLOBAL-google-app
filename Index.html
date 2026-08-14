@@ -771,13 +771,12 @@
     }
 
     /* Tooltip for collapsed sidebar */
-    .sidebar.collapsed .nav-item::after {
-      content: attr(data-label);
-      position: absolute;
-      left: 100%;
-      top: 50%;
-      transform: translateY(-50%);
-      margin-left: 12px;
+    .sidebar.collapsed .nav-item {
+      position: relative;
+    }
+
+    .sidebar-tooltip {
+      position: fixed;
       padding: 6px 12px;
       background: #1e293b;
       color: white;
@@ -785,19 +784,20 @@
       font-size: 13px;
       font-weight: 500;
       white-space: nowrap;
-      opacity: 0;
       pointer-events: none;
-      transition: opacity 0.2s ease, margin-left 0.2s ease;
-      z-index: 2000;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      opacity: 0;
+      transition: opacity 0.2s ease, left 0.2s ease;
+      display: none;
     }
 
-    .sidebar.collapsed .nav-item:hover::after {
+    .sidebar-tooltip.show {
+      display: block;
       opacity: 1;
-      margin-left: 16px;
     }
 
-    body.dark-mode .sidebar.collapsed .nav-item::after {
+    body.dark-mode .sidebar-tooltip {
       background: #475569;
       color: #f1f5f9;
     }
@@ -1126,6 +1126,52 @@
           overlay.classList.remove('active');
         }
       };
+
+      // --- SIDEBAR TOOLTIP LOGIC ---
+      (function setupSidebarTooltips() {
+        // Create tooltip element
+        const tooltip = document.createElement('div');
+        tooltip.className = 'sidebar-tooltip';
+        document.body.appendChild(tooltip);
+
+        // Add hover listeners to nav items
+        function attachTooltipListeners() {
+          const navItems = document.querySelectorAll('#sidebarMenu .nav-item');
+          navItems.forEach(item => {
+            item.addEventListener('mouseenter', function(e) {
+              const sidebar = document.getElementById('sidebarMenuContainer');
+              if (!sidebar || !sidebar.classList.contains('collapsed')) return;
+              
+              const label = this.getAttribute('data-label');
+              if (!label) return;
+              
+              tooltip.textContent = label;
+              
+              // Position tooltip
+              const rect = this.getBoundingClientRect();
+              tooltip.style.top = (rect.top + rect.height / 2) + 'px';
+              tooltip.style.left = (rect.right + 16) + 'px';
+              tooltip.style.transform = 'translateY(-50%)';
+              
+              tooltip.classList.add('show');
+            });
+            
+            item.addEventListener('mouseleave', function() {
+              tooltip.classList.remove('show');
+            });
+          });
+        }
+
+        // Initial attach
+        setTimeout(attachTooltipListeners, 500);
+
+        // Re-attach when sidebar is rebuilt
+        const sidebar = document.getElementById('sidebarMenu');
+        if (sidebar) {
+          const observer = new MutationObserver(attachTooltipListeners);
+          observer.observe(sidebar, { childList: true });
+        }
+      })();
 
       // --- DARK MODE TOGGLE LOGIC ---
       window.toggleDarkMode = function() {
