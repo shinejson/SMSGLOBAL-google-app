@@ -1124,6 +1124,14 @@
           // Desktop behavior - collapse/expand
           sidebar.classList.toggle('collapsed');
           overlay.classList.remove('active');
+          
+          // Save collapsed state to localStorage
+          try {
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
+          } catch (e) {
+            console.warn('Could not save sidebar state:', e);
+          }
         }
       };
 
@@ -1221,6 +1229,24 @@
           document.body.classList.add('dark-mode');
           document.getElementById('darkModeIcon').textContent = '☀️';
           document.getElementById('darkModeText').textContent = 'Light';
+        }
+      })();
+
+      // --- APPLY SAVED SIDEBAR COLLAPSE STATE ---
+      (function applySavedSidebarState() {
+        // Only apply on desktop (width > 1024px)
+        if (window.innerWidth > 1024) {
+          try {
+            const sidebarCollapsed = localStorage.getItem('sidebarCollapsed');
+            if (sidebarCollapsed === 'true') {
+              const sidebar = document.getElementById('sidebarMenuContainer');
+              if (sidebar) {
+                sidebar.classList.add('collapsed');
+              }
+            }
+          } catch (e) {
+            console.warn('Could not restore sidebar state:', e);
+          }
         }
       })();
 
