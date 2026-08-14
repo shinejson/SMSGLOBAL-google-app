@@ -90,9 +90,34 @@
     body.dark-mode .searchable-select-item:hover { background-color: #334155; }
     body.dark-mode .field-error { color: #fca5a5; }
     body.dark-mode #toast { background: #1e293b !important; }
+
+    /* --- TOAST NOTIFICATIONS --- */
+    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+    .toast { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); display: flex; align-items: center; gap: 12px; min-width: 300px; max-width: 400px; opacity: 0; transform: translateX(400px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); pointer-events: auto; border-left: 4px solid; }
+    .toast.show { opacity: 1; transform: translateX(0); }
+    .toast.success { border-left-color: #10b981; }
+    .toast.error { border-left-color: #ef4444; }
+    .toast.warning { border-left-color: #f59e0b; }
+    .toast.info { border-left-color: #3b82f6; }
+    .toast-icon { font-size: 20px; flex-shrink: 0; }
+    .toast.success .toast-icon { color: #10b981; }
+    .toast.error .toast-icon { color: #ef4444; }
+    .toast.warning .toast-icon { color: #f59e0b; }
+    .toast.info .toast-icon { color: #3b82f6; }
+    .toast-content { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .toast-title { font-weight: 600; font-size: 14px; color: #0f172a; }
+    .toast-message { font-size: 13px; color: #64748b; line-height: 1.4; }
+    .toast-close { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 18px; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: color 0.15s; }
+    .toast-close:hover { color: #475569; }
+    body.dark-mode .toast { background: #1e293b; }
+    body.dark-mode .toast-title { color: #f1f5f9; }
+    body.dark-mode .toast-message { color: #cbd5e1; }
   </style>
 </head>
 <body>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <!-- HEADER -->
   <div class="page-header">
@@ -378,6 +403,27 @@
   </div>
 
   <script>
+    // --- TOAST NOTIFICATION SYSTEM ---
+    function showToast(message, type = 'success', duration = 4000) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+      const titles = { success: 'Success', error: 'Error', warning: 'Warning', info: 'Info' };
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-content">
+          <div class="toast-title">${titles[type] || titles.info}</div>
+          <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 10);
+      setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, duration);
+    }
+
     let performanceList = [];
     let allStudents = [];
     let scorePercentages = {
@@ -394,7 +440,7 @@
         // Ensure google.script is available
         if (typeof google === 'undefined' || !google.script || !google.script.run) {
           console.error('google.script.run is not available!');
-          alert('Error: Unable to connect to backend. Please refresh the page.');
+          showToast('Unable to connect to backend. Please refresh the page', 'error');
           return;
         }
         
@@ -435,7 +481,7 @@
       });
       } catch (err) {
         console.error('Error in DOMContentLoaded:', err);
-        alert('Error initializing page: ' + err.message);
+        showToast('Error initializing page: ' + err.message, 'error');
       }
     });
 
@@ -536,7 +582,7 @@
 
     function openStudentDropdown() {
       const cls = document.getElementById('classSelect').value;
-      if (!cls) { alert('Please select a Class first.'); return; }
+      if (!cls) { showToast('Please select a Class first', 'warning'); return; }
       const dd = document.getElementById('studentSearchDropdown');
       dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
       document.getElementById('studentSearchInput').select && document.getElementById('studentSearchInput').select();
@@ -544,7 +590,7 @@
 
     function openEditStudentDropdown() {
       const cls = document.getElementById('edit_studentClass').value;
-      if (!cls) { alert('Please select a Class first.'); return; }
+      if (!cls) { showToast('Please select a Class first', 'warning'); return; }
       const dd = document.getElementById('edit_studentSearchDropdown');
       dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
     }

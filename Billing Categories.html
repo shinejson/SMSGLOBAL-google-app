@@ -98,6 +98,86 @@
     .item-checkbox-price {
       font-size: 13px;
       color: #64748b;
+      flex-shrink: 0;
+    }
+
+    /* --- TOAST NOTIFICATIONS --- */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      background: white;
+      border-radius: 8px;
+      padding: 14px 18px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 300px;
+      max-width: 400px;
+      opacity: 0;
+      transform: translateX(400px);
+      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      pointer-events: auto;
+      border-left: 4px solid;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .toast.success { border-left-color: #10b981; }
+    .toast.error { border-left-color: #ef4444; }
+    .toast.warning { border-left-color: #f59e0b; }
+    .toast.info { border-left-color: #3b82f6; }
+    
+    .toast-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .toast.success .toast-icon { color: #10b981; }
+    .toast.error .toast-icon { color: #ef4444; }
+    .toast.warning .toast-icon { color: #f59e0b; }
+    .toast.info .toast-icon { color: #3b82f6; }
+    
+    .toast-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .toast-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #0f172a;
+    }
+    .toast-message {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.4;
+    }
+    .toast-close {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: color 0.15s;
+    }
+    .toast-close:hover { color: #475569; }
       font-weight: 500;
     }
     .items-empty {
@@ -155,6 +235,9 @@
   </style>
 </head>
 <body>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <!-- HEADER -->
   <div class="page-header">
@@ -384,6 +467,49 @@
   </div>
 
   <script>
+    // --- TOAST NOTIFICATION SYSTEM ---
+    function showToast(message, type = 'success', duration = 4000) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      const icons = {
+        success: '✓',
+        error: '✕',
+        warning: '⚠',
+        info: 'ℹ'
+      };
+      
+      const titles = {
+        success: 'Success',
+        error: 'Error',
+        warning: 'Warning',
+        info: 'Info'
+      };
+      
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-content">
+          <div class="toast-title">${titles[type] || titles.info}</div>
+          <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+      `;
+      
+      container.appendChild(toast);
+      
+      // Trigger animation
+      setTimeout(() => toast.classList.add('show'), 10);
+      
+      // Auto remove
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
     // Define modal functions in global scope immediately
     window.openAddModal = function() { 
       document.getElementById('catForm').reset();
@@ -648,7 +774,7 @@
     /* --- Additional window-scoped modal functions (already defined above) --- */
     window.openEditModal = function(id) {
       const cat = catList.find(c => c.id === id);
-      if (!cat) return alert('Error: Category not found.');
+      if (!cat) return showToast('Category not found', 'error');
 
       document.getElementById('formCatId').value = cat.id;
       document.getElementById('academicYear').value = cat.academicYear;
@@ -677,7 +803,7 @@
       
       const selectedItems = getSelectedItems();
       if (!selectedItems.length) {
-        alert('Please select at least one billable item.');
+        showToast('Please select at least one billable item', 'warning');
         btn.disabled = false;
         btn.innerText = id ? 'Update Category' : 'Save Category';
         return;
@@ -702,7 +828,7 @@
               const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
               if (!proceed) {
                 btn.disabled = false; btn.innerText = isUpdate ? 'Update Category' : 'Save Category';
-                alert('Billing category action cancelled.');
+                showToast('Billing category action cancelled', 'info');
                 return;
               }
               payload.__adminAcademicYearOverride = true;
@@ -713,14 +839,15 @@
             if(res.success) {
               closeModal();
               refreshData();
-              if (!isUpdate) alert(`Billing Category created! ID: ${res.id}`);
+              if (!isUpdate) showToast(`Billing Category created! ID: ${res.id}`, 'success');
+              else showToast('Billing Category updated successfully', 'success');
             } else {
-              alert('Error: ' + (res && res.message ? res.message : 'Failed to save category'));
+              showToast(res && res.message ? res.message : 'Failed to save category', 'error');
             }
           })
           .withFailureHandler(function(err) {
             btn.disabled = false; btn.innerText = isUpdate ? 'Update Category' : 'Save Category';
-            alert('Error: ' + err.message);
+            showToast(err.message || 'Failed to save category', 'error');
           });
 
         if (isUpdate) {
@@ -745,17 +872,24 @@
               const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
               if (!proceed) {
                 btn.disabled = false; btn.innerText = 'Delete';
-                alert('Billing category delete cancelled.');
+                showToast('Billing category delete cancelled', 'info');
                 return;
               }
               submitDelete({ adminAcademicYearOverride: true });
               return;
             }
             btn.disabled = false; btn.innerText = 'Delete';
-            if(res.success) { closeDeleteModal(); refreshData(); }
-            else { alert('Error: ' + (res && res.message ? res.message : 'Failed to delete category')); }
+            if(res.success) { 
+              closeDeleteModal(); 
+              refreshData(); 
+              showToast('Billing category deleted successfully', 'success');
+            }
+            else { showToast(res && res.message ? res.message : 'Failed to delete category', 'error'); }
           })
-          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Delete'; alert('Error: ' + err.message); })
+          .withFailureHandler(function(err) { 
+            btn.disabled = false; btn.innerText = 'Delete'; 
+            showToast(err.message || 'Failed to delete category', 'error');
+          })
           .deleteBillingCategory(currentDeleteId, options || null);
       }
 
@@ -1011,7 +1145,7 @@
 
     function previewSingleReport(student) {
       if (!selectedBillingCategory) {
-        alert('Please select a valid billing category');
+        showToast('Please select a valid billing category', 'warning');
         return;
       }
 
@@ -1046,12 +1180,12 @@
           if (result && result.base64) {
             openPDFPreview(result.base64, result.fileName);
           } else {
-            alert('Failed to generate report preview');
+            showToast('Failed to generate report preview', 'error');
           }
         })
         .withFailureHandler(function(err) {
           document.body.removeChild(loadingMsg);
-          alert('Error: ' + (err && err.message ? err.message : 'Failed to generate report'));
+          showToast(err && err.message ? err.message : 'Failed to generate report', 'error');
         })
         .generateSinglePupilBill(reportData, studentData);
     }
@@ -1125,14 +1259,14 @@
           document.body.removeChild(loadingMsg);
           if (result && result.base64) {
             downloadBase64AsFile(result.base64, result.fileName);
-            alert(`Successfully generated ${students.length} report(s)`);
+            showToast(`Successfully generated ${students.length} report(s)`, 'success');
           } else {
-            alert('Failed to generate reports');
+            showToast('Failed to generate reports', 'error');
           }
         })
         .withFailureHandler(function(err) {
           document.body.removeChild(loadingMsg);
-          alert('Error: ' + (err && err.message ? err.message : 'Failed to generate reports'));
+          showToast(err && err.message ? err.message : 'Failed to generate reports', 'error');
         })
         .generateMultiplePupilBills(reportData, students);
     }
@@ -1210,7 +1344,7 @@
               if (!proceed) {
                 btn.disabled = false;
                 btn.innerText = 'Generate Billings';
-                alert('Billing generation cancelled.');
+                showToast('Billing generation cancelled', 'info');
                 return;
               }
               payload.__adminAcademicYearOverride = true;
@@ -1221,15 +1355,15 @@
             btn.innerText = 'Generate Billings';
             if (res && res.success) {
               closeGenerateModal();
-              alert(`Success! Generated ${res.count || selectedStudentIds.length} student billing(s).`);
+              showToast(`Success! Generated ${res.count || selectedStudentIds.length} student billing(s)`, 'success');
             } else {
-              alert('Error: ' + (res && res.message ? res.message : 'Failed to generate billings'));
+              showToast(res && res.message ? res.message : 'Failed to generate billings', 'error');
             }
           })
           .withFailureHandler(function(err) {
             btn.disabled = false;
             btn.innerText = 'Generate Billings';
-            alert('Error: ' + (err && err.message ? err.message : 'Unknown error'));
+            showToast(err && err.message ? err.message : 'Unknown error', 'error');
           })
           .generateStudentBillings(payload);
       }

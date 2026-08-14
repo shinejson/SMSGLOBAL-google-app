@@ -210,9 +210,34 @@
     body.dark-mode .form-group input, body.dark-mode .form-group textarea, body.dark-mode .form-group select { background: #0f172a; border-color: #334155; color: #f1f5f9; }
     body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
     body.dark-mode .btn-secondary:hover { background: #475569; }
+
+    /* --- TOAST NOTIFICATIONS --- */
+    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+    .toast { background: white; border-radius: 8px; padding: 14px 18px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); display: flex; align-items: center; gap: 12px; min-width: 300px; max-width: 400px; opacity: 0; transform: translateX(400px); transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); pointer-events: auto; border-left: 4px solid; }
+    .toast.show { opacity: 1; transform: translateX(0); }
+    .toast.success { border-left-color: #10b981; }
+    .toast.error { border-left-color: #ef4444; }
+    .toast.warning { border-left-color: #f59e0b; }
+    .toast.info { border-left-color: #3b82f6; }
+    .toast-icon { font-size: 20px; flex-shrink: 0; }
+    .toast.success .toast-icon { color: #10b981; }
+    .toast.error .toast-icon { color: #ef4444; }
+    .toast.warning .toast-icon { color: #f59e0b; }
+    .toast.info .toast-icon { color: #3b82f6; }
+    .toast-content { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .toast-title { font-weight: 600; font-size: 14px; color: #0f172a; }
+    .toast-message { font-size: 13px; color: #64748b; line-height: 1.4; }
+    .toast-close { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 18px; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: color 0.15s; }
+    .toast-close:hover { color: #475569; }
+    body.dark-mode .toast { background: #1e293b; }
+    body.dark-mode .toast-title { color: #f1f5f9; }
+    body.dark-mode .toast-message { color: #cbd5e1; }
   </style>
 </head>
 <body>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <!-- HEADER -->
   <div class="page-header">
@@ -286,6 +311,27 @@
   </div>
 
   <script>
+    // --- TOAST NOTIFICATION SYSTEM ---
+    function showToast(message, type = 'success', duration = 4000) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+      const titles = { success: 'Success', error: 'Error', warning: 'Warning', info: 'Info' };
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-content">
+          <div class="toast-title">${titles[type] || titles.info}</div>
+          <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 10);
+      setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, duration);
+    }
+
     let currentEditingRole = null;
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -408,7 +454,7 @@
       const actions = document.getElementById('actionsInput').value;
 
       if(!role || !accessLevel || !actions) {
-        alert('Please fill in all fields');
+        showToast('Please fill in all fields', 'warning');
         return;
       }
 
@@ -417,10 +463,10 @@
           .withSuccessHandler(function() {
             closeModal();
             loadPermissions();
-            console.log('Permission updated successfully!');
+            showToast('Permission updated successfully', 'success');
           })
           .withFailureHandler(function(error) {
-            alert('Error updating permission: ' + error);
+            showToast('Error updating permission: ' + error, 'error');
           })
           .updatePermission(currentEditingRole, accessLevel, actions);
       } else {
@@ -428,10 +474,11 @@
           .withSuccessHandler(function() {
             closeModal();
             loadPermissions();
-            console.log('Permission created successfully!');
+            showToast('Permission created successfully', 'success');
           })
           .withFailureHandler(function(error) {
-            alert('Error creating permission: ' + error);
+            showToast('Error creating permission: ' + error, 'error');
+          })
           })
           .addPermission(role, accessLevel, actions);
       }
@@ -447,10 +494,11 @@
           google.script.run
             .withSuccessHandler(function() {
               loadPermissions();
-              console.log('Permission deleted successfully!');
+              showToast('Permission deleted successfully', 'success');
             })
             .withFailureHandler(function(error) {
-              alert('Error deleting permission: ' + error);
+              showToast('Error deleting permission: ' + error, 'error');
+            })
             })
             .deletePermission(role);
         }
