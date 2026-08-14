@@ -986,20 +986,21 @@
         
         const actionClass = getActionClass(log.action);
         const timelineClass = getTimelineClass(log.action);
+        const userName = log.userName || log.user || 'Unknown User';
         
         tr.innerHTML = `
           <td>${formatTimestamp(log.timestamp)}</td>
           <td>
             <div class="user-badge">
-              <div class="user-avatar">${getInitials(log.user)}</div>
-              <span>${log.user}</span>
+              <div class="user-avatar">${getInitials(userName)}</div>
+              <span>${userName}</span>
             </div>
           </td>
           <td>
             <span class="timeline-indicator ${timelineClass}"></span>
-            <span class="badge ${actionClass}">${log.action}</span>
+            <span class="badge ${actionClass}">${log.action || 'Unknown'}</span>
           </td>
-          <td>${log.module}</td>
+          <td>${log.module || '-'}</td>
           <td>${truncateText(log.details || '-', 50)}</td>
           <td>${log.ipAddress || '-'}</td>
           <td>
@@ -1025,7 +1026,7 @@
       const module = document.getElementById('filterModule').value;
 
       filteredLogs = allLogs.filter(function(log) {
-        // Search filter
+        // Search filter - check both userName and user fields
         if (searchTerm && !JSON.stringify(log).toLowerCase().includes(searchTerm)) {
           return false;
         }
@@ -1040,8 +1041,9 @@
         // Action filter
         if (action && log.action !== action) return false;
 
-        // User filter
-        if (user && log.user !== user) return false;
+        // User filter - check both userName and user fields
+        const logUserName = log.userName || log.user || 'Unknown User';
+        if (user && logUserName !== user) return false;
 
         // Module filter
         if (module && log.module !== module) return false;
@@ -1054,8 +1056,8 @@
 
     // Populate filter dropdowns
     function populateFilters() {
-      // Users
-      const users = [...new Set(allLogs.map(log => log.user))].sort();
+      // Users - filter out undefined/null values, use userName
+      const users = [...new Set(allLogs.map(log => log.userName || log.user || 'Unknown User').filter(Boolean))].sort();
       const userSelect = document.getElementById('filterUser');
       userSelect.innerHTML = '<option value="">All Users</option>';
       users.forEach(user => {
@@ -1065,8 +1067,8 @@
         userSelect.appendChild(option);
       });
 
-      // Modules
-      const modules = [...new Set(allLogs.map(log => log.module))].sort();
+      // Modules - filter out undefined/null values
+      const modules = [...new Set(allLogs.map(log => log.module).filter(Boolean))].sort();
       const moduleSelect = document.getElementById('filterModule');
       moduleSelect.innerHTML = '<option value="">All Modules</option>';
       modules.forEach(module => {
@@ -1086,8 +1088,8 @@
       const todayLogs = allLogs.filter(log => new Date(log.timestamp).toDateString() === today);
       document.getElementById('statToday').textContent = todayLogs.length;
 
-      // Unique users
-      const uniqueUsers = new Set(allLogs.map(log => log.user)).size;
+      // Unique users - filter out undefined/null, use userName
+      const uniqueUsers = new Set(allLogs.map(log => log.userName || log.user || 'Unknown User').filter(Boolean)).size;
       document.getElementById('statUsers').textContent = uniqueUsers;
 
       // Deletions
@@ -1145,22 +1147,29 @@
     // View details modal
     function viewDetails(log) {
       const content = document.getElementById('detailContent');
+      const userName = log.userName || log.user || 'Unknown User';
+      const userId = log.userId || log.user || '-';
+      
       content.innerHTML = `
         <div class="detail-row">
           <div class="detail-label">Timestamp</div>
           <div class="detail-value">${formatTimestamp(log.timestamp)}</div>
         </div>
         <div class="detail-row">
-          <div class="detail-label">User</div>
-          <div class="detail-value">${log.user}</div>
+          <div class="detail-label">User ID</div>
+          <div class="detail-value">${userId}</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-label">User Name</div>
+          <div class="detail-value">${userName}</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">Action</div>
-          <div class="detail-value"><span class="badge ${getActionClass(log.action)}">${log.action}</span></div>
+          <div class="detail-value"><span class="badge ${getActionClass(log.action)}">${log.action || 'Unknown'}</span></div>
         </div>
         <div class="detail-row">
           <div class="detail-label">Module</div>
-          <div class="detail-value">${log.module}</div>
+          <div class="detail-value">${log.module || '-'}</div>
         </div>
         <div class="detail-row">
           <div class="detail-label">Record ID</div>
