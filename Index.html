@@ -99,7 +99,22 @@
       font-weight: 600;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+    }
+
+    .logo-area .school-logo-img {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    .logo-area .school-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e293b;
+      line-height: 1.2;
     }
 
     .nav-menu {
@@ -359,6 +374,9 @@
       border-bottom-color: #334155;
     }
     body.dark-mode .logo-area h2 {
+      color: #f1f5f9;
+    }
+    body.dark-mode .logo-area .school-name {
       color: #f1f5f9;
     }
     body.dark-mode .nav-item {
@@ -763,6 +781,10 @@
       justify-content: center;
     }
 
+    .sidebar.collapsed .logo-area .school-name {
+      display: none;
+    }
+
     .sidebar.collapsed .nav-item {
       padding-left: 10px;
       padding-right: 10px;
@@ -856,7 +878,10 @@
   <!-- SIDEBAR -->
   <div class="sidebar" id="sidebarMenuContainer">
     <div class="logo-area">
-      <h2><span class="nav-icon"><i class="fas fa-chart-pie"></i></span><span class="logo-text">SMS</span></h2>
+      <h2>
+        <img src="https://via.placeholder.com/36" alt="School Logo" class="school-logo-img" id="schoolLogo">
+        <span class="school-name" id="schoolName">SMS</span>
+      </h2>
     </div>
     <ul class="nav-menu" id="sidebarMenu">
       <!-- Sidebar items will be generated here by JS -->
@@ -1025,6 +1050,35 @@
 
     // Initialize the dashboard after DOM and Google Apps Script API are ready
     function initializeDashboard() {
+      // --- LOAD SCHOOL SETTINGS (Logo and Alias) ---
+      google.script.run
+        .withSuccessHandler(function(params) {
+          if (params) {
+            const logoUrl = params['School Logo URL'] || params['schoolLogoDirectUrl'] || '';
+            const schoolAlias = params['School Alias'] || 'SMS';
+            
+            const logoImg = document.getElementById('schoolLogo');
+            const schoolNameEl = document.getElementById('schoolName');
+            
+            if (logoImg && logoUrl) {
+              logoImg.src = logoUrl;
+              logoImg.onerror = function() {
+                // Fallback to placeholder if logo fails to load
+                this.src = 'https://via.placeholder.com/36x36/3b82f6/ffffff?text=' + (schoolAlias ? schoolAlias.charAt(0) : 'S');
+              };
+            }
+            
+            if (schoolNameEl) {
+              schoolNameEl.textContent = schoolAlias;
+            }
+          }
+        })
+        .withFailureHandler(function(err) {
+          console.warn('Could not load school settings:', err);
+          // Keep default SMS and placeholder logo
+        })
+        .getParameters();
+
       // --- LOAD USER PROFILE ---
       google.script.run
         .withSuccessHandler(function(user) {
