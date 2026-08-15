@@ -479,7 +479,6 @@
           .withFailureHandler(function(error) {
             showToast('Error creating permission: ' + error, 'error');
           })
-          })
           .addPermission(role, accessLevel, actions);
       }
     }
@@ -498,7 +497,6 @@
             })
             .withFailureHandler(function(error) {
               showToast('Error deleting permission: ' + error, 'error');
-            })
             })
             .deletePermission(role);
         }

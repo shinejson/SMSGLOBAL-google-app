@@ -2112,6 +2112,118 @@ function addCourse(courseData) {
   return { success: true, courseId: nextId };
 }
 
+// Update Course
+function updateCourse(courseId, courseData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Courses");
+  if (!sheet) throw new Error("Courses worksheet not found.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: false, message: "No courses found" };
+
+  // Find the row with the course ID (Column B)
+  const dataRange = sheet.getRange(2, 2, lastRow - 1, 6);
+  const data = dataRange.getValues();
+  
+  let rowIndex = -1;
+  let oldData = null;
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim() === courseId) {
+      rowIndex = i + 2; // +2 because data starts at row 2
+      oldData = {
+        courseId: String(data[i][0]).trim(),
+        courseName: String(data[i][1]).trim(),
+        instructor: String(data[i][2]).trim(),
+        credits: String(data[i][3]).trim(),
+        semester: String(data[i][4]).trim(),
+        status: String(data[i][5]).trim()
+      };
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    return { success: false, message: "Course not found" };
+  }
+
+  // Update the row (Columns B to G: courseId, courseName, instructor, credits, semester, status)
+  sheet.getRange(rowIndex, 2, 1, 6).setValues([[
+    courseId, // Keep same course ID
+    courseData.courseName,
+    courseData.instructor,
+    courseData.credits,
+    courseData.semester,
+    courseData.status || "Active"
+  ]]);
+
+  safeLogAuditEvent(
+    'Update',
+    'Courses',
+    courseId,
+    'Updated course record',
+    buildAuditSnapshot(oldData),
+    buildAuditSnapshot({
+      courseId: courseId,
+      courseName: courseData.courseName,
+      instructor: courseData.instructor,
+      credits: courseData.credits,
+      semester: courseData.semester,
+      status: courseData.status || 'Active'
+    })
+  );
+
+  return { success: true };
+}
+
+// Delete Course
+function deleteCourse(courseId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Courses");
+  if (!sheet) throw new Error("Courses worksheet not found.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: false, message: "No courses found" };
+
+  // Find the row with the course ID (Column B)
+  const dataRange = sheet.getRange(2, 2, lastRow - 1, 6);
+  const data = dataRange.getValues();
+  
+  let rowIndex = -1;
+  let deletedData = null;
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim() === courseId) {
+      rowIndex = i + 2; // +2 because data starts at row 2
+      deletedData = {
+        courseId: String(data[i][0]).trim(),
+        courseName: String(data[i][1]).trim(),
+        instructor: String(data[i][2]).trim(),
+        credits: String(data[i][3]).trim(),
+        semester: String(data[i][4]).trim(),
+        status: String(data[i][5]).trim()
+      };
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    return { success: false, message: "Course not found" };
+  }
+
+  // Delete the row
+  sheet.deleteRow(rowIndex);
+
+  safeLogAuditEvent(
+    'Delete',
+    'Courses',
+    courseId,
+    'Deleted course record',
+    buildAuditSnapshot(deletedData),
+    null
+  );
+
+  return { success: true };
+}
+
 // 17. Fetch Enrollments Data
 function getEnrollmentsData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2381,6 +2493,102 @@ function addAcademicYear(yearData) {
   return { success: true };
 }
 
+// Update Academic Year
+function updateAcademicYear(originalYear, yearData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Academic Years");
+  if (!sheet) throw new Error("Academic Years worksheet not found.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return { success: false, message: "No academic years found" };
+
+  // Find the row with the original year
+  const dataRange = sheet.getRange(3, 2, lastRow - 2, 2);
+  const data = dataRange.getValues();
+  
+  let rowIndex = -1;
+  let oldData = null;
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim() === originalYear) {
+      rowIndex = i + 3; // +3 because data starts at row 3
+      oldData = {
+        academicYear: String(data[i][0]).trim(),
+        status: String(data[i][1]).trim()
+      };
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    return { success: false, message: "Academic year not found" };
+  }
+
+  // Update the row
+  sheet.getRange(rowIndex, 2, 1, 2).setValues([[
+    yearData.academicYear,
+    yearData.status || "Active"
+  ]]);
+
+  safeLogAuditEvent(
+    'Update',
+    'Academic Years',
+    originalYear,
+    'Updated academic year record',
+    buildAuditSnapshot(oldData),
+    buildAuditSnapshot({
+      academicYear: yearData.academicYear,
+      status: yearData.status || 'Active'
+    })
+  );
+
+  return { success: true };
+}
+
+// Delete Academic Year
+function deleteAcademicYear(yearName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Academic Years");
+  if (!sheet) throw new Error("Academic Years worksheet not found.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return { success: false, message: "No academic years found" };
+
+  // Find the row with the year
+  const dataRange = sheet.getRange(3, 2, lastRow - 2, 2);
+  const data = dataRange.getValues();
+  
+  let rowIndex = -1;
+  let deletedData = null;
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim() === yearName) {
+      rowIndex = i + 3; // +3 because data starts at row 3
+      deletedData = {
+        academicYear: String(data[i][0]).trim(),
+        status: String(data[i][1]).trim()
+      };
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    return { success: false, message: "Academic year not found" };
+  }
+
+  // Delete the row
+  sheet.deleteRow(rowIndex);
+
+  safeLogAuditEvent(
+    'Delete',
+    'Academic Years',
+    yearName,
+    'Deleted academic year record',
+    buildAuditSnapshot(deletedData),
+    null
+  );
+
+  return { success: true };
+}
+
 // --- TEACHERS FUNCTIONS ---
 
 // Fetch Teachers Data
@@ -2473,6 +2681,128 @@ function addTeacher(teacherData) {
   );
 
   return { success: true, teacherId: nextId };
+}
+
+// Update Teacher
+function updateTeacher(teacherId, teacherData) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Teachers");
+  if (!sheet) throw new Error("Teachers worksheet not found.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: false, message: "No teachers found" };
+
+  // Find the row with the teacher ID (Column B)
+  const dataRange = sheet.getRange(2, 2, lastRow - 1, 5);
+  const data = dataRange.getValues();
+  
+  let rowIndex = -1;
+  let oldData = null;
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim() === teacherId) {
+      rowIndex = i + 2; // +2 because data starts at row 2
+      oldData = {
+        teacherId: String(data[i][0]).trim(),
+        firstName: String(data[i][1]).trim(),
+        lastName: String(data[i][2]).trim(),
+        class: String(data[i][3]).trim(),
+        academicYear: String(data[i][4]).trim()
+      };
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    return { success: false, message: "Teacher not found" };
+  }
+
+  // Build new snapshot for audit
+  const newSnapshot = buildAuditSnapshot({
+    teacherId: teacherId,
+    firstName: teacherData.firstName,
+    lastName: teacherData.lastName,
+    class: teacherData.class,
+    academicYear: teacherData.academicYear
+  });
+
+  // Check academic year security
+  const teacherYearGuard = enforceAcademicYearCrudSecurity({
+    action: 'Update',
+    module: 'Teachers',
+    recordId: teacherId,
+    academicYear: teacherData.academicYear,
+    newValue: newSnapshot,
+    overrideConfirmed: teacherData && teacherData.__adminAcademicYearOverride === true
+  });
+  if (!teacherYearGuard.allowed) return teacherYearGuard;
+
+  // Update the row (Columns B to F: teacherId, firstName, lastName, class, academicYear)
+  sheet.getRange(rowIndex, 2, 1, 5).setValues([[
+    teacherId, // Keep same teacher ID
+    teacherData.firstName,
+    teacherData.lastName,
+    teacherData.class,
+    teacherData.academicYear
+  ]]);
+
+  safeLogAuditEvent(
+    'Update',
+    'Teachers',
+    teacherId,
+    appendAcademicYearOverrideAuditDetails('Updated teacher record', teacherYearGuard),
+    buildAuditSnapshot(oldData),
+    newSnapshot
+  );
+
+  return { success: true };
+}
+
+// Delete Teacher
+function deleteTeacher(teacherId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Teachers");
+  if (!sheet) throw new Error("Teachers worksheet not found.");
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: false, message: "No teachers found" };
+
+  // Find the row with the teacher ID (Column B)
+  const dataRange = sheet.getRange(2, 2, lastRow - 1, 5);
+  const data = dataRange.getValues();
+  
+  let rowIndex = -1;
+  let deletedData = null;
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]).trim() === teacherId) {
+      rowIndex = i + 2; // +2 because data starts at row 2
+      deletedData = {
+        teacherId: String(data[i][0]).trim(),
+        firstName: String(data[i][1]).trim(),
+        lastName: String(data[i][2]).trim(),
+        class: String(data[i][3]).trim(),
+        academicYear: String(data[i][4]).trim()
+      };
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    return { success: false, message: "Teacher not found" };
+  }
+
+  // Delete the row
+  sheet.deleteRow(rowIndex);
+
+  safeLogAuditEvent(
+    'Delete',
+    'Teachers',
+    teacherId,
+    'Deleted teacher record',
+    buildAuditSnapshot(deletedData),
+    null
+  );
+
+  return { success: true };
 }
 
 // Generic helper to get just Class names (for Teacher dropdown)

@@ -21,13 +21,22 @@
     .list-item { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
     .list-item:last-child { border-bottom: none; }
     .list-item:hover { background-color: #f8fafc; }
-    .list-item-left { display: flex; align-items: center; gap: 20px; }
+    .list-item-left { display: flex; align-items: center; gap: 20px; flex: 1; }
+    .list-item-right { display: flex; align-items: center; gap: 12px; }
     .list-item h4 { font-size: 15px; font-weight: 500; color: #0f172a; }
 
     /* BADGE */
     .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-block; }
     .status-active { background: #dcfce7; color: #166534; }
     .status-inactive { background: #fee2e2; color: #991b1b; }
+
+    /* ACTION BUTTONS */
+    .action-icon-btn { background: none; border: none; cursor: pointer; padding: 6px 10px; border-radius: 6px; font-size: 18px; transition: all 0.2s; }
+    .action-icon-btn:hover { transform: scale(1.1); }
+    .edit-btn { color: #3b82f6; }
+    .edit-btn:hover { background: #eff6ff; }
+    .delete-btn { color: #ef4444; }
+    .delete-btn:hover { background: #fef2f2; }
 
     #loading { text-align: center; padding: 40px; color: #64748b; }
 
@@ -50,6 +59,86 @@
     .btn-secondary:hover { background: #cbd5e1; color: #1e293b; }
     .btn-primary { background: #3b82f6; color: #fff; }
     .btn-primary:hover { background: #2563eb; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+
+    /* TOAST NOTIFICATIONS */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      background: white;
+      border-radius: 8px;
+      padding: 14px 18px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 300px;
+      max-width: 400px;
+      opacity: 0;
+      transform: translateX(400px);
+      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      pointer-events: auto;
+      border-left: 4px solid;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .toast.success { border-left-color: #10b981; }
+    .toast.error { border-left-color: #ef4444; }
+    .toast.warning { border-left-color: #f59e0b; }
+    .toast.info { border-left-color: #3b82f6; }
+    
+    .toast-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .toast.success .toast-icon { color: #10b981; }
+    .toast.error .toast-icon { color: #ef4444; }
+    .toast.warning .toast-icon { color: #f59e0b; }
+    .toast.info .toast-icon { color: #3b82f6; }
+    
+    .toast-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .toast-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #0f172a;
+    }
+    .toast-message {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.4;
+    }
+    .toast-close {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: color 0.15s;
+    }
+    .toast-close:hover { color: #475569; }
 
     @media (max-width: 768px) {
       body { padding: 20px; }
@@ -82,9 +171,15 @@
     body.dark-mode .form-input:focus, body.dark-mode .form-select:focus { border-color: #3b82f6; }
     body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
     body.dark-mode .btn-secondary:hover { background: #475569; }
+    body.dark-mode .toast { background: #1e293b; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); }
+    body.dark-mode .toast-title { color: #f1f5f9; }
+    body.dark-mode .toast-message { color: #cbd5e1; }
   </style>
 </head>
 <body>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <div class="page-header">
     <div class="page-title">
@@ -106,14 +201,15 @@
     <div id="yearsList"></div>
   </div>
 
-  <!-- MODAL -->
+  <!-- ADD/EDIT MODAL -->
   <div class="modal-backdrop" id="academicYearModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Add New Academic Year</h3>
+        <h3 id="modalTitle">Add New Academic Year</h3>
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       <form id="yearForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="originalYear">
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label" for="academicYear">Academic Year</label>
@@ -135,10 +231,77 @@
     </div>
   </div>
 
+  <!-- DELETE CONFIRMATION MODAL -->
+  <div class="modal-backdrop" id="deleteModal">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>Delete Academic Year</h3>
+        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: #64748b; font-size: 15px; line-height: 1.5;">
+          Are you sure you want to delete <strong id="deleteYearName" style="color: #0f172a;"></strong>?
+        </p>
+        <p style="color: #ef4444; font-size: 13px; margin-top: 10px;">
+          This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let yearList = [];
+    let currentDeleteYear = null;
+    let isEditMode = false;
 
     document.addEventListener('DOMContentLoaded', function() { refreshData(); });
+
+    // TOAST NOTIFICATION SYSTEM
+    function showToast(message, type = 'success', duration = 4000) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      const icons = {
+        success: '✓',
+        error: '✕',
+        warning: '⚠',
+        info: 'ℹ'
+      };
+      
+      const titles = {
+        success: 'Success',
+        error: 'Error',
+        warning: 'Warning',
+        info: 'Info'
+      };
+      
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-content">
+          <div class="toast-title">${titles[type] || titles.info}</div>
+          <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+      `;
+      
+      container.appendChild(toast);
+      
+      // Trigger animation
+      setTimeout(() => toast.classList.add('show'), 10);
+      
+      // Auto remove
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
 
     function refreshData() {
       document.getElementById('loading').style.display = 'block';
@@ -170,7 +333,15 @@
           <div class="list-item-left">
             <h4>${item.academicYear}</h4>
           </div>
-          <span class="status-badge ${badgeClass}">${item.status || 'Active'}</span>
+          <div class="list-item-right">
+            <span class="status-badge ${badgeClass}">${item.status || 'Active'}</span>
+            <button class="action-icon-btn edit-btn" onclick='editYear(${JSON.stringify(item)})' title="Edit">
+              ✏️
+            </button>
+            <button class="action-icon-btn delete-btn" onclick='openDeleteModal("${item.academicYear}")' title="Delete">
+              🗑️
+            </button>
+          </div>
         `;
         container.appendChild(div);
       });
@@ -193,35 +364,125 @@
       countBadge.innerText = visibleCount;
     }
 
-    function openAddModal() { document.getElementById('academicYearModal').classList.add('active'); }
-    function closeModal() { document.getElementById('academicYearModal').classList.remove('active'); }
+    // ADD MODAL
+    function openAddModal() {
+      isEditMode = false;
+      document.getElementById('modalTitle').innerText = 'Add New Academic Year';
+      document.getElementById('saveBtn').innerText = 'Save Year';
+      document.getElementById('yearForm').reset();
+      document.getElementById('originalYear').value = '';
+      document.getElementById('academicYearModal').classList.add('active');
+    }
 
+    // EDIT MODAL
+    function editYear(item) {
+      isEditMode = true;
+      document.getElementById('modalTitle').innerText = 'Edit Academic Year';
+      document.getElementById('saveBtn').innerText = 'Update Year';
+      document.getElementById('originalYear').value = item.academicYear;
+      document.getElementById('academicYear').value = item.academicYear;
+      document.getElementById('status').value = item.status || 'Active';
+      document.getElementById('academicYearModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('academicYearModal').classList.remove('active');
+    }
+
+    // SAVE (CREATE OR UPDATE)
     function handleSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('saveBtn');
-      btn.disabled = true; btn.innerText = 'Saving...';
+      btn.disabled = true;
+      btn.innerText = isEditMode ? 'Updating...' : 'Saving...';
       
       const data = {
         academicYear: document.getElementById('academicYear').value.trim(),
         status: document.getElementById('status').value
       };
 
+      if (isEditMode) {
+        const originalYear = document.getElementById('originalYear').value;
+        google.script.run
+          .withSuccessHandler(function(res) {
+            btn.disabled = false;
+            btn.innerText = 'Update Year';
+            if(res.success) {
+              closeModal();
+              refreshData();
+              showToast('Academic Year updated successfully!', 'success');
+            } else {
+              showToast(res.message || 'Failed to update academic year', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerText = 'Update Year';
+            showToast('Error: ' + err.message, 'error');
+          })
+          .updateAcademicYear(originalYear, data);
+      } else {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            btn.disabled = false;
+            btn.innerText = 'Save Year';
+            if(res.success) {
+              closeModal();
+              document.getElementById('yearForm').reset();
+              refreshData();
+              showToast('Academic Year added successfully!', 'success');
+            } else {
+              showToast(res.message || 'Failed to add academic year', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerText = 'Save Year';
+            showToast('Error: ' + err.message, 'error');
+          })
+          .addAcademicYear(data);
+      }
+    }
+
+    // DELETE MODAL
+    function openDeleteModal(yearName) {
+      currentDeleteYear = yearName;
+      document.getElementById('deleteYearName').innerText = yearName;
+      document.getElementById('deleteModal').classList.add('active');
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('deleteModal').classList.remove('active');
+      currentDeleteYear = null;
+    }
+
+    // DELETE CONFIRMATION
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+      if (!currentDeleteYear) return;
+      
+      const btn = this;
+      btn.disabled = true;
+      btn.innerText = 'Deleting...';
+
       google.script.run
         .withSuccessHandler(function(res) {
-          btn.disabled = false; btn.innerText = 'Save Year';
+          btn.disabled = false;
+          btn.innerText = 'Delete';
           if(res.success) {
-            closeModal(); 
-            document.getElementById('yearForm').reset(); 
+            closeDeleteModal();
             refreshData();
-            alert('Academic Year added successfully!');
+            showToast('Academic Year deleted successfully!', 'success');
+          } else {
+            showToast(res.message || 'Failed to delete academic year', 'error');
           }
         })
         .withFailureHandler(function(err) {
-          btn.disabled = false; btn.innerText = 'Save Year';
-          alert('Error: ' + err.message);
+          btn.disabled = false;
+          btn.innerText = 'Delete';
+          showToast('Error: ' + err.message, 'error');
         })
-        .addAcademicYear(data);
-    }
+        .deleteAcademicYear(currentDeleteYear);
+    };
   </script>
 </body>
 </html>

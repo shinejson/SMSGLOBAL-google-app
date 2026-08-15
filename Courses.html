@@ -30,6 +30,14 @@
     td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
     tr:hover { background-color: #f8fafc; }
 
+    /* ACTION BUTTONS */
+    .action-icon-btn { background: none; border: none; cursor: pointer; padding: 6px 10px; border-radius: 6px; font-size: 18px; transition: all 0.2s; }
+    .action-icon-btn:hover { transform: scale(1.1); }
+    .edit-btn { color: #3b82f6; }
+    .edit-btn:hover { background: #eff6ff; }
+    .delete-btn { color: #ef4444; }
+    .delete-btn:hover { background: #fef2f2; }
+
     /* --- BADGES --- */
     .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-block; }
     .status-active { background: #dcfce7; color: #166534; }
@@ -61,6 +69,8 @@
     .btn-secondary:hover { background: #cbd5e1; color: #1e293b; }
     .btn-primary { background: #3b82f6; color: #fff; }
     .btn-primary:hover { background: #2563eb; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
 
     /* --- TOAST NOTIFICATIONS --- */
     .toast-container {
@@ -221,6 +231,7 @@
           <th>Credits</th>
           <th>Semester</th>
           <th>Status</th>
+          <th style="text-align: center;">Actions</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
@@ -280,8 +291,32 @@
     </div>
   </div>
 
+  <!-- DELETE CONFIRMATION MODAL -->
+  <div class="modal-backdrop" id="deleteModal">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>Delete Course</h3>
+        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: #64748b; font-size: 15px; line-height: 1.5;">
+          Are you sure you want to delete course <strong id="deleteCourseName" style="color: #0f172a;"></strong>?
+        </p>
+        <p style="color: #ef4444; font-size: 13px; margin-top: 10px;">
+          This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let courseList = [];
+    let currentDeleteCourse = null;
+    let isEditMode = false;
 
     document.addEventListener('DOMContentLoaded', function() {
       refreshData();
@@ -333,7 +368,7 @@
       tbody.innerHTML = '';
       
       if(courseList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">No courses found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">No courses found.</td></tr>`;
         return;
       }
 
@@ -351,6 +386,14 @@
           <td>${row.credits || '-'}</td>
           <td>${row.semester || '-'}</td>
           <td><span class="status-badge ${statusClass}">${row.status || 'Active'}</span></td>
+          <td style="text-align: center;">
+            <button class="action-icon-btn edit-btn" onclick='editCourse(${JSON.stringify(row)})' title="Edit">
+              ✏️
+            </button>
+            <button class="action-icon-btn delete-btn" onclick='openDeleteModal("${row.courseId}", "${row.courseName}")' title="Delete">
+              🗑️
+            </button>
+          </td>
         `;
         tbody.appendChild(tr);
       });
@@ -385,7 +428,8 @@
     }
 
     // --- MODAL LOGIC ---
-    function openAddModal() { 
+    function openAddModal() {
+      isEditMode = false;
       document.getElementById('courseForm').reset();
       document.getElementById('formCourseId').value = '';
       document.getElementById('modalTitle').innerText = 'Add New Course';
@@ -393,12 +437,27 @@
       document.getElementById('courseModal').classList.add('active'); 
     }
 
+    // EDIT MODAL
+    function editCourse(course) {
+      isEditMode = true;
+      document.getElementById('modalTitle').innerText = 'Edit Course';
+      document.getElementById('saveBtn').innerText = 'Update Course';
+      document.getElementById('formCourseId').value = course.courseId;
+      document.getElementById('courseName').value = course.courseName;
+      document.getElementById('instructor').value = course.instructor;
+      document.getElementById('credits').value = course.credits;
+      document.getElementById('semester').value = course.semester;
+      document.getElementById('status').value = course.status || 'Active';
+      document.getElementById('courseModal').classList.add('active');
+    }
+
     function closeModal() { document.getElementById('courseModal').classList.remove('active'); }
 
     function handleSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('saveBtn');
-      btn.disabled = true; btn.innerText = 'Saving...';
+      btn.disabled = true;
+      btn.innerText = isEditMode ? 'Updating...' : 'Saving...';
 
       const data = {
         courseName: document.getElementById('courseName').value.trim(),
@@ -408,23 +467,87 @@
         status: document.getElementById('status').value
       };
 
+      if (isEditMode) {
+        const courseId = document.getElementById('formCourseId').value;
+        google.script.run
+          .withSuccessHandler(function(res) {
+            btn.disabled = false;
+            btn.innerText = 'Update Course';
+            if(res.success) {
+              closeModal();
+              refreshData();
+              showToast('Course updated successfully!', 'success');
+            } else {
+              showToast(res.message || 'Error updating course.', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerText = 'Update Course';
+            showToast('Error: ' + (err ? err.message : 'Could not update course.'), 'error');
+          })
+          .updateCourse(courseId, data);
+      } else {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            btn.disabled = false;
+            btn.innerText = 'Save Course';
+            if(res.success) {
+              closeModal();
+              refreshData();
+              showToast(`Course added successfully! ID: ${res.courseId}`, 'success');
+            } else {
+              showToast('Error saving course.', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerText = 'Save Course';
+            showToast('Error: ' + (err ? err.message : 'Could not save course.'), 'error');
+          })
+          .addCourse(data);
+      }
+    }
+
+    // DELETE MODAL
+    function openDeleteModal(courseId, courseName) {
+      currentDeleteCourse = courseId;
+      document.getElementById('deleteCourseName').innerText = courseName;
+      document.getElementById('deleteModal').classList.add('active');
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('deleteModal').classList.remove('active');
+      currentDeleteCourse = null;
+    }
+
+    // DELETE CONFIRMATION
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+      if (!currentDeleteCourse) return;
+      
+      const btn = this;
+      btn.disabled = true;
+      btn.innerText = 'Deleting...';
+
       google.script.run
         .withSuccessHandler(function(res) {
-          btn.disabled = false; btn.innerText = 'Save Course';
+          btn.disabled = false;
+          btn.innerText = 'Delete';
           if(res.success) {
-            closeModal();
+            closeDeleteModal();
             refreshData();
-            showToast(`Course added successfully! ID: ${res.courseId}`, 'success');
+            showToast('Course deleted successfully!', 'success');
           } else {
-            showToast('Error saving course.', 'error');
+            showToast(res.message || 'Error deleting course.', 'error');
           }
         })
         .withFailureHandler(function(err) {
-          btn.disabled = false; btn.innerText = 'Save Course';
-          showToast('Error: ' + (err ? err.message : 'Could not save course.'), 'error');
+          btn.disabled = false;
+          btn.innerText = 'Delete';
+          showToast('Error: ' + (err ? err.message : 'Could not delete course.'), 'error');
         })
-        .addCourse(data);
-    }
+        .deleteCourse(currentDeleteCourse);
+    };
   </script>
 </body>
 </html>

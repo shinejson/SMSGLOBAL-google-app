@@ -25,9 +25,17 @@
     .table-container { background: white; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow-x: auto; margin: 0 -40px; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     thead { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
-    th { text-align: left; padding: 16px 20px; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+    th { text-align: left; padding: 16px 20px; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; white-space: nowrap; }
     td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
     tr:hover { background-color: #f8fafc; }
+
+    /* ACTION BUTTONS */
+    .action-icon-btn { background: none; border: none; cursor: pointer; padding: 6px 10px; border-radius: 6px; font-size: 18px; transition: all 0.2s; }
+    .action-icon-btn:hover { transform: scale(1.1); }
+    .edit-btn { color: #3b82f6; }
+    .edit-btn:hover { background: #eff6ff; }
+    .delete-btn { color: #ef4444; }
+    .delete-btn:hover { background: #fef2f2; }
 
     #loading { text-align: center; padding: 40px; color: #64748b; }
 
@@ -53,6 +61,8 @@
     .btn-secondary:hover { background: #cbd5e1; color: #1e293b; }
     .btn-primary { background: #3b82f6; color: #fff; }
     .btn-primary:hover { background: #2563eb; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
 
     /* --- TOAST NOTIFICATIONS --- */
     .toast-container {
@@ -158,13 +168,16 @@
     body.dark-mode td { border-bottom-color: #334155; color: #f1f5f9; }
     body.dark-mode tr:hover { background-color: #334155; }
     body.dark-mode #loading { color: #94a3b8; }
-    body.dark-mode .form-select { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+    body.dark-mode .form-select, body.dark-mode .form-input { background: #0f172a; border-color: #334155; color: #f1f5f9; }
     body.dark-mode .modal-content { background: #1e293b; }
     body.dark-mode .modal-header { border-bottom-color: #334155; }
     body.dark-mode .modal-header h3 { color: #f1f5f9; }
     body.dark-mode .modal-close { color: #94a3b8; }
     body.dark-mode .modal-close:hover { color: #f1f5f9; }
     body.dark-mode .modal-footer { background: #0f172a; border-top-color: #334155; }
+    body.dark-mode .form-label { color: #94a3b8; }
+    body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
+    body.dark-mode .btn-secondary:hover { background: #475569; }
     body.dark-mode .toast { background: #1e293b; color: #f1f5f9; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); }
     body.dark-mode .toast-message { color: #f1f5f9; }
   </style>
@@ -204,20 +217,22 @@
           <th>Last Name</th>
           <th>Class</th>
           <th>Academic Year</th>
+          <th style="text-align: center;">Actions</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
 
-  <!-- MODAL -->
+  <!-- ADD/EDIT MODAL -->
   <div class="modal-backdrop" id="teacherModal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Add New Teacher</h3>
+        <h3 id="modalTitle">Add New Teacher</h3>
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       <form id="teacherForm" onsubmit="handleSubmit(event)">
+        <input type="hidden" id="originalTeacherId">
         <div class="modal-body">
           <div class="form-grid">
             <div class="form-group">
@@ -253,8 +268,32 @@
     </div>
   </div>
 
+  <!-- DELETE CONFIRMATION MODAL -->
+  <div class="modal-backdrop" id="deleteModal">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>Delete Teacher</h3>
+        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: #64748b; font-size: 15px; line-height: 1.5;">
+          Are you sure you want to delete teacher <strong id="deleteTeacherName" style="color: #0f172a;"></strong>?
+        </p>
+        <p style="color: #ef4444; font-size: 13px; margin-top: 10px;">
+          This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let teacherList = [];
+    let currentDeleteTeacher = null;
+    let isEditMode = false;
 
     document.addEventListener('DOMContentLoaded', function() {
       loadDropdowns();
@@ -329,7 +368,7 @@
 
       tbody.innerHTML = '';
       if(teacherList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#64748b;">No teachers found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">No teachers found.</td></tr>`;
         return;
       }
 
@@ -341,6 +380,14 @@
           <td>${row.lastName || '-'}</td>
           <td>${row.class || '-'}</td>
           <td>${row.academicYear || '-'}</td>
+          <td style="text-align: center;">
+            <button class="action-icon-btn edit-btn" onclick='editTeacher(${JSON.stringify(row)})' title="Edit">
+              ✏️
+            </button>
+            <button class="action-icon-btn delete-btn" onclick='openDeleteModal("${row.teacherId}", "${row.firstName} ${row.lastName}")' title="Delete">
+              🗑️
+            </button>
+          </td>
         `;
         tbody.appendChild(tr);
       });
@@ -364,13 +411,39 @@
       countBadge.innerText = visibleCount;
     }
 
-    function openAddModal() { document.getElementById('teacherModal').classList.add('active'); }
-    function closeModal() { document.getElementById('teacherModal').classList.remove('active'); }
+    // ADD MODAL
+    function openAddModal() {
+      isEditMode = false;
+      document.getElementById('modalTitle').innerText = 'Add New Teacher';
+      document.getElementById('saveBtn').innerText = 'Save Teacher';
+      document.getElementById('teacherForm').reset();
+      document.getElementById('originalTeacherId').value = '';
+      document.getElementById('teacherModal').classList.add('active');
+    }
 
+    // EDIT MODAL
+    function editTeacher(teacher) {
+      isEditMode = true;
+      document.getElementById('modalTitle').innerText = 'Edit Teacher';
+      document.getElementById('saveBtn').innerText = 'Update Teacher';
+      document.getElementById('originalTeacherId').value = teacher.teacherId;
+      document.getElementById('firstName').value = teacher.firstName;
+      document.getElementById('lastName').value = teacher.lastName;
+      document.getElementById('classSelect').value = teacher.class;
+      document.getElementById('yearSelect').value = teacher.academicYear;
+      document.getElementById('teacherModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('teacherModal').classList.remove('active');
+    }
+
+    // SAVE (CREATE OR UPDATE)
     function handleSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('saveBtn');
-      btn.disabled = true; btn.innerText = 'Saving...';
+      btn.disabled = true;
+      btn.innerText = isEditMode ? 'Updating...' : 'Saving...';
       
       const data = {
         firstName: document.getElementById('firstName').value.trim(),
@@ -380,38 +453,110 @@
       };
 
       function submitTeacher(payload) {
-        google.script.run
-          .withSuccessHandler(function(res) {
-            if (res && res.requiresAdminOverride && !payload.__adminAcademicYearOverride) {
-              const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
-              if (!proceed) {
-                btn.disabled = false; btn.innerText = 'Save Teacher';
-                showToast('Teacher save cancelled.', 'warning');
+        if (isEditMode) {
+          const originalTeacherId = document.getElementById('originalTeacherId').value;
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (res && res.requiresAdminOverride && !payload.__adminAcademicYearOverride) {
+                const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+                if (!proceed) {
+                  btn.disabled = false; btn.innerText = 'Update Teacher';
+                  showToast('Teacher update cancelled.', 'warning');
+                  return;
+                }
+                payload.__adminAcademicYearOverride = true;
+                submitTeacher(payload);
                 return;
               }
-              payload.__adminAcademicYearOverride = true;
-              submitTeacher(payload);
-              return;
-            }
-            btn.disabled = false; btn.innerText = 'Save Teacher';
-            if(res.success) {
-              closeModal(); 
-              document.getElementById('teacherForm').reset();
-              refreshData();
-              showToast(`Teacher added successfully! ID: ${res.teacherId}`, 'success');
-            } else {
-              showToast(res && res.message ? res.message : 'Error saving teacher record.', 'error');
-            }
-          })
-          .withFailureHandler(function(err) {
-            btn.disabled = false; btn.innerText = 'Save Teacher';
-            showToast('Error: ' + (err ? err.message : 'Could not save teacher.'), 'error');
-          })
-          .addTeacher(payload);
+              btn.disabled = false;
+              btn.innerText = 'Update Teacher';
+              if(res.success) {
+                closeModal();
+                refreshData();
+                showToast('Teacher updated successfully!', 'success');
+              } else {
+                showToast(res && res.message ? res.message : 'Error updating teacher.', 'error');
+              }
+            })
+            .withFailureHandler(function(err) {
+              btn.disabled = false; btn.innerText = 'Update Teacher';
+              showToast('Error: ' + (err ? err.message : 'Could not update teacher.'), 'error');
+            })
+            .updateTeacher(originalTeacherId, payload);
+        } else {
+          google.script.run
+            .withSuccessHandler(function(res) {
+              if (res && res.requiresAdminOverride && !payload.__adminAcademicYearOverride) {
+                const proceed = confirm((res.message || 'This action needs admin confirmation.') + '\n\nClick OK to continue as Admin, or Cancel to stop.');
+                if (!proceed) {
+                  btn.disabled = false; btn.innerText = 'Save Teacher';
+                  showToast('Teacher save cancelled.', 'warning');
+                  return;
+                }
+                payload.__adminAcademicYearOverride = true;
+                submitTeacher(payload);
+                return;
+              }
+              btn.disabled = false; btn.innerText = 'Save Teacher';
+              if(res.success) {
+                closeModal(); 
+                document.getElementById('teacherForm').reset();
+                refreshData();
+                showToast(`Teacher added successfully! ID: ${res.teacherId}`, 'success');
+              } else {
+                showToast(res && res.message ? res.message : 'Error saving teacher record.', 'error');
+              }
+            })
+            .withFailureHandler(function(err) {
+              btn.disabled = false; btn.innerText = 'Save Teacher';
+              showToast('Error: ' + (err ? err.message : 'Could not save teacher.'), 'error');
+            })
+            .addTeacher(payload);
+        }
       }
 
       submitTeacher(data);
     }
+
+    // DELETE MODAL
+    function openDeleteModal(teacherId, teacherName) {
+      currentDeleteTeacher = teacherId;
+      document.getElementById('deleteTeacherName').innerText = teacherName;
+      document.getElementById('deleteModal').classList.add('active');
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('deleteModal').classList.remove('active');
+      currentDeleteTeacher = null;
+    }
+
+    // DELETE CONFIRMATION
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+      if (!currentDeleteTeacher) return;
+      
+      const btn = this;
+      btn.disabled = true;
+      btn.innerText = 'Deleting...';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Delete';
+          if(res.success) {
+            closeDeleteModal();
+            refreshData();
+            showToast('Teacher deleted successfully!', 'success');
+          } else {
+            showToast(res && res.message ? res.message : 'Error deleting teacher.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = 'Delete';
+          showToast('Error: ' + (err ? err.message : 'Could not delete teacher.'), 'error');
+        })
+        .deleteTeacher(currentDeleteTeacher);
+    };
   </script>
 </body>
 </html>
