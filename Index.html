@@ -1048,20 +1048,43 @@
     }
     console.log('SCRIPT_URL:', SCRIPT_URL);
 
+    // Convert Google Drive share links to a direct image URL (same as Login page)
+    function formatDriveImageUrl(url) {
+      if (!url) return '';
+      const strUrl = String(url).trim();
+      const fileDMatch = strUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      const idParamMatch = strUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      const fileId = (fileDMatch && fileDMatch[1]) || (idParamMatch && idParamMatch[1]);
+      if (fileId) {
+        return 'https://lh3.googleusercontent.com/d/' + fileId;
+      }
+      return strUrl;
+    }
+
+    function getLogoUrlFromParams(params) {
+      if (!params) return '';
+      return params['School Logo URL']
+        || params['schoolLogoDirectUrl']
+        || params['School Logo']
+        || params['Logo URL']
+        || params['schoolLogoUrl']
+        || '';
+    }
+
     // Initialize the dashboard after DOM and Google Apps Script API are ready
     function initializeDashboard() {
       // --- LOAD SCHOOL SETTINGS (Logo and Alias) ---
       google.script.run
         .withSuccessHandler(function(params) {
           if (params) {
-            const logoUrl = params['School Logo URL'] || params['schoolLogoDirectUrl'] || '';
+            const logoUrl = getLogoUrlFromParams(params);
             const schoolAlias = params['School Alias'] || 'SMS';
             
             const logoImg = document.getElementById('schoolLogo');
             const schoolNameEl = document.getElementById('schoolName');
             
             if (logoImg && logoUrl) {
-              logoImg.src = logoUrl;
+              logoImg.src = formatDriveImageUrl(logoUrl);
               logoImg.onerror = function() {
                 // Fallback to placeholder if logo fails to load
                 this.src = 'https://via.placeholder.com/36x36/3b82f6/ffffff?text=' + (schoolAlias ? schoolAlias.charAt(0) : 'S');
