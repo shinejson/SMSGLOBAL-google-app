@@ -42,6 +42,29 @@
       }
     };
     
+    window.saveSidebarCollapsedState = function() {
+      try {
+        const sidebar = document.getElementById('sidebarMenuContainer');
+        if (sidebar && window.innerWidth > 1024) {
+          localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed') ? 'true' : 'false');
+        }
+      } catch (e) {}
+    };
+
+    window.applySavedSidebarCollapsedState = function() {
+      try {
+        if (window.innerWidth <= 1024) return;
+        const sidebar = document.getElementById('sidebarMenuContainer');
+        if (!sidebar) return;
+        const collapsed = localStorage.getItem('sidebarCollapsed');
+        if (collapsed === 'true') {
+          sidebar.classList.add('collapsed');
+        } else if (collapsed === 'false') {
+          sidebar.classList.remove('collapsed');
+        }
+      } catch (e) {}
+    };
+
     window.toggleSidebar = function() {
       const sidebar = document.getElementById('sidebarMenuContainer');
       const overlay = document.getElementById('sidebarOverlay');
@@ -53,6 +76,7 @@
       } else {
         sidebar.classList.toggle('collapsed');
         overlay.classList.remove('active');
+        window.saveSidebarCollapsedState();
       }
     };
   </script>
@@ -893,6 +917,12 @@
       </button>
     </div>
   </div>
+  <script>
+    // Restore collapsed sidebar immediately on refresh (before GAS API loads)
+    if (typeof applySavedSidebarCollapsedState === 'function') {
+      applySavedSidebarCollapsedState();
+    }
+  </script>
 
   <!-- Logout Confirmation Modal -->
   <div class="modal-backdrop" id="logoutModal">
@@ -1201,14 +1231,7 @@
           // Desktop behavior - collapse/expand
           sidebar.classList.toggle('collapsed');
           overlay.classList.remove('active');
-          
-          // Save collapsed state to localStorage
-          try {
-            const isCollapsed = sidebar.classList.contains('collapsed');
-            localStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
-          } catch (e) {
-            console.warn('Could not save sidebar state:', e);
-          }
+          window.saveSidebarCollapsedState();
         }
       };
 
@@ -1310,22 +1333,7 @@
       })();
 
       // --- APPLY SAVED SIDEBAR COLLAPSE STATE ---
-      (function applySavedSidebarState() {
-        // Only apply on desktop (width > 1024px)
-        if (window.innerWidth > 1024) {
-          try {
-            const sidebarCollapsed = localStorage.getItem('sidebarCollapsed');
-            if (sidebarCollapsed === 'true') {
-              const sidebar = document.getElementById('sidebarMenuContainer');
-              if (sidebar) {
-                sidebar.classList.add('collapsed');
-              }
-            }
-          } catch (e) {
-            console.warn('Could not restore sidebar state:', e);
-          }
-        }
-      })();
+      window.applySavedSidebarCollapsedState();
 
       // --- PAGE LOADING HELPERS ---
       const loadingOverlay = document.getElementById('pageLoadingOverlay');
@@ -2080,12 +2088,15 @@
         const overlay = document.getElementById('sidebarOverlay');
         
         if (window.innerWidth > 1024) {
-          // On desktop, remove mobile classes
+          // On desktop, remove mobile classes and restore saved collapse state
           sidebar.classList.remove('open');
           overlay.classList.remove('active');
+          window.applySavedSidebarCollapsedState();
         } else {
-          // On mobile, remove desktop classes
+          // On mobile, remove desktop collapse (drawer uses .open instead)
           sidebar.classList.remove('collapsed');
+          sidebar.classList.remove('open');
+          overlay.classList.remove('active');
         }
       });
 
