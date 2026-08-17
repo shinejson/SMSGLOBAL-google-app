@@ -1219,6 +1219,93 @@ function updateStudent(studentId, studentData) {
 }
 
 // 7. Delete operation logic
+/**
+ * Check if a student has related records in other sheets
+ * Returns an object with hasRecords (boolean) and details (array of sheet names)
+ */
+function checkStudentRelatedRecords(studentId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const relatedSheets = [];
+  const normalizedStudentId = String(studentId).trim();
+  
+  // Check Payments sheet (column C - Student ID)
+  const paymentsSheet = ss.getSheetByName("Payments");
+  if (paymentsSheet && paymentsSheet.getLastRow() > 2) {
+    const paymentsData = paymentsSheet.getRange(3, 3, paymentsSheet.getLastRow() - 2, 1).getValues();
+    for (let i = 0; i < paymentsData.length; i++) {
+      if (String(paymentsData[i][0]).trim() === normalizedStudentId) {
+        relatedSheets.push("Payments");
+        break;
+      }
+    }
+  }
+  
+  // Check Invoices sheet (column C - Student ID)
+  const invoicesSheet = ss.getSheetByName("Invoices");
+  if (invoicesSheet && invoicesSheet.getLastRow() > 2) {
+    const invoicesData = invoicesSheet.getRange(3, 3, invoicesSheet.getLastRow() - 2, 1).getValues();
+    for (let i = 0; i < invoicesData.length; i++) {
+      if (String(invoicesData[i][0]).trim() === normalizedStudentId) {
+        relatedSheets.push("Invoices");
+        break;
+      }
+    }
+  }
+  
+  // Check Attendance sheet (column C - Student ID)
+  const attendanceSheet = ss.getSheetByName("Attendance");
+  if (attendanceSheet && attendanceSheet.getLastRow() > 2) {
+    const attendanceData = attendanceSheet.getRange(3, 3, attendanceSheet.getLastRow() - 2, 1).getValues();
+    for (let i = 0; i < attendanceData.length; i++) {
+      if (String(attendanceData[i][0]).trim() === normalizedStudentId) {
+        relatedSheets.push("Attendance");
+        break;
+      }
+    }
+  }
+  
+  // Check Enrollments sheet (column C - Student ID)
+  const enrollmentsSheet = ss.getSheetByName("Enrollments");
+  if (enrollmentsSheet && enrollmentsSheet.getLastRow() > 2) {
+    const enrollmentsData = enrollmentsSheet.getRange(3, 3, enrollmentsSheet.getLastRow() - 2, 1).getValues();
+    for (let i = 0; i < enrollmentsData.length; i++) {
+      if (String(enrollmentsData[i][0]).trim() === normalizedStudentId) {
+        relatedSheets.push("Enrollments");
+        break;
+      }
+    }
+  }
+  
+  // Check Performance sheet (column C - Student ID)
+  const performanceSheet = ss.getSheetByName("Performance");
+  if (performanceSheet && performanceSheet.getLastRow() > 2) {
+    const performanceData = performanceSheet.getRange(3, 3, performanceSheet.getLastRow() - 2, 1).getValues();
+    for (let i = 0; i < performanceData.length; i++) {
+      if (String(performanceData[i][0]).trim() === normalizedStudentId) {
+        relatedSheets.push("Performance");
+        break;
+      }
+    }
+  }
+  
+  // Check Billings sheet (column C - Student ID)
+  const billingsSheet = ss.getSheetByName("Billings");
+  if (billingsSheet && billingsSheet.getLastRow() > 2) {
+    const billingsData = billingsSheet.getRange(3, 3, billingsSheet.getLastRow() - 2, 1).getValues();
+    for (let i = 0; i < billingsData.length; i++) {
+      if (String(billingsData[i][0]).trim() === normalizedStudentId) {
+        relatedSheets.push("Billings");
+        break;
+      }
+    }
+  }
+  
+  return {
+    hasRecords: relatedSheets.length > 0,
+    relatedSheets: relatedSheets
+  };
+}
+
 function deleteStudent(studentId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Students");
@@ -1226,6 +1313,16 @@ function deleteStudent(studentId) {
 
   const row = findRowById(sheet, studentId);
   if (row === -1) throw new Error("Student record not found.");
+
+  // Check for related records before deletion
+  const relatedCheck = checkStudentRelatedRecords(studentId);
+  if (relatedCheck.hasRecords) {
+    const sheetList = relatedCheck.relatedSheets.join(", ");
+    throw new Error(
+      "Cannot delete student " + studentId + ". This student has related records in: " + sheetList + ". " +
+      "Please delete or reassign these records first to maintain data integrity."
+    );
+  }
 
   const currentRow = sheet.getRange(row, 1, 1, 10).getValues()[0];
   const deletedSnapshot = buildAuditSnapshot({
