@@ -32,6 +32,7 @@
     .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-block; }
     .status-active { background: #dcfce7; color: #166534; }
     .status-revoked { background: #fee2e2; color: #991b1b; }
+    .status-locked { background: #fef3c7; color: #92400e; }
     
     /* Role Styling */
     .role-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; display: inline-block; background: #e0f2fe; color: #0369a1; }
@@ -44,6 +45,7 @@
     .action-icon-btn:hover { transform: scale(1.1); }
     .action-icon-btn.edit-btn:hover { background: #eff6ff; color: #2563eb; }
     .action-icon-btn.delete-btn:hover { background: #fef2f2; color: #dc2626; }
+    .action-icon-btn.unlock-btn:hover { background: #fef3c7; color: #b45309; }
 
     /* --- LOADING --- */
     #loading { text-align: center; padding: 40px; color: #64748b; }
@@ -136,6 +138,8 @@
           <th>Account Status</th>
          <th>Username</th>
           <th>Password</th>
+          <th>Login Trials</th>
+          <th>Lock Status</th>
           <th class="text-center" style="text-align: center;">Actions</th>
         </tr>
       </thead>
@@ -226,9 +230,19 @@
   <script>
     let userList = [];
     let currentDeleteId = null;
+    let currentUserIsAdmin = false;
 
     document.addEventListener('DOMContentLoaded', function() {
-      refreshData();
+      google.script.run
+        .withSuccessHandler(function(user) {
+          currentUserIsAdmin = !!(user && String(user.role || '').trim().toLowerCase() === 'admin');
+          refreshData();
+        })
+        .withFailureHandler(function() {
+          currentUserIsAdmin = false;
+          refreshData();
+        })
+        .getLoggedInUser();
     });
 
     function refreshData() {
@@ -250,7 +264,7 @@
 
       tbody.innerHTML = '';
       if(userList.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:#64748b;">No users found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No users found.</td></tr>`;
         return;
       }
 
@@ -262,6 +276,17 @@
         let roleClass = 'role-badge';
         if(row.role === 'Admin') roleClass = 'role-badge role-admin';
         if(row.role === 'Bursar') roleClass = 'role-badge role-bursar';
+
+        const lockLabel = row.isLocked
+          ? `Locked (${row.lockMinutesRemaining || 30} min left)`
+          : (row.loginTrials > 0 ? `${row.loginTrials}/${4} failed attempts` : 'Unlocked');
+        const lockClass = row.isLocked ? 'status-badge status-locked' : 'status-badge status-active';
+        const showUnlockBtn = currentUserIsAdmin && (row.isLocked || (row.loginTrials || 0) > 0);
+        const unlockBtn = showUnlockBtn
+          ? `<button class="action-icon-btn unlock-btn" onclick="unlockAccount('${row.userId}')" title="Unlock Account">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+            </button>`
+          : '';
 
         tr.innerHTML = `
           <td><strong>${row.userId}</strong></td>
@@ -278,8 +303,13 @@
               </button>
             </div>
           </td>
+          <td><strong>${row.loginTrials || 0}</strong></td>
+          <td>
+            <span class="${lockClass}" title="${row.lockedUntil ? 'Locked until ' + row.lockedUntil : 'No active lock'}">${lockLabel}</span>
+          </td>
           <td style="text-align: center;">
             <div class="actions-cell">
+              ${unlockBtn}
               <button class="action-icon-btn edit-btn" onclick="openEditModal('${row.userId}')" title="Edit User">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               </button>
@@ -366,6 +396,33 @@
     };
 
     function closeModal() { document.getElementById('userModal').classList.remove('active'); }
+
+    function unlockAccount(userId) {
+      if (!currentUserIsAdmin) {
+        alert('Only administrators can unlock user accounts.');
+        return;
+      }
+
+      const user = userList.find(function(u) { return u.userId === userId; });
+      if (!user) return alert('Error: User not found.');
+
+      const label = user.fullName || userId;
+      if (!confirm('Unlock account for ' + label + '? This will reset failed login attempts and remove the temporary lock.')) {
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            refreshData();
+            alert(res.message || 'Account unlocked successfully.');
+          }
+        })
+        .withFailureHandler(function(err) {
+          alert('Error: ' + (err && err.message ? err.message : 'Could not unlock account.'));
+        })
+        .unlockUserAccount(userId);
+    }
 
      function handleSubmit(e) {
       e.preventDefault();

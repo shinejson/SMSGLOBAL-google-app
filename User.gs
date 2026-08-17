@@ -1,5 +1,71 @@
 // --- USERS FUNCTIONS ---
 
+const MAX_LOGIN_ATTEMPTS = 4;
+const LOGIN_LOCK_MINUTES = 30;
+const USER_SHEET_FIRST_DATA_ROW = 3;
+const USER_SHEET_FIRST_COL = 2;
+const USER_SHEET_COL_COUNT = 9; // B through J
+
+function getUserSheetColumnCount_(sheet) {
+  const lastCol = sheet.getLastColumn();
+  return Math.max(USER_SHEET_COL_COUNT, lastCol >= USER_SHEET_FIRST_COL ? lastCol - USER_SHEET_FIRST_COL + 1 : USER_SHEET_COL_COUNT);
+}
+
+function parseLockedUntilValue_(value) {
+  if (!value) return null;
+  if (value instanceof Date && !isNaN(value.getTime())) return value;
+  const parsed = new Date(value);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatLockedUntilForDisplay_(value) {
+  const lockedUntil = parseLockedUntilValue_(value);
+  if (!lockedUntil) return '';
+  try {
+    return Utilities.formatDate(lockedUntil, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+  } catch (e) {
+    return lockedUntil.toISOString();
+  }
+}
+
+function isUserAccountLocked_(loginTrials, lockedUntilValue) {
+  const lockedUntil = parseLockedUntilValue_(lockedUntilValue);
+  if (!lockedUntil) return false;
+  return lockedUntil.getTime() > Date.now();
+}
+
+function getRemainingLockMinutes_(lockedUntilValue) {
+  const lockedUntil = parseLockedUntilValue_(lockedUntilValue);
+  if (!lockedUntil) return 0;
+  const remainingMs = lockedUntil.getTime() - Date.now();
+  return remainingMs > 0 ? Math.ceil(remainingMs / 60000) : 0;
+}
+
+function resetUserLoginLock_(sheet, rowNum) {
+  sheet.getRange(rowNum, 9, 1, 2).setValues([[0, '']]);
+}
+
+function recordFailedLoginAttempt_(sheet, rowNum, currentAttempts) {
+  const newAttempts = (parseInt(currentAttempts, 10) || 0) + 1;
+
+  if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+    const lockUntil = new Date(Date.now() + LOGIN_LOCK_MINUTES * 60 * 1000);
+    sheet.getRange(rowNum, 9, 1, 2).setValues([[newAttempts, lockUntil]]);
+    return {
+      locked: true,
+      attempts: newAttempts,
+      message: 'Too many failed login attempts. Account locked for ' + LOGIN_LOCK_MINUTES + ' minutes.'
+    };
+  }
+
+  sheet.getRange(rowNum, 9).setValue(newAttempts);
+  return {
+    locked: false,
+    attempts: newAttempts,
+    message: 'Invalid username or password'
+  };
+}
+
 // 1. Fetch Users Data (EXCLUDES Password for security)
 function getUsersData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -7,22 +73,31 @@ function getUsersData() {
   if (!sheet) return [];
 
   const lastRow = sheet.getLastRow();
-  if (lastRow < 3) return [];
+  if (lastRow < USER_SHEET_FIRST_DATA_ROW) return [];
 
-  // Row 3 to Last, Col B(2) to Col H(8) => 7 columns
-  const dataRange = sheet.getRange(3, 2, lastRow - 2, 7);
+  const colCount = getUserSheetColumnCount_(sheet);
+  const dataRange = sheet.getRange(USER_SHEET_FIRST_DATA_ROW, USER_SHEET_FIRST_COL, lastRow - (USER_SHEET_FIRST_DATA_ROW - 1), colCount);
   const data = dataRange.getValues();
 
-  return data.map((row) => ({
-    userId: String(row[0]).trim(),
-    googleEmail: String(row[1]).trim(),
-    fullName: String(row[2]).trim(),
-    role: String(row[3]).trim(),
-    accountStatus: String(row[4]).trim(),
-    username: String(row[5]).trim(),
-    // Password is intentionally excluded for security
-    password: "••••••••", // Masked password for display purposes
-  }));
+  return data.map((row) => {
+    const loginTrials = parseInt(row[7], 10) || 0;
+    const lockedUntil = row[8];
+    const locked = isUserAccountLocked_(loginTrials, lockedUntil);
+
+    return {
+      userId: String(row[0]).trim(),
+      googleEmail: String(row[1]).trim(),
+      fullName: String(row[2]).trim(),
+      role: String(row[3]).trim(),
+      accountStatus: String(row[4]).trim(),
+      username: String(row[5]).trim(),
+      password: "••••••••",
+      loginTrials: loginTrials,
+      lockedUntil: formatLockedUntilForDisplay_(lockedUntil),
+      isLocked: locked,
+      lockMinutesRemaining: locked ? getRemainingLockMinutes_(lockedUntil) : 0
+    };
+  });
 }
 
 // 2. Helper to generate User ID (e.g. USR-1001)
@@ -94,8 +169,8 @@ function addUser(userData) {
   const plainPassword = userData.password || "Password123";
   const hashedPassword = hashPassword(plainPassword);
 
-  // Write to Column B to Column H (7 columns)
-  sheet.getRange(targetRow, 2, 1, 7).setValues([
+  // Write to Column B to Column J
+  sheet.getRange(targetRow, USER_SHEET_FIRST_COL, 1, USER_SHEET_COL_COUNT).setValues([
     [
       nextId,
       userData.googleEmail,
@@ -103,7 +178,9 @@ function addUser(userData) {
       userData.role,
       userData.accountStatus || "Active",
       userData.username,
-      hashedPassword, // Store hashed password
+      hashedPassword,
+      0,
+      ""
     ],
   ]);
 
@@ -166,6 +243,10 @@ function updateUser(userId, userData) {
       ],
     ]);
 
+  if (String(userData.accountStatus || '').trim().toLowerCase() === 'active') {
+    resetUserLoginLock_(sheet, row);
+  }
+
   // Invalidate cache and index
   invalidateCacheOnModify('Users');
   invalidateIndex('Users');
@@ -185,6 +266,46 @@ function updateUser(userId, userData) {
   );
 
   return { success: true };
+}
+
+// 6b. Unlock a temporarily locked user account (Admin only)
+function unlockUserAccount(userId) {
+  if (typeof isCurrentUserAdmin === 'function' && !isCurrentUserAdmin()) {
+    throw new Error('Only administrators can unlock user accounts.');
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Users');
+  if (!sheet) throw new Error('Users worksheet not found.');
+
+  const existingUser = getUsersData().find((user) => String(user.userId).trim() === String(userId).trim()) || null;
+  const row = findUserRowById(sheet, userId);
+  if (row === -1) throw new Error('User record not found.');
+
+  if (!existingUser || (!existingUser.isLocked && !(existingUser.loginTrials > 0))) {
+    return { success: true, message: 'Account is not locked.' };
+  }
+
+  resetUserLoginLock_(sheet, row);
+
+  invalidateCacheOnModify('Users');
+  invalidateIndex('Users');
+
+  safeLogAuditEvent(
+    'Update',
+    'Users',
+    userId,
+    'Unlocked user account ' + String((existingUser.fullName || userId)).trim(),
+    buildUserAuditSnapshot(existingUser),
+    buildUserAuditSnapshot(Object.assign({}, existingUser, {
+      loginTrials: 0,
+      lockedUntil: '',
+      isLocked: false,
+      lockMinutesRemaining: 0
+    }))
+  );
+
+  return { success: true, message: 'Account unlocked successfully.' };
 }
 
 // 6. Delete User (Delete)
@@ -234,44 +355,58 @@ function loginUser(username, password) {
   if (!sheet) return { success: false, message: "Users worksheet not found" };
 
   const lastRow = sheet.getLastRow();
-  if (lastRow < 3) return { success: false, message: "No users found" };
+  if (lastRow < USER_SHEET_FIRST_DATA_ROW) return { success: false, message: "No users found" };
 
-  // Read User data columns B through H so we can verify username/password and capture role.
-  const dataRange = sheet.getRange(3, 2, lastRow - 2, 7);
+  const colCount = getUserSheetColumnCount_(sheet);
+  const dataRange = sheet.getRange(USER_SHEET_FIRST_DATA_ROW, USER_SHEET_FIRST_COL, lastRow - (USER_SHEET_FIRST_DATA_ROW - 1), colCount);
   const data = dataRange.getValues();
+  const normalizedUsername = String(username || '').trim();
 
   for (let i = 0; i < data.length; i++) {
+    const rowNum = i + USER_SHEET_FIRST_DATA_ROW;
     const userId = String(data[i][0]).trim();
     const fullName = String(data[i][2]).trim();
     const role = String(data[i][3]).trim() || "User";
     const accountStatus = String(data[i][4]).trim();
     const user = String(data[i][5]).trim();
     const storedPasswordHash = String(data[i][6]).trim();
+    const loginTrials = parseInt(data[i][7], 10) || 0;
+    const lockedUntilValue = data[i][8];
 
-    // Check if account is active
-    if (accountStatus.toLowerCase() !== "active") {
-      if (user === username) {
-        return { success: false, message: "Account is inactive. Contact administrator." };
-      }
-      continue;
+    if (user !== normalizedUsername) continue;
+
+    const lockedUntil = parseLockedUntilValue_(lockedUntilValue);
+    if (lockedUntil && lockedUntil.getTime() <= Date.now()) {
+      resetUserLoginLock_(sheet, rowNum);
+    } else if (isUserAccountLocked_(loginTrials, lockedUntilValue)) {
+      const minutesLeft = getRemainingLockMinutes_(lockedUntilValue) || LOGIN_LOCK_MINUTES;
+      return {
+        success: false,
+        message: 'Account temporarily locked after ' + MAX_LOGIN_ATTEMPTS + ' failed attempts. Try again in ' + minutesLeft + ' minute(s).'
+      };
     }
 
-    // Verify username and password using secure hash comparison
-    if (user === username && verifyPassword(password, storedPasswordHash)) {
-      // Create secure session with unique token
-      const sessionId = createSession(userId, username, role, fullName);
-      
-      // Store session ID in user properties (client-accessible)
+    if (accountStatus.toLowerCase() !== "active") {
+      return { success: false, message: "Account is inactive. Contact administrator." };
+    }
+
+    if (verifyPassword(password, storedPasswordHash)) {
+      resetUserLoginLock_(sheet, rowNum);
+
+      const sessionId = createSession(userId, normalizedUsername, role, fullName);
       storeSessionIdInProperties(sessionId);
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         role: role,
         sessionId: sessionId,
-        username: username,
+        username: normalizedUsername,
         fullName: fullName
       };
     }
+
+    const failureResult = recordFailedLoginAttempt_(sheet, rowNum, loginTrials);
+    return { success: false, message: failureResult.message };
   }
 
   return { success: false, message: "Invalid username or password" };

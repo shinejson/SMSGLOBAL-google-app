@@ -92,7 +92,8 @@ function getUsersDataUncached() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 3) return [];
 
-  const dataRange = sheet.getRange(3, 2, lastRow - 2, 7);
+  const colCount = Math.max(9, sheet.getLastColumn() >= 2 ? sheet.getLastColumn() - 1 : 9);
+  const dataRange = sheet.getRange(3, 2, lastRow - 2, colCount);
   const data = dataRange.getValues();
 
   return data.map((row) => ({
@@ -102,7 +103,11 @@ function getUsersDataUncached() {
     role: String(row[3]).trim(),
     accountStatus: String(row[4]).trim(),
     username: String(row[5]).trim(),
-    password: "••••••••", // Masked
+    password: "••••••••",
+    loginTrials: parseInt(row[7], 10) || 0,
+    lockedUntil: row[8] ? String(row[8]) : '',
+    isLocked: false,
+    lockMinutesRemaining: 0
   }));
 }
 
@@ -388,4 +393,35 @@ function invalidateFinancialCache() {
  */
 function invalidateAttendanceCache() {
   invalidateCacheOnModify('Attendance');
+}
+
+// ==================== ROW INDEX HELPERS ====================
+
+/**
+ * Look up a sheet row number by ID using a cached index.
+ * Returns -1 when the index is missing so callers can fall back to linear search.
+ */
+function findRowByIdIndexed(sheetName, id) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get('index_' + sheetName);
+    if (!cached) return -1;
+
+    const index = JSON.parse(cached);
+    const row = index[String(id).trim()];
+    return typeof row === 'number' ? row : -1;
+  } catch (e) {
+    return -1;
+  }
+}
+
+/**
+ * Clear the cached row index for a sheet after add/update/delete operations.
+ */
+function invalidateIndex(sheetName) {
+  try {
+    CacheService.getScriptCache().remove('index_' + sheetName);
+  } catch (e) {
+    Logger.log('Could not invalidate index for ' + sheetName + ': ' + e.message);
+  }
 }
