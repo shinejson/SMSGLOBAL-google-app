@@ -75,6 +75,15 @@
     .btn-danger { background: #ef4444; color: #fff; }
     .btn-danger:hover { background: #dc2626; }
 
+    /* --- TOAST NOTIFICATIONS --- */
+    .toast-container { position: fixed; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 2000; }
+    .toast { background: #1e293b; color: #fff; padding: 12px 20px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 10px; transform: translateY(-20px); opacity: 0; animation: slideIn 0.3s forwards; border-left: 4px solid transparent; }
+    @keyframes slideIn { to { transform: translateY(0); opacity: 1; } }
+    @keyframes slideOut { to { transform: translateX(400px); opacity: 0; } }
+    .toast.success { border-left-color: #10b981; }
+    .toast.error { border-left-color: #ef4444; }
+    .toast.warning { border-left-color: #f59e0b; }
+
     @media (max-width: 768px) {
       body { padding: 20px; }
       .table-container { margin: 0 -20px; }
@@ -102,9 +111,13 @@
     body.dark-mode .modal-footer { background: #0f172a; border-top-color: #334155; }
     body.dark-mode .form-label { color: #94a3b8; }
     body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
+    body.dark-mode .toast { background: #334155; color: #f1f5f9; }
   </style>
 </head>
 <body>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <!-- HEADER -->
   <div class="page-header">
@@ -231,6 +244,26 @@
     let userList = [];
     let currentDeleteId = null;
     let currentUserIsAdmin = false;
+
+    // Toast notification function
+    function showToast(message, type) {
+      type = type || 'success';
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast ' + type;
+      
+      let icon = '✓';
+      if (type === 'error') icon = '✗';
+      if (type === 'warning') icon = '⚠';
+      
+      toast.innerHTML = '<span style="font-size: 18px;">' + icon + '</span><span>' + message + '</span>';
+      container.appendChild(toast);
+      
+      setTimeout(function() {
+        toast.style.animation = 'slideOut 0.3s forwards';
+        setTimeout(function() { container.removeChild(toast); }, 300);
+      }, 3000);
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
       google.script.run
@@ -415,11 +448,11 @@
         .withSuccessHandler(function(res) {
           if (res && res.success) {
             refreshData();
-            alert(res.message || 'Account unlocked successfully.');
+            showToast(res.message || 'Account unlocked successfully.', 'success');
           }
         })
         .withFailureHandler(function(err) {
-          alert('Error: ' + (err && err.message ? err.message : 'Could not unlock account.'));
+          showToast('Error: ' + (err && err.message ? err.message : 'Could not unlock account.'), 'error');
         })
         .unlockUserAccount(userId);
     }
@@ -444,18 +477,34 @@
         google.script.run
           .withSuccessHandler(function(res) {
             btn.disabled = false; btn.innerText = 'Update User';
-            if(res.success) { closeModal(); refreshData(); }
+            if(res.success) { 
+              closeModal(); 
+              refreshData(); 
+              showToast('User updated successfully!', 'success');
+            }
           })
-          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Update User'; alert('Error: ' + err.message); })
+          .withFailureHandler(function(err) { 
+            btn.disabled = false; 
+            btn.innerText = 'Update User'; 
+            showToast('Error: ' + err.message, 'error');
+          })
           .updateUser(userId, data);
       } else {
         // Add
         google.script.run
           .withSuccessHandler(function(res) {
             btn.disabled = false; btn.innerText = 'Save User';
-            if(res.success) { closeModal(); refreshData(); alert(`User created! ID: ${res.userId}`); }
+            if(res.success) { 
+              closeModal(); 
+              refreshData(); 
+              showToast('User created successfully! ID: ' + res.userId, 'success');
+            }
           })
-          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Save User'; alert('Error: ' + err.message); })
+          .withFailureHandler(function(err) { 
+            btn.disabled = false; 
+            btn.innerText = 'Save User'; 
+            showToast('Error: ' + err.message, 'error');
+          })
           .addUser(data);
       }
     }
@@ -474,11 +523,15 @@
       google.script.run
         .withSuccessHandler(function(res) {
           btn.disabled = false; btn.innerText = 'Delete';
-          if(res.success) { closeDeleteModal(); refreshData(); }
+          if(res.success) { 
+            closeDeleteModal(); 
+            refreshData(); 
+            showToast('User deleted successfully.', 'success');
+          }
         })
         .withFailureHandler(function(err) {
           btn.disabled = false; btn.innerText = 'Delete';
-          alert('Error: ' + err.message); // Will show the "Cannot delete last Admin" error
+          showToast('Error: ' + err.message, 'error');
         })
         .deleteUser(currentDeleteId);
     };
