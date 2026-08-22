@@ -1175,12 +1175,81 @@ function addStudent(studentData) {
 }
 
 // 6. Update operation logic
-function updateStudent(studentId, studentData) {
+/**
+ * Update a student without replacing fields that were not supplied.
+ *
+ * The old students page called this function with positional arguments while
+ * the current page sends one data object.  Treating the old call as an object
+ * caused every property to be undefined and the subsequent setValues() call
+ * blanked the student's name, email, dates, gender, and class.  Supporting the
+ * legacy shape here and merging against the existing row makes the server side
+ * operation safe even when an older deployed page is still open.
+ */
+function updateStudent(studentId, studentData, legacyLastName, legacyEmail, legacyDob, legacyGender, legacyEnrollmentDate, legacyStatus, legacyClass) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Students");
   if (!sheet) throw new Error("Students worksheet not found.");
 
-  const duplicate = findDuplicateStudent(studentData, studentId);
+  const isObjectPayload = studentData !== null &&
+    typeof studentData === "object" &&
+    !Array.isArray(studentData);
+
+  if (!isObjectPayload) {
+    // Backward compatibility for older Student.html deployments.  If an
+    // invalid request contains no legacy fields, reject it rather than writing
+    // undefined values to the sheet.
+    if (arguments.length < 3) {
+      return { success: false, message: "Student update data is invalid." };
+    }
+    studentData = {
+      firstName: studentData,
+      lastName: legacyLastName,
+      email: legacyEmail,
+      dob: legacyDob,
+      gender: legacyGender,
+      enrollmentDate: legacyEnrollmentDate,
+      status: legacyStatus,
+      class: legacyClass
+    };
+  }
+
+  const row = findRowById(sheet, studentId);
+  if (row === -1) throw new Error("Student record not found.");
+
+  const currentRow = sheet.getRange(row, 1, 1, 10).getValues()[0];
+  const hasField = function(field) {
+    return Object.prototype.hasOwnProperty.call(studentData, field) &&
+      studentData[field] !== undefined;
+  };
+  const suppliedOrCurrent = function(field, currentValue) {
+    return hasField(field) ? studentData[field] : currentValue;
+  };
+  const textValue = function(value) {
+    return value === null || value === undefined ? "" : String(value);
+  };
+  const dateValue = function(value, fallback) {
+    if (value === null || value === undefined || value === "") return value === "" ? "" : fallback;
+    if (value instanceof Date) {
+      return isNaN(value.getTime()) ? fallback : value;
+    }
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? fallback : parsed;
+  };
+
+  // Merge with the row currently in the sheet.  This is deliberately done
+  // before writing so a partial/legacy request can never erase unrelated data.
+  const mergedStudentData = {
+    firstName: textValue(suppliedOrCurrent("firstName", currentRow[2])),
+    lastName: textValue(suppliedOrCurrent("lastName", currentRow[3])),
+    email: textValue(suppliedOrCurrent("email", currentRow[4])),
+    dob: dateValue(suppliedOrCurrent("dob", currentRow[5]), currentRow[5]),
+    gender: textValue(suppliedOrCurrent("gender", currentRow[6])),
+    enrollmentDate: dateValue(suppliedOrCurrent("enrollmentDate", currentRow[7]), currentRow[7]),
+    status: textValue(suppliedOrCurrent("status", currentRow[8])),
+    class: textValue(suppliedOrCurrent("class", currentRow[9]))
+  };
+
+  const duplicate = findDuplicateStudent(mergedStudentData, studentId);
   if (duplicate) {
     return {
       success: false,
@@ -1189,13 +1258,9 @@ function updateStudent(studentId, studentData) {
     };
   }
 
-  const row = findRowById(sheet, studentId);
-  if (row === -1) throw new Error("Student record not found.");
-
   // Check if student is Completed JHS 3 (locked record)
-  const currentRow = sheet.getRange(row, 1, 1, 10).getValues()[0];
-  const currentStatus = String(currentRow[8] || "").trim();
-  const currentClass = String(currentRow[9] || "").trim();
+  const currentStatus = textValue(currentRow[8]).trim();
+  const currentClass = textValue(currentRow[9]).trim();
   if (currentStatus.toLowerCase() === "completed" && currentClass.toUpperCase().includes("JHS 3")) {
     return {
       success: false,
@@ -1204,32 +1269,29 @@ function updateStudent(studentId, studentData) {
   }
 
   const oldSnapshot = buildAuditSnapshot({
-    studentId: String(currentRow[1] || '').trim(),
-    firstName: String(currentRow[2] || '').trim(),
-    lastName: String(currentRow[3] || '').trim(),
-    email: String(currentRow[4] || '').trim(),
-    dob: currentRow[5] instanceof Date ? currentRow[5].toISOString() : String(currentRow[5] || '').trim(),
-    gender: String(currentRow[6] || '').trim(),
-    enrollmentDate: currentRow[7] instanceof Date ? currentRow[7].toISOString() : String(currentRow[7] || '').trim(),
-    status: String(currentRow[8] || '').trim(),
-    class: String(currentRow[9] || '').trim()
+    studentId: textValue(currentRow[1]).trim(),
+    firstName: textValue(currentRow[2]).trim(),
+    lastName: textValue(currentRow[3]).trim(),
+    email: textValue(currentRow[4]).trim(),
+    dob: currentRow[5] instanceof Date ? currentRow[5].toISOString() : textValue(currentRow[5]).trim(),
+    gender: textValue(currentRow[6]).trim(),
+    enrollmentDate: currentRow[7] instanceof Date ? currentRow[7].toISOString() : textValue(currentRow[7]).trim(),
+    status: currentStatus,
+    class: currentClass
   });
 
-  // Update details in sheet spanning Column 3 (C) to Column 10 (J) -> 8 columns total (includes Class)
-  sheet
-    .getRange(row, 3, 1, 8)
-    .setValues([
-      [
-        studentData.firstName,
-        studentData.lastName,
-        studentData.email,
-        studentData.dob ? new Date(studentData.dob) : "",
-        studentData.gender,
-        studentData.enrollmentDate ? new Date(studentData.enrollmentDate) : "",
-        studentData.status || "Active",
-        studentData.class || "",
-      ],
-    ]);
+  // Update only the student detail columns (C:J).  Every value is either from
+  // the request or the existing row; undefined can never be sent to Sheets.
+  sheet.getRange(row, 3, 1, 8).setValues([[
+    mergedStudentData.firstName,
+    mergedStudentData.lastName,
+    mergedStudentData.email,
+    mergedStudentData.dob,
+    mergedStudentData.gender,
+    mergedStudentData.enrollmentDate,
+    mergedStudentData.status || "Active",
+    mergedStudentData.class
+  ]]);
 
   // Invalidate cache and index after modification
   invalidateStudentsCache();
@@ -1243,14 +1305,14 @@ function updateStudent(studentId, studentData) {
     oldSnapshot,
     buildAuditSnapshot({
       studentId: studentId,
-      firstName: studentData.firstName,
-      lastName: studentData.lastName,
-      email: studentData.email,
-      dob: studentData.dob || '',
-      gender: studentData.gender || '',
-      enrollmentDate: studentData.enrollmentDate || '',
-      status: studentData.status || 'Active',
-      class: studentData.class || ''
+      firstName: mergedStudentData.firstName,
+      lastName: mergedStudentData.lastName,
+      email: mergedStudentData.email,
+      dob: mergedStudentData.dob || '',
+      gender: mergedStudentData.gender,
+      enrollmentDate: mergedStudentData.enrollmentDate || '',
+      status: mergedStudentData.status || 'Active',
+      class: mergedStudentData.class
     })
   );
 
