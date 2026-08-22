@@ -588,10 +588,20 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
     const lastRow = attendanceSheet.getLastRow();
     if (lastRow >= 3) {
       const attendanceData = typeof getAttendanceData === 'function' ? getAttendanceData() : [];
+      // getAttendanceData() returns HTML-escaped values, while the year/term
+      // filters arrive raw. Decode so names like "2025/2026" match correctly.
+      const decodeAtt = typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml : function (v) { return v; };
+      const decodedAttendanceData = attendanceData.map(function (row) {
+        return Object.assign({}, row, {
+          academicYear: decodeAtt(row.academicYear),
+          term: decodeAtt(row.term),
+          status: decodeAtt(row.status)
+        });
+      });
       const statuses = typeof getAttendanceStatuses === 'function' ? getAttendanceStatuses() : [];
 
       // Valid records matching Year, Term, and Date filter (if selected)
-      const validRecords = attendanceData.filter((row) => matchYT(row.academicYear, row.term) && matchDate(row.date));
+      const validRecords = decodedAttendanceData.filter((row) => matchYT(row.academicYear, row.term) && matchDate(row.date));
 
       if (validRecords.length > 0) {
         const presentCount = validRecords.filter(
@@ -604,7 +614,7 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
       }
 
       // Year & Term records for monthly trend chart (independent of single date filter)
-      const yearTermRecords = attendanceData.filter((row) => matchYT(row.academicYear, row.term));
+      const yearTermRecords = decodedAttendanceData.filter((row) => matchYT(row.academicYear, row.term));
 
       const trendMap = {};
       yearTermRecords.forEach((row) => {
@@ -1854,6 +1864,35 @@ function formatAttendanceDate(rawD, ss) {
   return str;
 }
 
+// Build a Date whose calendar day in the spreadsheet's timezone matches the
+// given "yyyy-MM-dd" string, so writing then reading it back (formatAttendanceDate)
+// yields the same day regardless of the spreadsheet timezone. Parsing with
+// new Date("yyyy-MM-dd") alone yields UTC midnight, which shifts a day backwards
+// in timezones west of UTC.
+function buildAttendanceSheetDate(dateString, tz) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateString || "").trim());
+  if (!m) return dateString ? new Date(dateString) : null;
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  const d = parseInt(m[3], 10);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return new Date(dateString);
+
+  // Anchor at noon UTC (safe midpoint for offsets up to ±12h), then adjust so
+  // the local calendar date in tz equals the picked date.
+  let dt = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0));
+  try {
+    const effectiveTz = tz || Session.getScriptTimeZone();
+    const local = Utilities.formatDate(dt, effectiveTz, "yyyy-MM-dd");
+    if (local !== m[0]) {
+      const shiftDays = local > m[0] ? -1 : 1;
+      dt = new Date(dt.getTime() + shiftDays * 86400000);
+    }
+  } catch (e) {
+    // Keep the noon-UTC anchor if the timezone lookup fails
+  }
+  return dt;
+}
+
 // Helper to inspect Row 2 headers in the Attendance sheet and return column index maps (0-based offset relative to Column B)
 function getAttendanceHeaderMap(sheet) {
   const lastCol = Math.max(sheet.getLastColumn(), 10);
@@ -2005,11 +2044,12 @@ function addAttendance(attendanceData) {
   if (!sheet) throw new Error("Attendance worksheet not found.");
 
   const studentId = String(attendanceData.studentId || "").trim();
-  const dateValue = attendanceData.date ? new Date(attendanceData.date) : null;
-  const dateString =
-    dateValue instanceof Date && !isNaN(dateValue.getTime())
-      ? dateValue.toISOString().split("T")[0]
-      : "";
+  // Normalize the incoming date string first (the date input sends "yyyy-MM-dd")
+  const normalizedDateString = formatAttendanceDate(attendanceData.date, ss);
+  const dateValue = normalizedDateString
+    ? buildAttendanceSheetDate(normalizedDateString, ss.getSpreadsheetTimeZone())
+    : null;
+  const dateString = normalizedDateString;
 
   if (!studentId) {
     return { success: false, message: "Student ID is required." };
@@ -2029,10 +2069,10 @@ function addAttendance(attendanceData) {
       const existingDate = row[hMap.idxDate];
       const existingStudentId = String(row[hMap.idxStudentId] || "").trim();
       const existingCourseId = String(row[hMap.idxCourse] || "").trim();
+      // Format with formatAttendanceDate so both sides use the spreadsheet
+      // timezone (toISOString would be UTC and could differ by a day)
       const existingDateString = existingDate
-        ? (existingDate instanceof Date && !isNaN(existingDate.getTime())
-            ? existingDate.toISOString().split("T")[0]
-            : String(existingDate).trim())
+        ? formatAttendanceDate(existingDate, ss)
         : "";
 
       const sameCourse = !incomingCourseId || !existingCourseId || existingCourseId === incomingCourseId;
@@ -2194,7 +2234,10 @@ function updateAttendance(attendanceId, attendanceData) {
     }
   }
 
-  setCellVal(hMap.idxDate, attendanceData.date ? new Date(attendanceData.date) : "");
+  const normalizedDateString = formatAttendanceDate(attendanceData.date, ss);
+  setCellVal(hMap.idxDate, normalizedDateString
+    ? buildAttendanceSheetDate(normalizedDateString, ss.getSpreadsheetTimeZone())
+    : "");
   setCellVal(hMap.idxYear, attendanceData.academicYear || "");
   setCellVal(hMap.idxClass, attendanceData.className || "");
   setCellVal(hMap.idxStudentId, attendanceData.studentId || "");
@@ -2331,14 +2374,21 @@ function exportAttendancePdf(filters) {
   requireLogin();
   const records = getAttendanceData();
 
+  // Records come back HTML-escaped from the cache layer, while filter values
+  // arrive raw from the page dropdowns. Decode before comparing so years like
+  // "2025/2026" match instead of their escaped form "2025&#x2F;2026".
+  const decode = typeof decodeSanitizedHtml === 'function'
+    ? decodeSanitizedHtml
+    : function (v) { return v; };
+
   // Apply simple filter matching on provided keys (date, status, academicYear, className, term)
   const filtered = records.filter((r) => {
     if (filters.date && filters.date !== r.date) return false;
-    if (filters.status && filters.status !== r.status) return false;
-    if (filters.academicYear && filters.academicYear !== r.academicYear)
+    if (filters.status && filters.status !== decode(r.status)) return false;
+    if (filters.academicYear && filters.academicYear !== decode(r.academicYear))
       return false;
-    if (filters.className && filters.className !== r.className) return false;
-    if (filters.term && filters.term !== r.term) return false;
+    if (filters.className && filters.className !== decode(r.className)) return false;
+    if (filters.term && filters.term !== decode(r.term)) return false;
     if (filters.search) {
       const s = String(filters.search).toLowerCase();
       const hay = [
