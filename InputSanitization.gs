@@ -21,6 +21,28 @@ function sanitizeHtml(input) {
 }
 
 /**
+ * Reverses the escaping applied by sanitizeHtml().
+ * Use ONLY on values that were produced by sanitizeHtml() when the original
+ * (unescaped) value is needed for comparisons (e.g. matching sheet records
+ * against raw filter dropdown values). Never inject the result into HTML.
+ * @param {string} input - Previously sanitized string
+ * @returns {string} Original unescaped value
+ */
+function decodeSanitizedHtml(input) {
+  if (input === null || input === undefined) {
+    return '';
+  }
+
+  return String(input)
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&amp;/g, '&'); // Must be last so pre-escaped text is not double-decoded
+}
+
+/**
  * Sanitize for use in JavaScript strings
  * @param {string} input - User input to sanitize
  * @returns {string} Sanitized string safe for JS

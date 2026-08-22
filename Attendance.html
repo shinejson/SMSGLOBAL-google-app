@@ -402,6 +402,22 @@
       return String(status || '').trim().toLowerCase() === 'active';
     }
 
+    // Reverses the server-side sanitizeHtml() escaping (see InputSanitization.gs).
+    // Attendance rows arrive HTML-escaped, but dropdown values are raw, so any
+    // comparison/filtering must use decoded values. Safe for matching logic and
+    // for setAttribute()/.value assignment (no HTML parsing happens there);
+    // never feed the result into innerHTML.
+    function decodeSanitized(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&#x2F;/gi, '/')
+        .replace(/&amp;/g, '&'); // last, to avoid double-decoding
+    }
+
     function ensureYearOption(selectEl, yearValue, label) {
       if (!selectEl || !yearValue) return;
       const exists = Array.from(selectEl.options).some(o => o.value === yearValue);
@@ -499,11 +515,13 @@
       attendanceList.forEach(row => {
         const displayDate = formatDisplayDate(row.date);
         const tr = document.createElement('tr');
-        tr.setAttribute('data-status', row.status || '');
+        // Filter attributes must hold the decoded (real) values so they match
+        // the raw dropdown option values (e.g. year "2025/2026").
+        tr.setAttribute('data-status', decodeSanitized(row.status));
         tr.setAttribute('data-date', displayDate);
-        tr.setAttribute('data-academicyear', row.academicYear || '');
-        tr.setAttribute('data-classname', row.className || '');
-        tr.setAttribute('data-term', row.term || '');
+        tr.setAttribute('data-academicyear', decodeSanitized(row.academicYear));
+        tr.setAttribute('data-classname', decodeSanitized(row.className));
+        tr.setAttribute('data-term', decodeSanitized(row.term));
 
         // Get dynamic status class
         let statusClass = 'status-present'; // default
@@ -554,9 +572,10 @@
       const terms = new Set();
 
       attendanceList.forEach(r => {
-        if (r.academicYear) years.add(r.academicYear);
-        if (r.className) classes.add(r.className);
-        if (r.term) terms.add(r.term);
+        // Decode so filter option values match the raw dropdown values elsewhere
+        if (r.academicYear) years.add(decodeSanitized(r.academicYear));
+        if (r.className) classes.add(decodeSanitized(r.className));
+        if (r.term) terms.add(decodeSanitized(r.term));
       });
 
       const yearSel = document.getElementById('academicYearFilter');
@@ -928,7 +947,7 @@
       // Build a Set of studentIds already recorded for this date
       const alreadyRecorded = new Set(
         attendanceList
-          .filter(r => formatDisplayDate(r.date) === date && r.className === className)
+          .filter(r => formatDisplayDate(r.date) === date && decodeSanitized(r.className) === className)
           .map(r => r.studentId)
       );
 
@@ -976,7 +995,7 @@
       // ---- CLIENT-SIDE DUPLICATE CHECK ----
       const alreadyRecorded = new Set(
         attendanceList
-          .filter(r => formatDisplayDate(r.date) === date && r.className === className)
+          .filter(r => formatDisplayDate(r.date) === date && decodeSanitized(r.className) === className)
           .map(r => r.studentId)
       );
 
@@ -1078,12 +1097,13 @@
 
       document.getElementById('edit_attendanceId').value      = record.attendanceId;
       document.getElementById('edit_date').value              = formatDisplayDate(record.date);
-      document.getElementById('edit_academicYear').value      = record.academicYear;
-      document.getElementById('edit_className').value         = record.className;
-      document.getElementById('edit_term').value              = record.term;
-      document.getElementById('edit_studentDisplay').value    = `${record.studentName || ''} (${record.studentId || ''})`;
-      document.getElementById('edit_courseSelect').value      = record.courseId || '';
-      document.getElementById('edit_status').value            = record.status || '';
+      // Decode: select option values are raw, record fields are HTML-escaped
+      document.getElementById('edit_academicYear').value      = decodeSanitized(record.academicYear);
+      document.getElementById('edit_className').value         = decodeSanitized(record.className);
+      document.getElementById('edit_term').value              = decodeSanitized(record.term);
+      document.getElementById('edit_studentDisplay').value    = `${decodeSanitized(record.studentName)} (${record.studentId || ''})`;
+      document.getElementById('edit_courseSelect').value      = decodeSanitized(record.courseId);
+      document.getElementById('edit_status').value            = decodeSanitized(record.status);
 
       document.getElementById('editAttendanceModal').classList.add('active');
     }
