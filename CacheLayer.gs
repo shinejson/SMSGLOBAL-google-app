@@ -240,6 +240,12 @@ function warmCache() {
 function invalidateCacheOnModify(dataType) {
   const keysToInvalidate = ['data_' + dataType];
   
+  // Class list displays student counts, so any student add/update/delete can
+  // change the Classes page even when the Classes sheet itself was not edited.
+  if (dataType === 'Students') {
+    keysToInvalidate.push('data_Classes');
+  }
+
   // Also invalidate dashboard if data affects it
   const dashboardRelatedTypes = ['Students', 'Courses', 'Attendance', 'Invoices', 'Payments', 'Performance'];
   if (dashboardRelatedTypes.indexOf(dataType) !== -1) {

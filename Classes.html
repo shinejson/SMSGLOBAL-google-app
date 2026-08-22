@@ -50,6 +50,10 @@
     .btn-secondary:hover { background: #cbd5e1; color: #1e293b; }
     .btn-primary { background: #3b82f6; color: #fff; }
     .btn-primary:hover { background: #2563eb; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-icon:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+    .btn-icon.delete:disabled:hover { background: #f1f5f9; color: #475569; }
 
     @media (max-width: 768px) {
       body { padding: 20px; }
@@ -162,7 +166,16 @@
     function refreshData() {
       document.getElementById('loading').style.display = 'block';
       document.getElementById('classesList').style.display = 'none';
-      google.script.run.withSuccessHandler(renderList).getClassesData();
+      google.script.run
+        .withSuccessHandler(renderList)
+        .withFailureHandler(function(err) {
+          document.getElementById('loading').innerText = 'Error loading classes: ' + (err && err.message ? err.message : err);
+        })
+        .getClassesData();
+    }
+
+    function normalizeClassName(value) {
+      return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
     }
 
     function renderList(data) {
@@ -183,16 +196,18 @@
 
       classList.forEach(classItem => {
         const div = document.createElement('div');
+        const studentCount = Number(classItem.studentCount) || 0;
+        const hasStudents = studentCount > 0;
         div.className = 'list-item';
-        div.setAttribute('data-name', classItem.className.toLowerCase());
+        div.setAttribute('data-name', normalizeClassName(classItem.className));
         div.innerHTML = `
           <div class="list-item-content">
             <h4>${classItem.className}</h4>
-            <div class="student-count">${classItem.studentCount}</div>
+            <div class="student-count" title="${studentCount} enrolled student${studentCount === 1 ? '' : 's'}">${studentCount}</div>
           </div>
           <div class="list-item-actions">
-            <button type="button" class="btn-icon" onclick="editClass(${classItem.id})">✏️ Edit</button>
-            <button type="button" class="btn-icon delete" onclick="deleteClassConfirm(${classItem.id}, '${classItem.className}')">🗑️ Delete</button>
+            <button type="button" class="btn-icon" onclick="editClass(${Number(classItem.id)})">✏️ Edit</button>
+            <button type="button" class="btn-icon delete" onclick="deleteClassConfirm(${Number(classItem.id)})" ${hasStudents ? 'disabled title="Move or remove students before deleting this class"' : ''}>🗑️ Delete</button>
           </div>
         `;
         container.appendChild(div);
@@ -201,7 +216,7 @@
     }
 
     function filterList() {
-      const searchVal = document.getElementById('searchInput').value.toLowerCase();
+      const searchVal = normalizeClassName(document.getElementById('searchInput').value);
       const items = document.querySelectorAll('.list-item');
       const countBadge = document.getElementById('classCount');
       let visibleCount = 0;
@@ -252,7 +267,7 @@
     }
 
     function editClass(id) {
-      const classItem = classList.find(c => c.id === id);
+      const classItem = classList.find(c => Number(c.id) === Number(id));
       if(!classItem) { alert('Class not found.'); return; }
       
       document.getElementById('classId').value = id;
@@ -263,10 +278,19 @@
       document.getElementById('classModal').classList.add('active');
     }
 
-    function deleteClassConfirm(id, className) {
+    function deleteClassConfirm(id) {
+      const classItem = classList.find(c => Number(c.id) === Number(id));
+      if(!classItem) { alert('Class not found.'); return; }
+
+      const studentCount = Number(classItem.studentCount) || 0;
+      if (studentCount > 0) {
+        alert('Cannot delete "' + classItem.className + '" because ' + studentCount + ' student' + (studentCount === 1 ? ' is' : 's are') + ' currently assigned to this class.');
+        return;
+      }
+
       openConfirmModal({
         title: 'Delete Class',
-        message: `Are you sure you want to delete the class "${className}"?`,
+        message: `Are you sure you want to delete the class "${classItem.className}"?`,
         confirmText: 'Delete',
         confirmClass: 'btn-danger',
         onConfirm: function() {
@@ -282,7 +306,8 @@
             alert('Class deleted successfully!');
             refreshData();
           } else {
-            alert('Error deleting class.');
+            alert('Error: ' + (res.message || 'Could not delete class.'));
+            refreshData();
           }
         })
         .withFailureHandler(function(err) {
@@ -302,6 +327,13 @@
       if (!className) {
         btn.disabled = false; btn.innerText = classId ? 'Update Class' : 'Save Class';
         alert('Please enter a class name.');
+        return;
+      }
+
+      const duplicate = classList.find(c => normalizeClassName(c.className) === normalizeClassName(className) && Number(c.id) !== Number(classId || 0));
+      if (duplicate) {
+        btn.disabled = false; btn.innerText = classId ? 'Update Class' : 'Save Class';
+        alert('A class named "' + duplicate.className + '" already exists.');
         return;
       }
 

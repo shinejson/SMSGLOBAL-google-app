@@ -179,30 +179,36 @@ function getClassesDataUncached() {
   const classRange = sheet.getRange(2, 1, lastRow - 1, 1);
   const classData = classRange.getValues();
   
-  // Get all students data and count them per class
+  // Get all students data and count them per class. Use normalized keys so
+  // capitalization or extra spaces do not cause a class to show zero students.
   let studentCounts = {};
   
   try {
-    // Use the existing getStudentsDataUncached which properly handles headers
-    const studentsData = getStudentsDataUncached();
-    
-    // Count students per class
-    studentsData.forEach(function(student) {
-      const className = String(student.class || '').trim();
-      if (className) {
-        studentCounts[className] = (studentCounts[className] || 0) + 1;
-      }
-    });
+    if (typeof getStudentCountsByNormalizedClass_ === 'function') {
+      studentCounts = getStudentCountsByNormalizedClass_();
+    } else {
+      // Fallback for older deployments where the shared class helper is not loaded.
+      const studentsData = getStudentsDataUncached();
+      studentsData.forEach(function(student) {
+        const classKey = String(student.class || '').trim().replace(/\s+/g, ' ').toLowerCase();
+        if (classKey) {
+          studentCounts[classKey] = (studentCounts[classKey] || 0) + 1;
+        }
+      });
+    }
   } catch (e) {
     Logger.log('Error counting students per class: ' + e.message);
   }
   
   return classData.map((row, idx) => {
     const className = String(row[0]).trim();
+    const classKey = typeof normalizeClassNameForComparison_ === 'function'
+      ? normalizeClassNameForComparison_(className)
+      : className.replace(/\s+/g, ' ').toLowerCase();
     return {
       id: idx + 2, // Sheet row number for reference
       className: className,
-      studentCount: studentCounts[className] || 0
+      studentCount: studentCounts[classKey] || 0
     };
   }).filter((r) => r.className);
 }
