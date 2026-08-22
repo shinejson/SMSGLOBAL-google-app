@@ -82,10 +82,22 @@
     #bulkActionsBar {
       display: flex;
       align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
       padding: 8px 16px;
       background: #f1f5f9;
       border-radius: 8px;
       border: 1px solid #cbd5e1;
+    }
+
+    #bulkActionsBar .form-select {
+      max-width: 210px;
+    }
+
+    #bulkActionsBar button:disabled,
+    #bulkActionsBar select:disabled {
+      cursor: not-allowed;
+      opacity: 0.65;
     }
 
     .search-box {
@@ -608,13 +620,16 @@
     </div>
     <div id="bulkActionsBar" style="display: none; gap: 8px; align-items: center;">
       <span id="selectedCount" style="color: #64748b; font-size: 14px; margin-right: 8px;">0 selected</span>
-      <select id="bulkStatusChange" class="form-select" style="width: auto; padding: 8px 12px;">
+      <select id="bulkStatusChange" class="form-select" style="width: auto; padding: 8px 12px;" onchange="handleBulkStatusChange(this)" aria-label="Update status for selected students">
         <option value="">Change Status...</option>
         <option value="Active">Active</option>
         <option value="Inactive">Inactive</option>
         <option value="Completed">Completed</option>
       </select>
-      <button class="action-btn" style="background: #ef4444; padding: 8px 16px;" onclick="bulkDelete()">
+      <select id="bulkClassChange" class="form-select" style="width: auto; padding: 8px 12px;" onchange="handleBulkClassChange(this)" aria-label="Update class for selected students">
+        <option value="">Update Class...</option>
+      </select>
+      <button id="bulkDeleteBtn" class="action-btn" style="background: #ef4444; padding: 8px 16px;" onclick="bulkDelete()">
         🗑️ Delete Selected
       </button>
     </div>
@@ -944,6 +959,7 @@
           table.style.display = 'table';
           tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No students found.</td></tr>`;
           countBadge.innerText = '0';
+          updateBulkActions();
           return;
         }
       const tbody = document.getElementById('tableBody');
@@ -1008,6 +1024,7 @@
         `;
         tbody.appendChild(tr);
       });
+      updateBulkActions();
       } catch (err) {
         console.error('renderTable error', err);
         const loading = document.getElementById('loading');
@@ -1059,16 +1076,35 @@
 
     function populateClasses(classes) {
       const classSelect = document.getElementById('classSelect');
-      if (!classSelect) return;
-      classSelect.innerHTML = '<option value="">Select Class</option>';
+      const bulkClassSelect = document.getElementById('bulkClassChange');
+      const dropdowns = [
+        { element: classSelect, placeholder: 'Select Class' },
+        { element: bulkClassSelect, placeholder: 'Update Class...' }
+      ];
+
+      dropdowns.forEach(item => {
+        if (!item.element) return;
+        item.element.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.innerText = item.placeholder;
+        item.element.appendChild(placeholder);
+      });
+
       if (!classes || !Array.isArray(classes) || classes.length === 0) return;
+
       classes.forEach(c => {
-        const opt = document.createElement('option');
-        // Handle both string and object formats
-        const className = typeof c === 'string' ? c : (c.className || c);
-        opt.value = className;
-        opt.innerText = className;
-        classSelect.appendChild(opt);
+        // Handle both string and object formats returned by getClassesData().
+        const className = String(typeof c === 'string' ? c : (c.className || '')).trim();
+        if (!className) return;
+
+        dropdowns.forEach(item => {
+          if (!item.element) return;
+          const opt = document.createElement('option');
+          opt.value = className;
+          opt.innerText = className;
+          item.element.appendChild(opt);
+        });
       });
     }
 
@@ -1144,6 +1180,7 @@
       // Update "select all" checkbox state
       const allCheckboxes = document.querySelectorAll('.row-checkbox:not([disabled])');
       selectAllCheckbox.checked = allCheckboxes.length > 0 && checkboxes.length === allCheckboxes.length;
+      selectAllCheckbox.indeterminate = checkboxes.length > 0 && checkboxes.length < allCheckboxes.length;
     }
 
     function getSelectedStudentIds() {
@@ -1188,72 +1225,73 @@
       });
     }
 
-    // Event listener for bulk status change
-    document.addEventListener('DOMContentLoaded', function() {
-      const bulkStatusSelect = document.getElementById('bulkStatusChange');
-      if (bulkStatusSelect) {
-        bulkStatusSelect.addEventListener('change', function() {
-          const newStatus = this.value;
-          if (!newStatus) return;
-          
-          const selectedIds = getSelectedStudentIds();
-          if (selectedIds.length === 0) {
-            showToast('No students selected', 'error');
-            this.value = '';
-            return;
-          }
-          
-          if (!confirm(`Change status to "${newStatus}" for ${selectedIds.length} student(s)?`)) {
-            this.value = '';
-            return;
-          }
-          
-          showToast(`Updating ${selectedIds.length} student(s)...`, 'success');
-          
-          let successCount = 0;
-          let errorCount = 0;
-          
-          selectedIds.forEach((id) => {
-            // Get student data first
-            const student = studentsList.find(s => s.studentId === id);
-            if (!student) {
-              errorCount++;
-              return;
-            }
-            
-            google.script.run
-              .withSuccessHandler(() => {
-                successCount++;
-                if (successCount + errorCount === selectedIds.length) {
-                  showToast(`Successfully updated ${successCount} student(s)${errorCount > 0 ? `, ${errorCount} failed` : ''}`, successCount > 0 ? 'success' : 'error');
-                  refreshData();
-                }
-              })
-              .withFailureHandler((err) => {
-                errorCount++;
-                console.error(`Failed to update student ${id}:`, err);
-                if (successCount + errorCount === selectedIds.length) {
-                  showToast(`Successfully updated ${successCount} student(s)${errorCount > 0 ? `, ${errorCount} failed` : ''}`, successCount > 0 ? 'success' : 'error');
-                  refreshData();
-                }
-              })
-              .updateStudent(
-                id,
-                student.firstName,
-                student.lastName,
-                student.email,
-                student.dob,
-                student.gender,
-                student.enrollmentDate,
-                newStatus,  // Use the new status
-                student.class
-              );
-          });
-          
-          this.value = '';
-        });
+    function setBulkActionsBusy(isBusy) {
+      ['bulkStatusChange', 'bulkClassChange', 'bulkDeleteBtn'].forEach(id => {
+        const control = document.getElementById(id);
+        if (control) control.disabled = isBusy;
+      });
+    }
+
+    function performBulkStudentUpdate(updates, fieldLabel, newValue, sourceSelect) {
+      const selectedIds = getSelectedStudentIds();
+      if (selectedIds.length === 0) {
+        showToast('No students selected', 'error');
+        sourceSelect.value = '';
+        return;
       }
-    });
+
+      const confirmation = `Update ${fieldLabel} to "${newValue}" for ${selectedIds.length} student(s)?`;
+      if (!confirm(confirmation)) {
+        sourceSelect.value = '';
+        return;
+      }
+
+      sourceSelect.value = '';
+      setBulkActionsBusy(true);
+      showToast(`Updating ${selectedIds.length} student(s)...`, 'success');
+
+      google.script.run
+        .withSuccessHandler(response => {
+          setBulkActionsBusy(false);
+
+          if (!response || !response.success) {
+            showToast(response && response.message ? response.message : 'Students could not be updated.', 'error');
+            return;
+          }
+
+          const updatedCount = Number(response.updatedCount) || 0;
+          const unchangedCount = Number(response.unchangedCount) || 0;
+          const failedCount = Number(response.failedCount) || 0;
+          let message = `Updated ${updatedCount} student(s)`;
+          if (unchangedCount > 0) message += `, ${unchangedCount} already had this value`;
+          if (failedCount > 0) message += `, ${failedCount} failed`;
+
+          if (response.errors && response.errors.length) {
+            console.warn('Bulk student update warnings:', response.errors);
+            if (updatedCount + unchangedCount === 0) message += `: ${response.errors[0]}`;
+          }
+
+          showToast(message, updatedCount + unchangedCount > 0 ? 'success' : 'error');
+          refreshData();
+        })
+        .withFailureHandler(err => {
+          setBulkActionsBusy(false);
+          showToast('Error updating students: ' + (err && err.message ? err.message : err), 'error');
+        })
+        .bulkUpdateStudents(selectedIds, updates);
+    }
+
+    function handleBulkStatusChange(select) {
+      const newStatus = select.value;
+      if (!newStatus) return;
+      performBulkStudentUpdate({ status: newStatus }, 'status', newStatus, select);
+    }
+
+    function handleBulkClassChange(select) {
+      const newClass = select.value;
+      if (!newClass) return;
+      performBulkStudentUpdate({ class: newClass }, 'class', newClass, select);
+    }
 
     /* --- TOAST SYSTEM --- */
     function showToast(message, type = 'success') {

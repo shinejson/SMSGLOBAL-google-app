@@ -1194,9 +1194,9 @@ function updateStudent(studentId, studentData) {
 
   // Check if student is Completed JHS 3 (locked record)
   const currentRow = sheet.getRange(row, 1, 1, 10).getValues()[0];
-  const currentStatus = String(currentRow[7] || "").trim();
+  const currentStatus = String(currentRow[8] || "").trim();
   const currentClass = String(currentRow[9] || "").trim();
-  if (currentStatus === "Completed" && currentClass.toUpperCase().includes("JHS 3")) {
+  if (currentStatus.toLowerCase() === "completed" && currentClass.toUpperCase().includes("JHS 3")) {
     return {
       success: false,
       message: "Cannot update this student: Completed JHS 3 record is locked.",
@@ -1255,6 +1255,206 @@ function updateStudent(studentId, studentData) {
   );
 
   return { success: true };
+}
+
+/**
+ * Update the status and/or class for multiple students in one request.
+ * Only these two fields are accepted so other student details cannot be
+ * accidentally overwritten by a bulk quick action.
+ */
+function bulkUpdateStudents(studentIds, updates) {
+  requireLogin();
+
+  if (!Array.isArray(studentIds) || studentIds.length === 0) {
+    return { success: false, message: "Select at least one student to update." };
+  }
+  if (studentIds.length > 1000) {
+    return { success: false, message: "A maximum of 1000 students can be updated at once." };
+  }
+
+  updates = updates || {};
+  const hasStatus = Object.prototype.hasOwnProperty.call(updates, "status");
+  const hasClass = Object.prototype.hasOwnProperty.call(updates, "class");
+  if (!hasStatus && !hasClass) {
+    return { success: false, message: "Choose a status or class to update." };
+  }
+
+  let newStatus = "";
+  if (hasStatus) {
+    newStatus = String(updates.status || "").trim();
+    const validStatuses = ["Active", "Inactive", "Completed"];
+    if (validStatuses.indexOf(newStatus) === -1) {
+      return { success: false, message: "The selected student status is invalid." };
+    }
+  }
+
+  let newClass = "";
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (hasClass) {
+    newClass = String(updates.class || "").trim();
+    if (!newClass) {
+      return { success: false, message: "Choose a class to update the selected students." };
+    }
+
+    const classesSheet = ss.getSheetByName("Classes");
+    if (!classesSheet) {
+      return { success: false, message: "Classes worksheet not found." };
+    }
+
+    const classNames = classesSheet.getLastRow() < 2
+      ? []
+      : classesSheet.getRange(2, 1, classesSheet.getLastRow() - 1, 1).getValues()
+          .map(function(row) { return String(row[0] || "").trim(); })
+          .filter(function(className) { return className !== ""; });
+    const selectedClass = classNames.find(function(className) {
+      return className.toLowerCase() === newClass.toLowerCase();
+    });
+
+    if (!selectedClass) {
+      return { success: false, message: "The selected class no longer exists. Refresh the page and try again." };
+    }
+    newClass = selectedClass;
+  }
+
+  const sheet = ss.getSheetByName("Students");
+  if (!sheet) {
+    return { success: false, message: "Students worksheet not found." };
+  }
+
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(30000);
+
+  try {
+    const values = sheet.getDataRange().getValues();
+    let headerRowIndex = -1;
+    for (let i = 0; i < values.length; i++) {
+      if (values[i].some(function(value) { return value !== "" && value !== null; })) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+
+    if (headerRowIndex === -1) {
+      return { success: false, message: "The Students worksheet is empty." };
+    }
+
+    const normalizedHeaders = values[headerRowIndex].map(function(header) {
+      return String(header || "").trim().toLowerCase();
+    });
+    const studentIdColumn = normalizedHeaders.indexOf("student id");
+    const statusColumn = normalizedHeaders.indexOf("status");
+    let classColumn = normalizedHeaders.indexOf("class");
+    if (classColumn === -1) classColumn = normalizedHeaders.indexOf("class name");
+
+    if (studentIdColumn === -1 || statusColumn === -1 || classColumn === -1) {
+      return {
+        success: false,
+        message: "Students worksheet must contain Student ID, Status, and Class columns."
+      };
+    }
+
+    const rowsByStudentId = {};
+    for (let rowIndex = headerRowIndex + 1; rowIndex < values.length; rowIndex++) {
+      const id = String(values[rowIndex][studentIdColumn] || "").trim();
+      if (id) rowsByStudentId["$" + id] = rowIndex;
+    }
+
+    const uniqueStudentIds = [];
+    const seenStudentIds = {};
+    studentIds.forEach(function(studentId) {
+      const id = String(studentId || "").trim();
+      if (id && !seenStudentIds["$" + id]) {
+        seenStudentIds["$" + id] = true;
+        uniqueStudentIds.push(id);
+      }
+    });
+
+    const statusRanges = [];
+    const classRanges = [];
+    const auditEntries = [];
+    const errors = [];
+    let unchangedCount = 0;
+
+    uniqueStudentIds.forEach(function(studentId) {
+      const rowIndex = rowsByStudentId["$" + studentId];
+      if (rowIndex === undefined) {
+        errors.push(studentId + ": student record not found.");
+        return;
+      }
+
+      const currentStatus = String(values[rowIndex][statusColumn] || "").trim();
+      const currentClass = String(values[rowIndex][classColumn] || "").trim();
+      const isLocked = currentStatus.toLowerCase() === "completed" &&
+        currentClass.toUpperCase().indexOf("JHS 3") !== -1;
+      if (isLocked) {
+        errors.push(studentId + ": Completed JHS 3 record is locked.");
+        return;
+      }
+
+      const statusChanged = hasStatus && currentStatus !== newStatus;
+      const classChanged = hasClass && currentClass !== newClass;
+      if (!statusChanged && !classChanged) {
+        unchangedCount++;
+        return;
+      }
+
+      const sheetRow = rowIndex + 1;
+      if (statusChanged) {
+        statusRanges.push(sheet.getRange(sheetRow, statusColumn + 1).getA1Notation());
+      }
+      if (classChanged) {
+        classRanges.push(sheet.getRange(sheetRow, classColumn + 1).getA1Notation());
+      }
+
+      auditEntries.push({
+        studentId: studentId,
+        oldStatus: currentStatus,
+        oldClass: currentClass,
+        newStatus: hasStatus ? newStatus : currentStatus,
+        newClass: hasClass ? newClass : currentClass
+      });
+    });
+
+    if (statusRanges.length > 0) sheet.getRangeList(statusRanges).setValue(newStatus);
+    if (classRanges.length > 0) sheet.getRangeList(classRanges).setValue(newClass);
+
+    if (auditEntries.length > 0) {
+      invalidateStudentsCache();
+      invalidateIndex("Students");
+
+      const detail = hasStatus && hasClass
+        ? "Bulk updated student status and class"
+        : (hasStatus ? "Bulk updated student status" : "Bulk updated student class");
+      auditEntries.forEach(function(entry) {
+        safeLogAuditEvent(
+          "Update",
+          "Students",
+          entry.studentId,
+          detail,
+          buildAuditSnapshot({
+            studentId: entry.studentId,
+            status: entry.oldStatus,
+            class: entry.oldClass
+          }),
+          buildAuditSnapshot({
+            studentId: entry.studentId,
+            status: entry.newStatus,
+            class: entry.newClass
+          })
+        );
+      });
+    }
+
+    return {
+      success: true,
+      updatedCount: auditEntries.length,
+      unchangedCount: unchangedCount,
+      failedCount: errors.length,
+      errors: errors
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // 7. Delete operation logic
