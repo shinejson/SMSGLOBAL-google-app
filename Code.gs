@@ -519,9 +519,10 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
   try {
     const students = typeof getStudentsData === 'function' ? getStudentsData() : [];
     
-    // If year or term filter is provided, check if students are active in that year/term via attendance or payments
+    // When NO filters are selected, show all students
+    // When filters ARE selected, only show students with matching activity records
     let filteredStudents = students;
-    if (normYear || normTerm) {
+    if (normYear || normTerm || filterDate) {
       const activeStudentIds = new Set();
       
       try {
@@ -542,8 +543,12 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
         });
       } catch(e) {}
 
+      // Only filter students if we found matching records AND filters are active
       if (activeStudentIds.size > 0) {
         filteredStudents = students.filter(s => activeStudentIds.has(String(s.studentId).trim()));
+      } else {
+        // If filters are active but no matching records, show empty (not all students)
+        filteredStudents = [];
       }
     }
 
