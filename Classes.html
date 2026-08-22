@@ -91,9 +91,117 @@
     body.dark-mode .btn-secondary { background: #334155; color: #f1f5f9; }
     body.dark-mode .btn-secondary:hover { background: #475569; }
     body.dark-mode small { color: #94a3b8; }
+
+    /* --- TOAST NOTIFICATIONS --- */
+    .toast-container {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    
+    .toast {
+      background: #1e293b;
+      color: #f1f5f9;
+      padding: 16px 20px;
+      border-radius: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 300px;
+      max-width: 450px;
+      opacity: 0;
+      transform: translateX(400px);
+      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      pointer-events: auto;
+      border-left: 4px solid #3b82f6;
+    }
+    
+    .toast.show {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    
+    .toast.success {
+      border-left-color: #10b981;
+    }
+    
+    .toast.error {
+      border-left-color: #ef4444;
+    }
+    
+    .toast.warning {
+      border-left-color: #f59e0b;
+    }
+    
+    .toast-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    
+    .toast-content {
+      flex: 1;
+    }
+    
+    .toast-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+    
+    .toast-message {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+    
+    .toast-close {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    
+    .toast-close:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f1f5f9;
+    }
+    
+    body.dark-mode .toast {
+      background: #1e293b;
+      color: #f1f5f9;
+    }
+    
+    @media (max-width: 768px) {
+      .toast-container {
+        right: 10px;
+        left: 10px;
+        top: 10px;
+      }
+      
+      .toast {
+        min-width: auto;
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <div class="page-header">
     <div class="page-title">
@@ -160,6 +268,54 @@
 
   <script>
     let classList = [];
+
+    // Toast notification function
+    function showToast(message, type = 'success', title = '') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+      };
+      
+      const titles = {
+        success: title || 'Success',
+        error: title || 'Error',
+        warning: title || 'Warning',
+        info: title || 'Info'
+      };
+      
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-content">
+          <div class="toast-title">${titles[type]}</div>
+          <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="removeToast(this.parentElement)">×</button>
+      `;
+      
+      container.appendChild(toast);
+      
+      // Trigger animation
+      setTimeout(() => toast.classList.add('show'), 10);
+      
+      // Auto remove after 4 seconds
+      setTimeout(() => removeToast(toast), 4000);
+    }
+    
+    function removeToast(toast) {
+      if (!toast) return;
+      toast.classList.remove('show');
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.parentElement.removeChild(toast);
+        }
+      }, 300);
+    }
 
     document.addEventListener('DOMContentLoaded', function() { refreshData(); });
 
@@ -268,7 +424,10 @@
 
     function editClass(id) {
       const classItem = classList.find(c => Number(c.id) === Number(id));
-      if(!classItem) { alert('Class not found.'); return; }
+      if(!classItem) { 
+        showToast('Class not found in the list.', 'error');
+        return; 
+      }
       
       document.getElementById('classId').value = id;
       document.getElementById('className').value = classItem.className;
@@ -280,11 +439,14 @@
 
     function deleteClassConfirm(id) {
       const classItem = classList.find(c => Number(c.id) === Number(id));
-      if(!classItem) { alert('Class not found.'); return; }
+      if(!classItem) { 
+        showToast('Class not found in the list.', 'error');
+        return; 
+      }
 
       const studentCount = Number(classItem.studentCount) || 0;
       if (studentCount > 0) {
-        alert('Cannot delete "' + classItem.className + '" because ' + studentCount + ' student' + (studentCount === 1 ? ' is' : 's are') + ' currently assigned to this class.');
+        showToast('Cannot delete "' + classItem.className + '" because ' + studentCount + ' student' + (studentCount === 1 ? ' is' : 's are') + ' currently assigned to this class.', 'warning', 'Cannot Delete');
         return;
       }
 

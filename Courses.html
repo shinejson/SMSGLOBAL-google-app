@@ -250,24 +250,24 @@
         <div class="modal-body">
           <div class="form-grid">
             <div class="form-group">
-              <label class="form-label" for="courseName">Course Name</label>
+              <label class="form-label" for="courseName">Course Name *</label>
               <input type="text" id="courseName" class="form-input" placeholder="e.g. Introduction to CS" required>
             </div>
             <div class="form-group">
               <label class="form-label" for="instructor">Instructor</label>
-              <input type="text" id="instructor" class="form-input" placeholder="e.g. Dr. Smith" required>
+              <input type="text" id="instructor" class="form-input" placeholder="e.g. Dr. Smith">
             </div>
           </div>
           
           <div class="form-grid">
             <div class="form-group">
-              <label class="form-label" for="credits">Credits</label>
+              <label class="form-label" for="credits">Credits *</label>
               <input type="number" id="credits" class="form-input" placeholder="e.g. 3" required>
             </div>
             <div class="form-group">
               <label class="form-label" for="semester">Semester</label>
-              <select id="semester" class="form-select" required>
-                <option value="" disabled selected>Select Semester</option>
+              <select id="semester" class="form-select">
+                <option value="">Select Semester (Optional)</option>
                 <option value="Fall 2026">Fall 2026</option>
                 <option value="Spring 2026">Spring 2026</option>
                 <option value="Summer 2026">Summer 2026</option>
@@ -277,7 +277,7 @@
 
           <div class="form-group">
             <label class="form-label" for="status">Status</label>
-            <select id="status" class="form-select" required>
+            <select id="status" class="form-select">
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
             </select>
