@@ -1240,6 +1240,22 @@
         return;
       }
 
+      // Quick actions are intentionally limited to these two fields. Do not
+      // send the student objects from studentsList: a quick action must never
+      // overwrite the other columns in a student row.
+      const safeUpdates = {};
+      if (updates && Object.prototype.hasOwnProperty.call(updates, 'status')) {
+        safeUpdates.status = updates.status;
+      }
+      if (updates && Object.prototype.hasOwnProperty.call(updates, 'class')) {
+        safeUpdates.class = updates.class;
+      }
+      if (Object.keys(safeUpdates).length === 0) {
+        showToast('No valid quick action was selected', 'error');
+        sourceSelect.value = '';
+        return;
+      }
+
       const confirmation = `Update ${fieldLabel} to "${newValue}" for ${selectedIds.length} student(s)?`;
       if (!confirm(confirmation)) {
         sourceSelect.value = '';
@@ -1278,7 +1294,7 @@
           setBulkActionsBusy(false);
           showToast('Error updating students: ' + (err && err.message ? err.message : err), 'error');
         })
-        .bulkUpdateStudents(selectedIds, updates);
+        .bulkUpdateStudents(selectedIds, safeUpdates);
     }
 
     function handleBulkStatusChange(select) {
