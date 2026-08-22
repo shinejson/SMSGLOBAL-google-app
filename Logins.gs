@@ -86,12 +86,17 @@ function getReportData() {
   let attPresent = 0;
 
   if (attSheet && attSheet.getLastRow() > 2) {
-    const attData = attSheet.getRange(3, 5, attSheet.getLastRow() - 2, 1).getValues(); // Col E(Status)
-    attTotal = attData.length;
-    attData.forEach(row => {
-      if (String(row[0]).trim() === 'Present') attPresent++;
-    });
-    attendanceAvg = attTotal > 0 ? Math.round((attPresent / attTotal) * 100) : 0;
+    const attendanceData = typeof getAttendanceData === 'function' ? getAttendanceData() : [];
+    attTotal = attendanceData.length;
+    if (attTotal > 0) {
+      const statuses = typeof getAttendanceStatuses === 'function' ? getAttendanceStatuses() : [];
+      attendanceData.forEach(row => {
+        if (typeof isAttendancePresentStatus === 'function' ? isAttendancePresentStatus(row.status, statuses) : String(row.status || '').trim().toLowerCase() === 'present') {
+          attPresent++;
+        }
+      });
+      attendanceAvg = Math.round((attPresent / attTotal) * 100);
+    }
   }
 
   // 4. Top Performers (Based on Performance sheet)

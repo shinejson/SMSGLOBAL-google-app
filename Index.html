@@ -1497,6 +1497,11 @@
             } catch (e) {
               console.warn('Could not save current page to localStorage:', e);
             }
+
+            // Reload dashboard stats when switching to Dashboard
+            if (typeof window.loadDashboardStatsWithFilters === 'function') {
+              window.loadDashboardStatsWithFilters();
+            }
             
             if (window.innerWidth <= 1024) window.toggleSidebar();
           };
@@ -1750,28 +1755,20 @@
               select.value = activeYear;
             }
             
-            // Set current date in the date filter
+            // Leave date filter empty by default so overall stats for active year/term are displayed
             const dateInput = document.getElementById('dashDateFilter');
             if (dateInput) {
-              const today = new Date();
-              const year = today.getFullYear();
-              const month = String(today.getMonth() + 1).padStart(2, '0');
-              const day = String(today.getDate()).padStart(2, '0');
-              dateInput.value = year + '-' + month + '-' + day;
+              dateInput.value = '';
             }
             
-            // Trigger the filter to load data with active year and current date
+            // Trigger the filter to load data with active year
             loadDashboardStatsWithFilters();
           })
           .withFailureHandler(function() {
-            // If academic years fail to load, still set current date and load stats
+            // If academic years fail to load, leave date filter empty and load stats
             const dateInput = document.getElementById('dashDateFilter');
             if (dateInput) {
-              const today = new Date();
-              const year = today.getFullYear();
-              const month = String(today.getMonth() + 1).padStart(2, '0');
-              const day = String(today.getDate()).padStart(2, '0');
-              dateInput.value = year + '-' + month + '-' + day;
+              dateInput.value = '';
             }
             loadDashboardStatsWithFilters();
           })
@@ -1972,6 +1969,22 @@
         const canvas = document.getElementById('attendanceChart');
         if (!canvas || typeof Chart === 'undefined') return;
 
+        trendData = trendData || [];
+
+        if (trendData.length === 0) {
+          if (canvas._chartInstance) {
+            canvas._chartInstance.destroy();
+            canvas._chartInstance = null;
+          }
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.font = '14px Inter, sans-serif';
+          ctx.fillStyle = document.body.classList.contains('dark-mode') ? '#94a3b8' : '#64748b';
+          ctx.textAlign = 'center';
+          ctx.fillText('No attendance trend data available', canvas.width / 2, canvas.height / 2);
+          return;
+        }
+
         const labels = trendData.map((item) => item.label);
         const values = trendData.map((item) => item.presentPct);
 
@@ -1997,11 +2010,24 @@
             },
             options: {
               maintainAspectRatio: false,
+              responsive: true,
               scales: {
+                x: {
+                  ticks: {
+                    color: document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#475569',
+                    font: { size: 11, family: 'Inter' },
+                  },
+                  grid: { display: false },
+                },
                 y: {
                   beginAtZero: true,
                   max: 100,
+                  grid: {
+                    color: document.body.classList.contains('dark-mode') ? '#334155' : '#f1f5f9',
+                  },
                   ticks: {
+                    color: document.body.classList.contains('dark-mode') ? '#cbd5e1' : '#475569',
+                    font: { size: 11, family: 'Inter' },
                     callback: function(value) {
                       return value + '%';
                     },
@@ -2013,9 +2039,19 @@
                   display: false,
                 },
                 tooltip: {
+                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                  titleColor: '#f1f5f9',
+                  bodyColor: '#cbd5e1',
+                  padding: 12,
+                  cornerRadius: 8,
                   callbacks: {
                     label: function(context) {
-                      return context.parsed.y + '% attendance';
+                      const item = trendData[context.dataIndex];
+                      let text = context.parsed.y + '% attendance';
+                      if (item && item.totalCount) {
+                        text += ' (' + item.presentCount + '/' + item.totalCount + ' present)';
+                      }
+                      return text;
                     },
                   },
                 },
@@ -2025,6 +2061,14 @@
         } else {
           canvas._chartInstance.data.labels = labels;
           canvas._chartInstance.data.datasets[0].data = values;
+          const isDarkMode = document.body.classList.contains('dark-mode');
+          if (canvas._chartInstance.options.scales.x) {
+            canvas._chartInstance.options.scales.x.ticks.color = isDarkMode ? '#cbd5e1' : '#475569';
+          }
+          if (canvas._chartInstance.options.scales.y) {
+            canvas._chartInstance.options.scales.y.ticks.color = isDarkMode ? '#cbd5e1' : '#475569';
+            canvas._chartInstance.options.scales.y.grid.color = isDarkMode ? '#334155' : '#f1f5f9';
+          }
           canvas._chartInstance.update();
         }
       }

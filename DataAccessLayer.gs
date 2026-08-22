@@ -217,42 +217,36 @@ function getClassesData() {
 // ==================== ATTENDANCE ====================
 
 function getAttendanceDataUncached() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Attendance");
-  if (!sheet) return [];
-  
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 3) return [];
-  
-  const data = sheet.getRange(3, 2, lastRow - 2, 8).getValues();
-  
-  return data.map(row => ({
-    attendanceId: String(row[0]).trim(),
-    date: row[1],
-    studentId: String(row[2]).trim(),
-    studentName: String(row[3]).trim(),
-    className: String(row[4]).trim(),
-    courseId: String(row[5]).trim(),
-    academicYear: String(row[6]).trim(),
-    term: String(row[7]).trim(),
-    status: String(row[8]).trim()
-  }));
+  if (typeof getAttendanceDataFromSheet === "function") {
+    return getAttendanceDataFromSheet();
+  }
+  return [];
 }
 
 function getAttendanceData() {
   const cachedData = getCachedData('data_Attendance', getAttendanceDataUncached, 300); // 5 min cache
   
   return cachedData.map(function(att) {
+    let dateVal = att.date;
+    if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
+      try {
+        dateVal = Utilities.formatDate(dateVal, Session.getScriptTimeZone(), "yyyy-MM-dd");
+      } catch (e) {
+        dateVal = dateVal.toISOString().split("T")[0];
+      }
+    } else if (dateVal && String(dateVal).indexOf("T") !== -1) {
+      dateVal = String(dateVal).split("T")[0];
+    }
     return {
       attendanceId: sanitizeHtml(att.attendanceId),
-      date: att.date, // Date object, safe
+      date: dateVal,
+      academicYear: sanitizeHtml(att.academicYear),
+      className: sanitizeHtml(att.className),
       studentId: sanitizeHtml(att.studentId),
       studentName: sanitizeHtml(att.studentName),
-      className: sanitizeHtml(att.className),
       courseId: sanitizeHtml(att.courseId),
-      academicYear: sanitizeHtml(att.academicYear),
-      term: sanitizeHtml(att.term),
-      status: sanitizeHtml(att.status)
+      status: sanitizeHtml(att.status),
+      term: sanitizeHtml(att.term)
     };
   });
 }

@@ -428,6 +428,49 @@ function getSheetNames() {
   });
 }
 
+// Helper to parse date string/object into a Date object at local midnight
+function parseDashboardDate(input) {
+  if (!input) return null;
+  if (input instanceof Date) return isNaN(input.getTime()) ? null : input;
+  const str = String(input).trim();
+  if (!str) return null;
+  // If ISO date string YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const parts = str.substring(0, 10).split('-');
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+  // If YYYY/MM/DD
+  if (/^\d{4}\/\d{2}\/\d{2}/.test(str)) {
+    const parts = str.substring(0, 10).split('/');
+    return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  }
+  // If DD/MM/YYYY or MM/DD/YYYY
+  const parts = str.split(/[\/\-\.]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    } else if (parts[2].length === 4) {
+      let p1 = Number(parts[0]), p2 = Number(parts[1]), y = Number(parts[2]);
+      if (p1 > 12) return new Date(y, p2 - 1, p1);
+      return new Date(y, p2 - 1, p1);
+    }
+  }
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Helper to determine if an attendance status counts as present
+function isAttendancePresentStatus(statusVal, statusesList) {
+  const s = String(statusVal || '').trim().toLowerCase();
+  if (!s || s === 'undefined' || s === 'null') return false;
+  if (s === 'present' || s === 'p' || s.startsWith('present') || s === 'late' || s === 'on time') return true;
+  if (statusesList && statusesList.length > 0) {
+    const firstStatus = String(statusesList[0].value || '').trim().toLowerCase();
+    if (firstStatus && s === firstStatus) return true;
+  }
+  return false;
+}
+
 // Function to get the dashboard data (Mocking data since your screenshot is empty)
 // You can replace these numbers with real formulas later.
 function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
@@ -439,17 +482,7 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
   const normTerm = selectedTerm ? String(selectedTerm).trim().toLowerCase() : '';
   
   // Parse selected date if provided
-  let filterDate = null;
-  if (selectedDate) {
-    try {
-      filterDate = new Date(selectedDate);
-      if (isNaN(filterDate.getTime())) {
-        filterDate = null;
-      }
-    } catch (e) {
-      filterDate = null;
-    }
-  }
+  let filterDate = parseDashboardDate(selectedDate);
 
   function matchYT(itemYear, itemTerm) {
     if (normYear) {
@@ -468,8 +501,8 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
     if (!itemDate) return false;
     
     try {
-      const compareDate = new Date(itemDate);
-      if (isNaN(compareDate.getTime())) return false;
+      const compareDate = parseDashboardDate(itemDate);
+      if (!compareDate) return false;
       
       // Match if the dates are on the same day
       return compareDate.getFullYear() === filterDate.getFullYear() &&
@@ -550,15 +583,14 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
     const lastRow = attendanceSheet.getLastRow();
     if (lastRow >= 3) {
       const attendanceData = typeof getAttendanceData === 'function' ? getAttendanceData() : [];
+      const statuses = typeof getAttendanceStatuses === 'function' ? getAttendanceStatuses() : [];
+
+      // Valid records matching Year, Term, and Date filter (if selected)
       const validRecords = attendanceData.filter((row) => matchYT(row.academicYear, row.term) && matchDate(row.date));
 
       if (validRecords.length > 0) {
-        // Use the first status from settings as the "present" equivalent
-        const statuses = getAttendanceStatuses();
-        const presentStatus = statuses.length > 0 ? statuses[0].value.toLowerCase() : 'present';
-        
         const presentCount = validRecords.filter(
-          (row) => String(row.status || '').trim().toLowerCase() === presentStatus,
+          (row) => isAttendancePresentStatus(row.status, statuses)
         ).length;
         const percentage = Math.round(
           (presentCount / validRecords.length) * 100,
@@ -566,20 +598,22 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
         avgAttendance = percentage + "%";
       }
 
+      // Year & Term records for monthly trend chart (independent of single date filter)
+      const yearTermRecords = attendanceData.filter((row) => matchYT(row.academicYear, row.term));
+
       const trendMap = {};
-      const statuses = getAttendanceStatuses();
-      const presentStatus = statuses.length > 0 ? statuses[0].value.toLowerCase() : 'present';
-      
-      validRecords.forEach((row) => {
-        const dateValue = row.date ? new Date(row.date) : null;
+      yearTermRecords.forEach((row) => {
+        const dateValue = parseDashboardDate(row.date);
         if (!dateValue || isNaN(dateValue.getTime())) return;
+
         const monthLabel = Utilities.formatDate(dateValue, Session.getScriptTimeZone(), "MMM yyyy");
-        const status = String(row.status || '').trim().toLowerCase();
+        const sortKey = dateValue.getFullYear() * 100 + (dateValue.getMonth() + 1);
+
         if (!trendMap[monthLabel]) {
-          trendMap[monthLabel] = { present: 0, total: 0, sortKey: dateValue.getFullYear() * 100 + (dateValue.getMonth() + 1) };
+          trendMap[monthLabel] = { present: 0, total: 0, sortKey: sortKey };
         }
         trendMap[monthLabel].total += 1;
-        if (status === presentStatus) {
+        if (isAttendancePresentStatus(row.status, statuses)) {
           trendMap[monthLabel].present += 1;
         }
       });
