@@ -2722,6 +2722,87 @@ function addEnrollment(enrollmentData) {
   return { success: true, enrollmentId: nextId };
 }
 
+// Class helpers
+function normalizeClassNameForComparison_(className) {
+  return String(className || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function invalidateClassesCache_() {
+  try {
+    if (typeof invalidateCacheOnModify === 'function') {
+      invalidateCacheOnModify('Classes');
+    } else if (typeof invalidateCache === 'function') {
+      invalidateCache('data_Classes');
+    }
+  } catch (e) {
+    Logger.log('Could not invalidate Classes cache: ' + e.message);
+  }
+}
+
+function findClassRowByName_(sheet, className, ignoreRow) {
+  const targetKey = normalizeClassNameForComparison_(className);
+  if (!targetKey) return null;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  const values = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let i = 0; i < values.length; i++) {
+    const rowNumber = i + 2;
+    if (ignoreRow && rowNumber === Number(ignoreRow)) continue;
+
+    const existingName = String(values[i][0] || '').trim();
+    if (existingName && normalizeClassNameForComparison_(existingName) === targetKey) {
+      return { row: rowNumber, className: existingName };
+    }
+  }
+
+  return null;
+}
+
+function getStudentsDataForClassCount_() {
+  try {
+    if (typeof getStudentsDataUncached === 'function') {
+      return getStudentsDataUncached();
+    }
+  } catch (e) {
+    Logger.log('Could not read uncached students for class count: ' + e.message);
+  }
+
+  try {
+    if (typeof getStudentsData === 'function') {
+      return getStudentsData();
+    }
+  } catch (e) {
+    Logger.log('Could not read students for class count: ' + e.message);
+  }
+
+  return [];
+}
+
+function getStudentCountsByNormalizedClass_() {
+  const counts = {};
+  const studentsData = getStudentsDataForClassCount_();
+
+  studentsData.forEach(function(student) {
+    const rawClassName = student && (student.class || student.className || student.studentClass);
+    const classKey = normalizeClassNameForComparison_(rawClassName);
+    if (classKey) {
+      counts[classKey] = (counts[classKey] || 0) + 1;
+    }
+  });
+
+  return counts;
+}
+
+function getStudentCountForClass_(className) {
+  const classKey = normalizeClassNameForComparison_(className);
+  if (!classKey) return 0;
+
+  const counts = getStudentCountsByNormalizedClass_();
+  return counts[classKey] || 0;
+}
+
 // 21. Fetch Classes Data (For the Classes page)
 function getClassesData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2734,31 +2815,14 @@ function getClassesData() {
   // Get class names from Column A, starting from Row 2
   const classRange = sheet.getRange(2, 1, lastRow - 1, 1);
   const classData = classRange.getValues();
-  
-  // Get all students data and count them per class
-  let studentCounts = {};
-  
-  try {
-    // Use the existing getStudentsData which properly handles headers
-    const studentsData = getStudentsData();
-    
-    // Count students per class
-    studentsData.forEach(function(student) {
-      const className = String(student.class || '').trim();
-      if (className) {
-        studentCounts[className] = (studentCounts[className] || 0) + 1;
-      }
-    });
-  } catch (e) {
-    Logger.log('Error counting students per class: ' + e.message);
-  }
+  const studentCounts = getStudentCountsByNormalizedClass_();
   
   return classData.map((row, idx) => {
     const className = String(row[0]).trim();
     return {
       id: idx + 2, // Sheet row number for reference
-      className: className,
-      studentCount: studentCounts[className] || 0
+      className: typeof sanitizeHtml === 'function' ? sanitizeHtml(className) : className,
+      studentCount: studentCounts[normalizeClassNameForComparison_(className)] || 0
     };
   }).filter((r) => r.className);
 }
@@ -2769,11 +2833,25 @@ function addClass(className) {
   const sheet = ss.getSheetByName("Classes");
   if (!sheet) throw new Error("Classes worksheet not found.");
 
+  className = String(className || '').trim().replace(/\s+/g, ' ');
+  if (!className) {
+    return { success: false, message: 'Class name is required.' };
+  }
+
+  const duplicate = findClassRowByName_(sheet, className);
+  if (duplicate) {
+    return {
+      success: false,
+      message: 'A class named "' + duplicate.className + '" already exists.'
+    };
+  }
+
   const lastRow = sheet.getLastRow();
   const targetRow = lastRow + 1;
 
   // Set value in Column A
-  sheet.getRange(targetRow, 1, 1, 1).setValue([className]);
+  sheet.getRange(targetRow, 1).setValue(className);
+  invalidateClassesCache_();
 
   safeLogAuditEvent(
     'Create',
@@ -2781,10 +2859,10 @@ function addClass(className) {
     className,
     'Created class record',
     null,
-    buildAuditSnapshot({ className: className })
+    buildAuditSnapshot({ className: className, rowId: targetRow })
   );
 
-  return { success: true };
+  return { success: true, className: className, rowId: targetRow };
 }
 
 // 23. Update Class Logic
@@ -2793,13 +2871,31 @@ function updateClass(id, className) {
   const sheet = ss.getSheetByName("Classes");
   if (!sheet) throw new Error("Classes worksheet not found.");
 
+  id = Number(id);
   // id is the row number in the sheet
-  if (id < 2) throw new Error("Invalid class ID.");
+  if (!id || id < 2 || id > sheet.getLastRow()) throw new Error("Invalid class ID.");
+
+  className = String(className || '').trim().replace(/\s+/g, ' ');
+  if (!className) {
+    return { success: false, message: 'Class name is required.' };
+  }
+
+  const duplicate = findClassRowByName_(sheet, className, id);
+  if (duplicate) {
+    return {
+      success: false,
+      message: 'A class named "' + duplicate.className + '" already exists.'
+    };
+  }
 
   const oldClassName = String(sheet.getRange(id, 1).getValue() || '').trim();
+  if (!oldClassName) {
+    return { success: false, message: 'Class not found.' };
+  }
 
   // Update Column A with the new class name
   sheet.getRange(id, 1).setValue(className);
+  invalidateClassesCache_();
 
   safeLogAuditEvent(
     'Update',
@@ -2810,7 +2906,7 @@ function updateClass(id, className) {
     buildAuditSnapshot({ className: className, rowId: id })
   );
 
-  return { success: true };
+  return { success: true, className: className, rowId: id };
 }
 
 // 24. Delete Class Logic
@@ -2819,13 +2915,26 @@ function deleteClass(id) {
   const sheet = ss.getSheetByName("Classes");
   if (!sheet) throw new Error("Classes worksheet not found.");
 
+  id = Number(id);
   // id is the row number in the sheet
-  if (id < 2) throw new Error("Invalid class ID.");
+  if (!id || id < 2 || id > sheet.getLastRow()) throw new Error("Invalid class ID.");
 
   const className = String(sheet.getRange(id, 1).getValue() || '').trim();
+  if (!className) {
+    return { success: false, message: 'Class not found.' };
+  }
+
+  const studentCount = getStudentCountForClass_(className);
+  if (studentCount > 0) {
+    return {
+      success: false,
+      message: 'Cannot delete "' + className + '" because ' + studentCount + ' student' + (studentCount === 1 ? ' is' : 's are') + ' currently assigned to this class.'
+    };
+  }
 
   // Delete the entire row
   sheet.deleteRow(id);
+  invalidateClassesCache_();
 
   safeLogAuditEvent(
     'Delete',
