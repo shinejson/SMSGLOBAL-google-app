@@ -483,7 +483,22 @@
     function refreshData() {
       document.getElementById('loading').style.display = 'block';
       document.getElementById('attendanceTable').style.display = 'none';
-      google.script.run.withSuccessHandler(renderTable).getAttendanceData();
+      // Re-fetch academic years first so activeAcademicYear is up-to-date
+      // (important when a new year was activated after page load), then load data.
+      google.script.run
+        .withSuccessHandler(function(years) {
+          if (years && years.length) {
+            academicYearsList = years;
+            const activeYears = years.filter(y => isActiveYearStatus(y.status));
+            activeAcademicYear = activeYears.length ? activeYears[0].academicYear : '';
+          }
+          google.script.run.withSuccessHandler(renderTable).getAttendanceData();
+        })
+        .withFailureHandler(function() {
+          // If year fetch fails, still load attendance data with whatever we have
+          google.script.run.withSuccessHandler(renderTable).getAttendanceData();
+        })
+        .getAcademicYearsData();
     }
 
     function formatDisplayDate(d) {
