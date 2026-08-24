@@ -976,18 +976,48 @@
     function refreshData(onComplete) {
       document.getElementById('loading').style.display = 'block';
       document.getElementById('performanceTable').style.display = 'none';
+      // Re-fetch academic years first so activeAcademicYearValue is up-to-date
+      // (important when a new year was activated after page load), then load data.
       google.script.run
-        .withSuccessHandler(function(data) {
-          renderTable(data);
-          if (typeof onComplete === 'function') onComplete(data);
+        .withSuccessHandler(function(years) {
+          if (years && years.length) {
+            const activeYears = years.filter(y => y.status === 'Active');
+            activeAcademicYearValue = activeYears.length ? activeYears[0].academicYear : '';
+            // Sync the year filter dropdown to the current active year
+            const filter = document.getElementById('yearFilter');
+            if (filter && activeAcademicYearValue) {
+              filter.value = activeAcademicYearValue;
+            }
+          }
+          google.script.run
+            .withSuccessHandler(function(data) {
+              renderTable(data);
+              if (typeof onComplete === 'function') onComplete(data);
+            })
+            .withFailureHandler(function(err) {
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('performanceTable').style.display = 'table';
+              document.getElementById('tableBody').innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:#ef4444;">Error loading performance data: ' + (err && err.message ? err.message : 'Unknown error') + '</td></tr>';
+              showToast('Error loading performance data', 'error');
+            })
+            .getPerformanceData();
         })
-        .withFailureHandler(function(err) {
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('performanceTable').style.display = 'table';
-          document.getElementById('tableBody').innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:#ef4444;">Error loading performance data: ' + (err && err.message ? err.message : 'Unknown error') + '</td></tr>';
-          showToast('Error loading performance data', 'error');
+        .withFailureHandler(function() {
+          // If year fetch fails, still load performance data with whatever we have
+          google.script.run
+            .withSuccessHandler(function(data) {
+              renderTable(data);
+              if (typeof onComplete === 'function') onComplete(data);
+            })
+            .withFailureHandler(function(err) {
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('performanceTable').style.display = 'table';
+              document.getElementById('tableBody').innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:#ef4444;">Error loading performance data: ' + (err && err.message ? err.message : 'Unknown error') + '</td></tr>';
+              showToast('Error loading performance data', 'error');
+            })
+            .getPerformanceData();
         })
-        .getPerformanceData();
+        .getAcademicYearsData();
     }
 
     function renderTable(data) {
