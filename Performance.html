@@ -976,19 +976,70 @@
     function refreshData(onComplete) {
       document.getElementById('loading').style.display = 'block';
       document.getElementById('performanceTable').style.display = 'none';
-      // Re-fetch academic years first so activeAcademicYearValue is up-to-date
-      // (important when a new year was activated after page load), then load data.
+      // Re-fetch academic years FIRST so activeAcademicYearValue and all year
+      // dropdowns are up-to-date (handles new year activated after page load).
       google.script.run
         .withSuccessHandler(function(years) {
           if (years && years.length) {
-            const activeYears = years.filter(y => y.status === 'Active');
+            const addSelect    = document.getElementById('yearSelect');
+            const editSelect   = document.getElementById('edit_academicYear');
+            const filterSel    = document.getElementById('yearFilter');
+            const bulkSelect   = document.getElementById('bulk_yearSelect');
+            const activeYears  = years.filter(y => y.status === 'Active');
             activeAcademicYearValue = activeYears.length ? activeYears[0].academicYear : '';
-            // Sync the year filter dropdown to the current active year
-            const filter = document.getElementById('yearFilter');
-            if (filter && activeAcademicYearValue) {
-              filter.value = activeAcademicYearValue;
+            knownAcademicYears = years.map(y => y.academicYear).filter(Boolean);
+
+            // Rebuild add modal year select (active years only)
+            if (addSelect) {
+              addSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
+              activeYears.forEach(y => {
+                const o = document.createElement('option');
+                o.value = y.academicYear;
+                o.innerText = y.academicYear + ' (Active)';
+                addSelect.appendChild(o);
+              });
+              if (activeAcademicYearValue) addSelect.value = activeAcademicYearValue;
+            }
+
+            // Rebuild edit modal year select (all years)
+            if (editSelect) {
+              editSelect.innerHTML = '<option value="" disabled>Select Year</option>';
+              years.forEach(y => {
+                const o = document.createElement('option');
+                o.value = y.academicYear;
+                o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : ' (Inactive)');
+                editSelect.appendChild(o);
+              });
+              if (activeAcademicYearValue) editSelect.value = activeAcademicYearValue;
+            }
+
+            // Rebuild bulk modal year select (active years only)
+            if (bulkSelect) {
+              bulkSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
+              activeYears.forEach(y => {
+                const o = document.createElement('option');
+                o.value = y.academicYear;
+                o.innerText = y.academicYear + ' (Active)';
+                bulkSelect.appendChild(o);
+              });
+              if (activeAcademicYearValue) bulkSelect.value = activeAcademicYearValue;
+            }
+
+            // Rebuild year FILTER dropdown (all years) and select active year.
+            // This is the critical step: the option must exist before setting .value.
+            if (filterSel) {
+              filterSel.innerHTML = '<option value="">All Years</option>';
+              years.forEach(y => {
+                const o = document.createElement('option');
+                o.value = y.academicYear;
+                o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : '');
+                filterSel.appendChild(o);
+              });
+              if (activeAcademicYearValue) filterSel.value = activeAcademicYearValue;
             }
           }
+          // Now load performance data — filterTable() inside renderTable will
+          // use the freshly-set yearFilter value and show the correct records.
           google.script.run
             .withSuccessHandler(function(data) {
               renderTable(data);
@@ -1003,7 +1054,7 @@
             .getPerformanceData();
         })
         .withFailureHandler(function() {
-          // If year fetch fails, still load performance data with whatever we have
+          // Year fetch failed — still load performance data with existing state
           google.script.run
             .withSuccessHandler(function(data) {
               renderTable(data);
