@@ -396,6 +396,45 @@
     let studentsList = [];
     let attendanceStatuses = []; // Dynamic statuses from settings
     let activeAcademicYear = '';
+    let academicYearsList = [];
+
+    function isActiveYearStatus(status) {
+      return String(status || '').trim().toLowerCase() === 'active';
+    }
+
+    // Reverses the server-side sanitizeHtml() escaping (see InputSanitization.gs).
+    // Attendance rows arrive HTML-escaped, but dropdown values are raw, so any
+    // comparison/filtering must use decoded values. Safe for matching logic and
+    // for setAttribute()/.value assignment (no HTML parsing happens there);
+    // never feed the result into innerHTML.
+    function decodeSanitized(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&#x2F;/gi, '/')
+        .replace(/&amp;/g, '&'); // last, to avoid double-decoding
+    }
+
+    function ensureYearOption(selectEl, yearValue, label) {
+      if (!selectEl || !yearValue) return;
+      const exists = Array.from(selectEl.options).some(o => o.value === yearValue);
+      if (!exists) {
+        const opt = document.createElement('option');
+        opt.value = yearValue;
+        opt.innerText = label || yearValue;
+        selectEl.appendChild(opt);
+      }
+    }
+
+    function selectActiveAcademicYear(selectEl) {
+      if (!selectEl || !activeAcademicYear) return false;
+      ensureYearOption(selectEl, activeAcademicYear, activeAcademicYear + ' (Active)');
+      selectEl.value = activeAcademicYear;
+      return selectEl.value === activeAcademicYear;
+    }
 
     function showToast(message, type = 'success') {
       const container = document.getElementById('toastContainer');
@@ -418,11 +457,8 @@
     function applyDefaultFilters() {
       const today = new Date().toISOString().split('T')[0];
       document.getElementById('dateFilter').value = today;
-      if (activeAcademicYear) {
-        const yearSel = document.getElementById('academicYearFilter');
-        const hasOption = Array.from(yearSel.options).some(o => o.value === activeAcademicYear);
-        if (hasOption) yearSel.value = activeAcademicYear;
-      }
+      selectActiveAcademicYear(document.getElementById('academicYearFilter'));
+      selectActiveAcademicYear(document.getElementById('academicYear'));
       filterTable();
     }
 
@@ -472,17 +508,20 @@
       
       if(attendanceList.length === 0) {
         tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No attendance records found.</td></tr>`;
+        populateFiltersFromData();
         return;
       }
 
       attendanceList.forEach(row => {
         const displayDate = formatDisplayDate(row.date);
         const tr = document.createElement('tr');
-        tr.setAttribute('data-status', row.status || '');
+        // Filter attributes must hold the decoded (real) values so they match
+        // the raw dropdown option values (e.g. year "2025/2026").
+        tr.setAttribute('data-status', decodeSanitized(row.status));
         tr.setAttribute('data-date', displayDate);
-        tr.setAttribute('data-academicyear', row.academicYear || '');
-        tr.setAttribute('data-classname', row.className || '');
-        tr.setAttribute('data-term', row.term || '');
+        tr.setAttribute('data-academicyear', decodeSanitized(row.academicYear));
+        tr.setAttribute('data-classname', decodeSanitized(row.className));
+        tr.setAttribute('data-term', decodeSanitized(row.term));
 
         // Get dynamic status class
         let statusClass = 'status-present'; // default
@@ -533,9 +572,10 @@
       const terms = new Set();
 
       attendanceList.forEach(r => {
-        if (r.academicYear) years.add(r.academicYear);
-        if (r.className) classes.add(r.className);
-        if (r.term) terms.add(r.term);
+        // Decode so filter option values match the raw dropdown values elsewhere
+        if (r.academicYear) years.add(decodeSanitized(r.academicYear));
+        if (r.className) classes.add(decodeSanitized(r.className));
+        if (r.term) terms.add(decodeSanitized(r.term));
       });
 
       const yearSel = document.getElementById('academicYearFilter');
@@ -543,15 +583,19 @@
       const termSel = document.getElementById('termFilter');
       const statusSel = document.getElementById('statusFilter');
 
-      // Reset (keep first placeholder option)
-      yearSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
+      // Reset class/term/status. Keep official academic years so the active year
+      // stays available even when no attendance rows exist for it yet.
       classSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
       termSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
       statusSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
 
       Array.from(years).sort().forEach(y => {
-        const o = document.createElement('option'); o.value = y; o.innerText = y; yearSel.appendChild(o);
+        const label = (y === activeAcademicYear) ? y + ' (Active)' : y;
+        ensureYearOption(yearSel, y, label);
       });
+      if (activeAcademicYear) {
+        ensureYearOption(yearSel, activeAcademicYear, activeAcademicYear + ' (Active)');
+      }
       Array.from(classes).sort().forEach(c => {
         const o = document.createElement('option'); o.value = c; o.innerText = c; classSel.appendChild(o);
       });
@@ -759,45 +803,38 @@
       const filterSel = document.getElementById('academicYearFilter');
       google.script.run
         .withSuccessHandler(function(years) {
-          sel.innerHTML = '<option value="" disabled selected>Select Year</option>';
-          editSel.innerHTML = '<option value="" disabled selected>Select Year</option>';
-          if (!years || years.length === 0) return;
+          academicYearsList = years || [];
+          sel.innerHTML = '<option value="" disabled>Select Year</option>';
+          editSel.innerHTML = '<option value="" disabled>Select Year</option>';
+          if (!academicYearsList.length) return;
 
-          const activeYears = years.filter(y => y.status === 'Active');
-          if (activeYears.length > 0) {
-            activeAcademicYear = activeYears[0].academicYear;
-          }
+          const activeYears = academicYearsList.filter(y => isActiveYearStatus(y.status));
+          activeAcademicYear = activeYears.length ? activeYears[0].academicYear : '';
 
-          activeYears.forEach(y => {
-            let opt = document.createElement('option');
+          const addYears = activeYears.length ? activeYears : academicYearsList;
+          addYears.forEach(y => {
+            const opt = document.createElement('option');
             opt.value = y.academicYear;
-            opt.innerText = y.academicYear;
+            opt.innerText = y.academicYear + (isActiveYearStatus(y.status) ? ' (Active)' : '');
             sel.appendChild(opt);
           });
+          selectActiveAcademicYear(sel);
 
-          if (activeYears.length === 1) {
-            sel.value = activeYears[0].academicYear;
-          }
-
-          years.forEach(y => {
-            let opt = document.createElement('option');
+          academicYearsList.forEach(y => {
+            const opt = document.createElement('option');
             opt.value = y.academicYear;
-            opt.innerText = y.academicYear + (y.status !== 'Active' ? ' (Inactive)' : '');
+            opt.innerText = y.academicYear + (isActiveYearStatus(y.status) ? ' (Active)' : ' (Inactive)');
             editSel.appendChild(opt);
           });
 
-          // Populate year filter from all academic years and default to active
           filterSel.querySelectorAll('option:not(:first-child)').forEach(n => n.remove());
-          years.forEach(y => {
+          academicYearsList.forEach(y => {
             const opt = document.createElement('option');
             opt.value = y.academicYear;
-            opt.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : '');
+            opt.innerText = y.academicYear + (isActiveYearStatus(y.status) ? ' (Active)' : '');
             filterSel.appendChild(opt);
           });
-          if (activeAcademicYear) {
-            filterSel.value = activeAcademicYear;
-            filterTable();
-          }
+          applyDefaultFilters();
         })
         .withFailureHandler(function(error) {
           console.error('Error loading academic years:', error);
@@ -890,6 +927,7 @@
       document.getElementById('attendanceForm').reset();
       const today = new Date().toISOString().split('T')[0];
       document.getElementById('attendanceDate').value = today;
+      selectActiveAcademicYear(document.getElementById('academicYear'));
       document.getElementById('rosterBody').innerHTML = '';
       document.getElementById('rosterSection').style.display  = 'none';
       document.getElementById('rosterPlaceholder').style.display = 'block';
@@ -909,7 +947,7 @@
       // Build a Set of studentIds already recorded for this date
       const alreadyRecorded = new Set(
         attendanceList
-          .filter(r => formatDisplayDate(r.date) === date && r.className === className)
+          .filter(r => formatDisplayDate(r.date) === date && decodeSanitized(r.className) === className)
           .map(r => r.studentId)
       );
 
@@ -957,7 +995,7 @@
       // ---- CLIENT-SIDE DUPLICATE CHECK ----
       const alreadyRecorded = new Set(
         attendanceList
-          .filter(r => formatDisplayDate(r.date) === date && r.className === className)
+          .filter(r => formatDisplayDate(r.date) === date && decodeSanitized(r.className) === className)
           .map(r => r.studentId)
       );
 
@@ -1059,12 +1097,13 @@
 
       document.getElementById('edit_attendanceId').value      = record.attendanceId;
       document.getElementById('edit_date').value              = formatDisplayDate(record.date);
-      document.getElementById('edit_academicYear').value      = record.academicYear;
-      document.getElementById('edit_className').value         = record.className;
-      document.getElementById('edit_term').value              = record.term;
-      document.getElementById('edit_studentDisplay').value    = `${record.studentName || ''} (${record.studentId || ''})`;
-      document.getElementById('edit_courseSelect').value      = record.courseId || '';
-      document.getElementById('edit_status').value            = record.status || '';
+      // Decode: select option values are raw, record fields are HTML-escaped
+      document.getElementById('edit_academicYear').value      = decodeSanitized(record.academicYear);
+      document.getElementById('edit_className').value         = decodeSanitized(record.className);
+      document.getElementById('edit_term').value              = decodeSanitized(record.term);
+      document.getElementById('edit_studentDisplay').value    = `${decodeSanitized(record.studentName)} (${record.studentId || ''})`;
+      document.getElementById('edit_courseSelect').value      = decodeSanitized(record.courseId);
+      document.getElementById('edit_status').value            = decodeSanitized(record.status);
 
       document.getElementById('editAttendanceModal').classList.add('active');
     }
