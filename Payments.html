@@ -584,9 +584,17 @@
         <input type="hidden" id="formTransactionId">
         <div class="modal-body">
           
-          <!-- Billing Category Selector -->
+          <!-- Academic Year Selector (First) -->
           <div class="form-group">
-            <label class="form-label" for="billingCategoryId">Select Billing Category <span style="color: #3b82f6;">(Auto-fills academic year and term)</span></label>
+            <label class="form-label" for="academicYear">Academic Year <span style="color: #3b82f6;">(Select year first to filter billing categories)</span></label>
+            <select id="academicYear" class="form-select" required onchange="filterBillingCategoriesByYear()">
+              <option value="" disabled selected>Select Academic Year</option>
+            </select>
+          </div>
+
+          <!-- Billing Category Selector (Filtered by Academic Year) -->
+          <div class="form-group">
+            <label class="form-label" for="billingCategoryId">Select Billing Category <span style="color: #3b82f6;">(Auto-fills term)</span></label>
             <select id="billingCategoryId" class="form-select" required onchange="populateCategoryDetails()">
               <option value="" disabled selected>Select a Billing Category</option>
             </select>
@@ -621,22 +629,14 @@
             </div>
           </div>
 
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label class="form-label" for="academicYear">Academic Year</label>
-              <select id="academicYear" class="form-select" required>
-                <option value="" disabled selected>Select Academic Year</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="term">Term</label>
-              <select id="term" class="form-select" required>
-                <option value="" disabled selected>Select Term</option>
-                <option value="Term 1">Term 1</option>
-                <option value="Term 2">Term 2</option>
-                <option value="Term 3">Term 3</option>
-              </select>
-            </div>
+          <div class="form-group">
+            <label class="form-label" for="term">Term</label>
+            <select id="term" class="form-select" required>
+              <option value="" disabled selected>Select Term</option>
+              <option value="Term 1">Term 1</option>
+              <option value="Term 2">Term 2</option>
+              <option value="Term 3">Term 3</option>
+            </select>
           </div>
 
           <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;">
@@ -916,15 +916,44 @@
     function populateCategoryDetails() {
       const categoryId = document.getElementById('billingCategoryId').value;
       if(!categoryId || !billingCategoryMap[categoryId]) {
-        document.getElementById('academicYear').value = '';
         document.getElementById('term').value = '';
         return;
       }
 
       const cat = billingCategoryMap[categoryId];
-      ensureAcademicYearInDropdown(cat.academicYear);
-      document.getElementById('academicYear').value = cat.academicYear;
       document.getElementById('term').value = cat.terms;
+    }
+
+    // Filter billing categories based on selected academic year
+    function filterBillingCategoriesByYear() {
+      const selectedYear = document.getElementById('academicYear').value;
+      const billingSelect = document.getElementById('billingCategoryId');
+      
+      // Clear and reset the billing category dropdown
+      billingSelect.innerHTML = '<option value="" disabled selected>Select a Billing Category</option>';
+      
+      if (!selectedYear) {
+        return;
+      }
+
+      // Filter categories that match the selected academic year
+      const filteredCategories = Object.values(billingCategoryMap).filter(cat => {
+        return cat.academicYear === selectedYear;
+      });
+
+      // Populate the dropdown with filtered categories
+      filteredCategories.forEach(cat => {
+        let opt = document.createElement('option');
+        opt.value = cat.id;
+        opt.innerText = `${cat.id} — ${cat.category} (${cat.terms})`;
+        billingSelect.appendChild(opt);
+      });
+
+      // If only one category, auto-select it
+      if (filteredCategories.length === 1) {
+        billingSelect.value = filteredCategories[0].id;
+        populateCategoryDetails();
+      }
     }
 
     // --- DATA HANDLING ---
@@ -1420,7 +1449,6 @@
       document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
       
       // Clear selectors and inputs
-      document.getElementById('billingCategoryId').value = '';
       document.getElementById('studentClass').value = '';
       document.getElementById('studentSearchInput').value = '';
       document.getElementById('studentSearchInput').readOnly = true;
@@ -1428,10 +1456,24 @@
       document.getElementById('studentSelect').value = '';
       document.getElementById('studentId').value = '';
       document.getElementById('studentName').value = '';
-      document.getElementById('academicYear').value = '';
       document.getElementById('term').value = '';
       document.getElementById('studentSearchDropdown').innerHTML = '';
       document.getElementById('studentSearchDropdown').style.display = 'none';
+      
+      // Reset academic year and billing category
+      document.getElementById('academicYear').value = '';
+      document.getElementById('billingCategoryId').value = '';
+      document.getElementById('billingCategoryId').innerHTML = '<option value="" disabled selected>Select a Billing Category</option>';
+      
+      // Auto-select active academic year if available and filter billing categories
+      const academicYearSelect = document.getElementById('academicYear');
+      const activeYear = Array.from(academicYearSelect.options).find(opt => 
+        opt.value && !opt.text.includes('(Inactive)')
+      );
+      if (activeYear) {
+        academicYearSelect.value = activeYear.value;
+        filterBillingCategoriesByYear();
+      }
       
       document.getElementById('payModal').classList.add('active'); 
     }
@@ -1441,6 +1483,13 @@
       if (!pay) return alert('Error: Payment not found.');
 
       document.getElementById('formTransactionId').value = pay.transactionId;
+      
+      // Ensure the academic year is present in the list first
+      ensureAcademicYearInDropdown(pay.academicYear);
+      document.getElementById('academicYear').value = pay.academicYear;
+      
+      // Filter billing categories by the payment's academic year
+      filterBillingCategoriesByYear();
       document.getElementById('billingCategoryId').value = pay.invoiceId;
       
       // Select the Class selector
@@ -1452,9 +1501,6 @@
       // Select the Student
       selectStudent(pay.studentId, pay.studentName);
       
-      // Ensure the academic year is present in the list
-      ensureAcademicYearInDropdown(pay.academicYear);
-      document.getElementById('academicYear').value = pay.academicYear;
       document.getElementById('term').value = pay.term;
       document.getElementById('paymentDate').value = pay.paymentDate;
       document.getElementById('amountPaid').value = pay.amountPaid;
