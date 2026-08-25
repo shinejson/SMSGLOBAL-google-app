@@ -338,6 +338,7 @@
 
   <script>
     let invList = [];
+    let lastInvData = [];
     let studentsList = [];
     let academicYearsList = [];
     let currentDeleteId = null;
@@ -612,6 +613,10 @@
       // Load Students
       google.script.run.withSuccessHandler(function(students) {
         studentsList = students || [];
+        // If invoices rendered before the student list arrived (legacy rows
+        // may carry no stored name), re-render so names appear under each
+        // student ID in the table.
+        if (lastInvData.length) renderTable(lastInvData);
       }).getStudentIdNamePairs();
 
       // Load Academic Years
@@ -651,7 +656,17 @@
     }
 
     /* --- TABLE RENDERING & FILTERING --- */
+    // Resolve the display name for an invoice row: prefer the name stored on
+    // the invoice, fall back to the student's current name from the Students
+    // sheet (covers legacy invoices saved before the name was captured).
+    function getStudentDisplayName(row) {
+      if (row.studentName) return row.studentName;
+      const match = (studentsList || []).find(s => String(s.studentId || '').trim() === String(row.studentId || '').trim());
+      return match ? (match.fullName || '') : '';
+    }
+
     function renderTable(data) {
+      lastInvData = data || [];
       invList = (data || []).map(row => ({
         invoiceId: decodeSanitized(row.invoiceId),
         studentId: decodeSanitized(row.studentId),
@@ -693,8 +708,9 @@
         else if(row.status === 'Partial') statusClass = 'status-partial';
         else if(row.status === 'Overdue') statusClass = 'status-overdue';
 
-        const studentDisplay = row.studentName 
-          ? `<div><strong>${escapeHtml(row.studentId)}</strong><br><span style="font-size:11px;color:#64748b;line-height:1.2;">${escapeHtml(row.studentName)}</span></div>`
+        const studentName = getStudentDisplayName(row);
+        const studentDisplay = studentName
+          ? `<div><strong>${escapeHtml(row.studentId)}</strong><br><span style="font-size:11px;color:#64748b;line-height:1.2;">${escapeHtml(studentName)}</span></div>`
           : `<strong>${escapeHtml(row.studentId)}</strong>`;
 
         tr.innerHTML = `
