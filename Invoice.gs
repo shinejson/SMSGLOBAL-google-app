@@ -124,7 +124,7 @@ function getInvoicesDataFromSheet() {
     }
   };
 
-  return data
+  const invoices = data
     .filter(row => {
       const id = headerInfo.idxInvoiceId !== -1 ? String(row[headerInfo.idxInvoiceId] || '').trim() : String(row[0] || '').trim();
       return id !== '';
@@ -148,6 +148,43 @@ function getInvoicesDataFromSheet() {
         paymentStatus: String(val(headerInfo.idxPaymentStatus, 'Unpaid')).trim()
       };
     });
+
+  // Legacy invoices saved before the Student Name / Student Class columns
+  // existed leave those cells empty. Backfill them from the authoritative
+  // Students sheet so the name shows under the student ID in the UI.
+  return enrichInvoiceStudentDetails(invoices);
+}
+
+// Fill missing student name/class on invoice rows from the Students sheet.
+// Only rows with an empty stored value are touched, and stored values are
+// never overwritten, so historical details are preserved.
+function enrichInvoiceStudentDetails(invoices) {
+  if (!Array.isArray(invoices) || !invoices.length) return invoices;
+
+  const needsEnrichment = invoices.some(function(inv) {
+    return !String(inv.studentName || '').trim() || !String(inv.studentClass || '').trim();
+  });
+  if (!needsEnrichment) return invoices;
+
+  let students = [];
+  try {
+    students = typeof getStudentIdNamePairs === 'function' ? getStudentIdNamePairs() : [];
+  } catch (e) {
+    return invoices;
+  }
+
+  const byId = {};
+  (students || []).forEach(function(student) {
+    if (student && student.studentId) byId[String(student.studentId).trim()] = student;
+  });
+
+  invoices.forEach(function(inv) {
+    const student = byId[String(inv.studentId || '').trim()];
+    if (!student) return;
+    if (!String(inv.studentName || '').trim()) inv.studentName = student.fullName || '';
+    if (!String(inv.studentClass || '').trim()) inv.studentClass = student.studentClass || '';
+  });
+  return invoices;
 }
 
 // 2. Helper to generate Invoice ID (e.g. INV-1001)
