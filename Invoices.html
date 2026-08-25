@@ -189,8 +189,11 @@
               <select id="category" class="form-select" required>
                 <option value="" disabled selected>Select Category</option>
                 <option value="Tuition">Tuition</option>
+                <option value="Lab Fee">Lab Fee</option>
+                <option value="Sports">Sports</option>
+                <option value="Fine">Fine</option>
+                <option value="Transportation">Transportation</option>
                 <option value="Books">Books</option>
-                <option value="Transport">Transport</option>
                 <option value="Uniform">Uniform</option>
                 <option value="Other">Other</option>
               </select>
@@ -331,6 +334,18 @@
         const option = document.createElement('option');
         option.value = year;
         option.textContent = `${year} (Inactive / historical)`;
+        select.appendChild(option);
+      }
+    }
+
+    function ensureCategoryOption(category) {
+      const select = document.getElementById('category');
+      if (!select || !category) return;
+      const exists = Array.from(select.options).some(option => option.value === category);
+      if (!exists) {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
         select.appendChild(option);
       }
     }
@@ -507,6 +522,7 @@
       document.getElementById('studentId').value = invoice.studentId;
       document.getElementById('issueDate').value = invoice.issueDate;
       document.getElementById('dueDate').value = invoice.dueDate;
+      ensureCategoryOption(invoice.category);
       document.getElementById('category').value = invoice.category;
       document.getElementById('amountDue').value = invoice.amountDue;
       document.getElementById('status').value = invoice.status;

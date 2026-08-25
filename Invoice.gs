@@ -22,6 +22,85 @@ function populateInvoiceStudentDetails(invData, existingInvoice) {
   return invData;
 }
 
+/**
+ * Dynamic Header Mapper for Invoices sheet (Row 2, Column B onwards)
+ */
+function getInvoicesHeaderInfo(sheet) {
+  const lastCol = Math.max(sheet.getLastColumn(), 14);
+  const rawHeaders = sheet.getRange(2, 2, 1, lastCol - 1).getValues()[0];
+  const headers = rawHeaders.map(h => String(h || '').trim().toLowerCase());
+
+  function findIndex(aliasGroups) {
+    // 1) exact match
+    for (let i = 0; i < headers.length; i++) {
+      if (!headers[i]) continue;
+      for (let a of aliasGroups) {
+        if (headers[i] === a) return i;
+      }
+    }
+    // 2) contains match
+    for (let i = 0; i < headers.length; i++) {
+      if (!headers[i]) continue;
+      for (let a of aliasGroups) {
+        if (headers[i].indexOf(a) !== -1) return i;
+      }
+    }
+    return -1;
+  }
+
+  return {
+    headers: headers,
+    rawHeaders: rawHeaders,
+    numCols: headers.length,
+    idxInvoiceId: findIndex(['invoice id', 'invid', 'invoice_id', 'invoice', 'id']),
+    idxStudentId: findIndex(['student id', 'studentid', 'student_id', 'sid']),
+    idxStudentName: findIndex(['student name', 'name']),
+    idxStudentClass: findIndex(['student class', 'class name', 'class']),
+    idxAcademicYear: findIndex(['academic year', 'acad. year', 'acad year', 'year']),
+    idxTerm: findIndex(['term']),
+    idxCategory: findIndex(['category', 'billing category']),
+    idxItems: findIndex(['items', 'debit items', 'item', 'description']),
+    idxAmountDue: findIndex(['amount due', 'amount', 'total amount', 'total']),
+    idxIssueDate: findIndex(['issue date', 'issued date', 'issue', 'date']),
+    idxDueDate: findIndex(['due date', 'due']),
+    idxStatus: findIndex(['status', 'invoice status']),
+    idxPaymentStatus: findIndex(['payment status', 'pay status'])
+  };
+}
+
+/**
+ * Build a row array matched to the sheet's actual column positions
+ */
+function buildInvoiceRowArray(headerInfo, invoiceId, invData) {
+  const row = new Array(headerInfo.numCols).fill('');
+
+  const parseDate = (dateValue) => {
+    if (!dateValue) return new Date();
+    try {
+      const d = new Date(dateValue);
+      return isNaN(d.getTime()) ? new Date() : d;
+    } catch (e) {
+      return new Date();
+    }
+  };
+
+  if (headerInfo.idxInvoiceId !== -1) row[headerInfo.idxInvoiceId] = invoiceId;
+  if (headerInfo.idxStudentId !== -1) row[headerInfo.idxStudentId] = invData.studentId || '';
+  if (headerInfo.idxStudentName !== -1) row[headerInfo.idxStudentName] = invData.studentName || '';
+  if (headerInfo.idxStudentClass !== -1) row[headerInfo.idxStudentClass] = invData.studentClass || '';
+  if (headerInfo.idxAcademicYear !== -1) row[headerInfo.idxAcademicYear] = invData.academicYear || '';
+  if (headerInfo.idxTerm !== -1) row[headerInfo.idxTerm] = invData.term || '';
+  if (headerInfo.idxCategory !== -1) row[headerInfo.idxCategory] = invData.category || 'Tuition';
+  if (headerInfo.idxItems !== -1) row[headerInfo.idxItems] = invData.items || '';
+  if (headerInfo.idxAmountDue !== -1) row[headerInfo.idxAmountDue] = Number(invData.amountDue) || 0;
+  if (headerInfo.idxIssueDate !== -1) row[headerInfo.idxIssueDate] = parseDate(invData.issueDate);
+  if (headerInfo.idxDueDate !== -1) row[headerInfo.idxDueDate] = parseDate(invData.dueDate);
+  if (headerInfo.idxStatus !== -1) row[headerInfo.idxStatus] = invData.status || 'Pending';
+  if (headerInfo.idxPaymentStatus !== -1) row[headerInfo.idxPaymentStatus] = invData.paymentStatus || 'Unpaid';
+
+  return row;
+}
+
 // 1. Fetch Invoices Data from Sheet (authoritative reader)
 function getInvoicesDataFromSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -31,41 +110,42 @@ function getInvoicesDataFromSheet() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 3) return []; 
 
-  // Row 3 to Last, Col B(2) onwards - read all columns to accommodate new structure
-  // Updated structure: Invoice ID, Student ID, Student Name, Class, Academic Year, Term, Category, 
-  //                    Items, Amount, Issue Date, Due Date, Status, Payment Status (13 columns)
-  const dataRange = sheet.getRange(3, 2, lastRow - 2, 13); 
-  const data = dataRange.getValues();
+  const headerInfo = getInvoicesHeaderInfo(sheet);
+  const data = sheet.getRange(3, 2, lastRow - 2, headerInfo.numCols).getValues();
+
+  const parseDateStr = (dateValue) => {
+    if (!dateValue) return '';
+    try {
+      const d = new Date(dateValue);
+      if (isNaN(d.getTime())) return String(dateValue).trim();
+      return d.toISOString().split('T')[0];
+    } catch (e) {
+      return String(dateValue || '').trim();
+    }
+  };
 
   return data
-    .filter(row => String(row[0]).trim() !== '') // Filter out empty rows
+    .filter(row => {
+      const id = headerInfo.idxInvoiceId !== -1 ? String(row[headerInfo.idxInvoiceId] || '').trim() : String(row[0] || '').trim();
+      return id !== '';
+    })
     .map((row) => {
-      // Helper to safely parse dates
-      const parseDate = (dateValue) => {
-        if (!dateValue) return '';
-        try {
-          const d = new Date(dateValue);
-          if (isNaN(d.getTime())) return ''; // Invalid date
-          return d.toISOString().split('T')[0];
-        } catch (e) {
-          return '';
-        }
-      };
+      const val = (idx, fallback = '') => (idx !== -1 && row[idx] !== undefined && row[idx] !== '') ? row[idx] : fallback;
 
       return {
-        invoiceId: String(row[0]).trim(),
-        studentId: String(row[1]).trim(),
-        studentName: String(row[2] || '').trim(),
-        studentClass: String(row[3] || '').trim(),
-        academicYear: String(row[4] || '').trim(),
-        term: String(row[5] || '').trim(),
-        category: String(row[6] || '').trim(),
-        items: String(row[7] || '').trim(),
-        amountDue: Number(row[8]) || 0,
-        issueDate: parseDate(row[9]),
-        dueDate: parseDate(row[10]),
-        status: String(row[11] || '').trim(),
-        paymentStatus: String(row[12] || '').trim()
+        invoiceId: String(val(headerInfo.idxInvoiceId)).trim(),
+        studentId: String(val(headerInfo.idxStudentId)).trim(),
+        studentName: String(val(headerInfo.idxStudentName)).trim(),
+        studentClass: String(val(headerInfo.idxStudentClass)).trim(),
+        academicYear: String(val(headerInfo.idxAcademicYear)).trim(),
+        term: String(val(headerInfo.idxTerm)).trim(),
+        category: String(val(headerInfo.idxCategory)).trim(),
+        items: String(val(headerInfo.idxItems)).trim(),
+        amountDue: Number(val(headerInfo.idxAmountDue, 0)) || 0,
+        issueDate: parseDateStr(val(headerInfo.idxIssueDate)),
+        dueDate: parseDateStr(val(headerInfo.idxDueDate)),
+        status: String(val(headerInfo.idxStatus, 'Pending')).trim(),
+        paymentStatus: String(val(headerInfo.idxPaymentStatus, 'Unpaid')).trim()
       };
     });
 }
@@ -75,7 +155,10 @@ function generateNextInvoiceId(sheet) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 3) return "INV-1001";
 
-  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues(); 
+  const headerInfo = getInvoicesHeaderInfo(sheet);
+  const idCol = headerInfo.idxInvoiceId !== -1 ? headerInfo.idxInvoiceId + 2 : 2;
+
+  const values = sheet.getRange(3, idCol, lastRow - 2, 1).getValues(); 
   let maxIdNum = 1000;
   values.forEach((row) => {
     const idStr = String(row[0]).trim();
@@ -93,7 +176,10 @@ function generateNextInvoiceId(sheet) {
 function findInvoiceRowById(sheet, invoiceId) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 3) return -1;
-  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues(); // Column B
+  const headerInfo = getInvoicesHeaderInfo(sheet);
+  const idCol = headerInfo.idxInvoiceId !== -1 ? headerInfo.idxInvoiceId + 2 : 2;
+
+  const values = sheet.getRange(3, idCol, lastRow - 2, 1).getValues();
   for (let i = 0; i < values.length; i++) {
     if (String(values[i][0]).trim() === String(invoiceId).trim()) {
       return i + 3; // Index 0 matches Row 3
@@ -143,35 +229,10 @@ function addInvoice(invData) {
   const lastRow = sheet.getLastRow();
   const targetRow = lastRow + 1;
 
-  // Helper to safely parse date
-  const parseDate = (dateValue) => {
-    if (!dateValue) return new Date();
-    try {
-      const d = new Date(dateValue);
-      return isNaN(d.getTime()) ? new Date() : d;
-    } catch (e) {
-      return new Date();
-    }
-  };
+  const headerInfo = getInvoicesHeaderInfo(sheet);
+  const rowArray = buildInvoiceRowArray(headerInfo, nextId, invData);
 
-  // Write to Column B onwards (13 columns for new structure)
-  sheet.getRange(targetRow, 2, 1, 13).setValues([
-    [
-      nextId,
-      invData.studentId || '',
-      invData.studentName || '',
-      invData.studentClass || '',
-      invData.academicYear || '',
-      invData.term || '',
-      invData.category || '',
-      invData.items || '',
-      invData.amountDue || 0,
-      parseDate(invData.issueDate),
-      parseDate(invData.dueDate),
-      invData.status || 'Pending',
-      invData.paymentStatus || 'Unpaid'
-    ]
-  ]);
+  sheet.getRange(targetRow, 2, 1, headerInfo.numCols).setValues([rowArray]);
 
   const rawInvoices = getInvoicesDataFromSheet();
   const createdInvoice = rawInvoices.find((invoice) => String(invoice.invoiceId).trim() === String(nextId).trim()) || buildAuditSnapshot({
@@ -230,34 +291,10 @@ function updateInvoice(invoiceId, invData) {
   const row = findInvoiceRowById(sheet, invoiceId);
   if (row === -1) throw new Error("Invoice record not found.");
 
-  // Helper to safely parse date
-  const parseDate = (dateValue) => {
-    if (!dateValue) return new Date();
-    try {
-      const d = new Date(dateValue);
-      return isNaN(d.getTime()) ? new Date() : d;
-    } catch (e) {
-      return new Date();
-    }
-  };
+  const headerInfo = getInvoicesHeaderInfo(sheet);
+  const rowArray = buildInvoiceRowArray(headerInfo, invoiceId, invData);
 
-  // Update from Col C(3) onwards -> 12 columns (excluding Invoice ID)
-  sheet.getRange(row, 3, 1, 12).setValues([
-    [
-      invData.studentId || '',
-      invData.studentName || '',
-      invData.studentClass || '',
-      invData.academicYear || '',
-      invData.term || '',
-      invData.category || '',
-      invData.items || '',
-      invData.amountDue || 0,
-      parseDate(invData.issueDate),
-      parseDate(invData.dueDate),
-      invData.status || 'Pending',
-      invData.paymentStatus || 'Unpaid'
-    ]
-  ]);
+  sheet.getRange(row, 2, 1, headerInfo.numCols).setValues([rowArray]);
 
   const updatedInvoice = getInvoicesDataFromSheet().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || buildAuditSnapshot(Object.assign({}, existingInvoice || {}, invData, { invoiceId: invoiceId }));
 
