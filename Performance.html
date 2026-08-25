@@ -924,11 +924,14 @@
 
       // Rebuild add modal year select (active years only)
       if (addSelect) {
-        addSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
+        addSelect.innerHTML = '<option value="" disabled>Select Year</option>';
         activeYears.forEach(y => {
           const o = document.createElement('option');
           o.value = y.academicYear;
           o.innerText = y.academicYear + ' (Active)';
+          if (y.academicYear === activeAcademicYearValue) {
+            o.selected = true;
+          }
           addSelect.appendChild(o);
         });
         if (activeAcademicYearValue) addSelect.value = activeAcademicYearValue;
@@ -1108,6 +1111,10 @@
 
     function openAddModal() {
       document.getElementById('performanceForm').reset();
+      const yearSelect = document.getElementById('yearSelect');
+      if (yearSelect && activeAcademicYearValue) {
+        yearSelect.value = activeAcademicYearValue;
+      }
       document.getElementById('classSelect').value = '';
       document.getElementById('studentIdHidden').value = '';
       document.getElementById('studentSearchInput').value = '';
