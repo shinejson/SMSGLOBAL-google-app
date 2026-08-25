@@ -17,10 +17,10 @@
     /* --- TOOLBAR --- */
     .toolbar { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 10px 10px 0 0; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px; margin: 0 -40px; padding-left: 60px; padding-right: 60px; }
     .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .search-box { display: flex; align-items: center; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 8px; width: 250px; background: #f8fafc; }
+    .search-box { display: flex; align-items: center; border: 1px solid #e2e8f0; padding: 8px 16px; border-radius: 8px; width: 280px; background: #f8fafc; }
     .search-box input { border: none; outline: none; background: transparent; width: 100%; margin-left: 8px; font-size: 14px; color: #333; }
-    .form-select { padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; outline: none; transition: border-color 0.2s; }
-    .form-select:focus { border-color: #3b82f6; }
+    .form-select { padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; outline: none; transition: border-color 0.2s; cursor: pointer; }
+    .form-select:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
 
     /* --- TABLE --- */
     .table-container { background: white; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); overflow-x: auto; margin: 0 -40px; padding: 0 40px; }
@@ -64,24 +64,56 @@
     .form-input, .form-select { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; transition: border-color 0.15s; }
     .form-input:focus, .form-select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
     
-    /* Searchable Input Styling */
-    .searchable-input {
+    /* Searchable Student Dropdown Styling */
+    .searchable-select-container {
       position: relative;
-    }
-    .searchable-input input {
       width: 100%;
-      padding: 10px 14px;
+    }
+    .searchable-select-list {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      width: 100%;
+      background: white;
       border: 1px solid #cbd5e1;
       border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 1050;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      display: none;
+    }
+    .searchable-select-item {
+      padding: 10px 14px;
       font-size: 14px;
       color: #0f172a;
-      background: #fff;
-      transition: border-color 0.15s;
+      cursor: pointer;
+      transition: background-color 0.15s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #f1f5f9;
     }
-    .searchable-input input:focus {
-      outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    .searchable-select-item:last-child {
+      border-bottom: none;
+    }
+    .searchable-select-item:hover, .searchable-select-item.highlighted {
+      background-color: #f1f5f9;
+    }
+    .searchable-select-item .student-meta {
+      font-size: 12px;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 2px 8px;
+      border-radius: 12px;
+      white-space: nowrap;
+      margin-left: 8px;
+    }
+    .searchable-select-no-results {
+      padding: 12px 14px;
+      font-size: 14px;
+      color: #64748b;
+      text-align: center;
     }
     
     .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
@@ -102,6 +134,7 @@
       .toolbar { flex-direction: column; align-items: flex-start; }
       .toolbar-left, .toolbar-right { width: 100%; flex-direction: column; }
       .search-box { width: 100%; }
+      .toolbar-right select { width: 100%; }
       .form-grid-3, .form-grid-2 { grid-template-columns: 1fr; }
     }
 
@@ -113,6 +146,11 @@
     body.dark-mode .search-box { background: #0f172a; border-color: #334155; }
     body.dark-mode .search-box input { color: #f1f5f9; }
     body.dark-mode .form-input, body.dark-mode .form-select { background: #1e293b; border-color: #334155; color: #f1f5f9; }
+    body.dark-mode .searchable-select-list { background: #1e293b; border-color: #334155; }
+    body.dark-mode .searchable-select-item { color: #f1f5f9; border-bottom-color: #334155; }
+    body.dark-mode .searchable-select-item:hover, body.dark-mode .searchable-select-item.highlighted { background-color: #334155; }
+    body.dark-mode .searchable-select-item .student-meta { background: #0f172a; color: #94a3b8; }
+    body.dark-mode .searchable-select-no-results { color: #94a3b8; }
     body.dark-mode .table-container { background: #1e293b; }
     body.dark-mode thead { background: #0f172a; border-bottom-color: #334155; }
     body.dark-mode th { color: #94a3b8; }
@@ -166,7 +204,7 @@
       <thead>
         <tr>
           <th>Invoice ID</th>
-          <th>Student ID</th>
+          <th>Student</th>
           <th>Issue Date</th>
           <th>Due Date</th>
           <th>Category</th>
@@ -192,19 +230,21 @@
         <input type="hidden" id="formInvoiceId">
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label" for="studentSearch">Student</label>
-            <div class="searchable-input">
+            <label class="form-label" for="studentSearchInput">Student <span style="color: #ef4444;">*</span></label>
+            <div class="searchable-select-container">
               <input 
                 type="text" 
-                id="studentSearch" 
-                list="studentList" 
-                placeholder="Type to search student..." 
+                id="studentSearchInput" 
+                class="form-input" 
+                placeholder="Type student name or ID to search..." 
                 autocomplete="off"
                 required
-                oninput="handleStudentSearch(this.value)"
+                onfocus="openStudentDropdown()"
+                oninput="filterStudentDropdown(this.value)"
+                onkeydown="handleStudentKeydown(event)"
               >
-              <datalist id="studentList"></datalist>
-              <input type="hidden" id="studentId">
+              <input type="hidden" id="studentId" required>
+              <div id="studentSearchDropdown" class="searchable-select-list"></div>
             </div>
           </div>
           <div class="form-grid-2">
@@ -297,24 +337,139 @@
     let academicYearsList = [];
     let currentDeleteId = null;
     let activeAcademicYear = '';
+    let highlightedStudentIndex = -1;
+    let filteredStudents = [];
 
-    function handleStudentSearch(value) {
-      const trimmedValue = value.trim();
-      const hidden = document.getElementById('studentId');
-      
-      // Find matching student
-      const matchingStudent = studentsList.find(s => {
-        const displayText = `${s.studentId} - ${s.fullName}`;
-        return displayText === trimmedValue || s.studentId === trimmedValue;
+    /* --- SEARCHABLE STUDENT DROPDOWN LOGIC --- */
+    function openStudentDropdown() {
+      const query = document.getElementById('studentSearchInput').value.trim();
+      renderStudentDropdown(query);
+    }
+
+    function filterStudentDropdown(query) {
+      const selectedId = document.getElementById('studentId').value;
+      const currentSelected = studentsList.find(s => s.studentId === selectedId);
+      const currentDisplayText = currentSelected ? `${currentSelected.studentId} - ${currentSelected.fullName}` : '';
+      if (currentDisplayText && query.trim() !== currentDisplayText) {
+        document.getElementById('studentId').value = '';
+      }
+      renderStudentDropdown(query);
+    }
+
+    function renderStudentDropdown(query) {
+      const dropdown = document.getElementById('studentSearchDropdown');
+      if (!dropdown) return;
+      dropdown.innerHTML = '';
+      highlightedStudentIndex = -1;
+
+      const q = (query || '').toLowerCase().trim();
+      filteredStudents = studentsList.filter(s => {
+        if (!q) return true;
+        const id = String(s.studentId || '').toLowerCase();
+        const name = String(s.fullName || '').toLowerCase();
+        const cls = String(s.studentClass || '').toLowerCase();
+        const combined = `${id} - ${name}`.toLowerCase();
+        return id.includes(q) || name.includes(q) || cls.includes(q) || combined.includes(q);
       });
-      
-      if (matchingStudent) {
-        hidden.value = matchingStudent.studentId;
-      } else {
-        hidden.value = '';
+
+      if (filteredStudents.length === 0) {
+        dropdown.innerHTML = '<div class="searchable-select-no-results">No students found</div>';
+        dropdown.style.display = 'block';
+        return;
+      }
+
+      const limit = Math.min(filteredStudents.length, 50);
+      for (let i = 0; i < limit; i++) {
+        const s = filteredStudents[i];
+        const item = document.createElement('div');
+        item.className = 'searchable-select-item';
+        item.setAttribute('data-index', i);
+        item.innerHTML = `
+          <div>
+            <strong>${escapeHtml(s.studentId)}</strong> — ${escapeHtml(s.fullName)}
+          </div>
+          ${s.studentClass ? `<span class="student-meta">${escapeHtml(s.studentClass)}</span>` : ''}
+        `;
+        item.onmousedown = function(e) {
+          e.preventDefault();
+          selectStudent(s);
+        };
+        dropdown.appendChild(item);
+      }
+
+      if (filteredStudents.length > 50) {
+        const more = document.createElement('div');
+        more.className = 'searchable-select-no-results';
+        more.style.fontSize = '12px';
+        more.innerText = `Showing 50 of ${filteredStudents.length} students. Type more to narrow search.`;
+        dropdown.appendChild(more);
+      }
+
+      dropdown.style.display = 'block';
+    }
+
+    function selectStudent(student) {
+      if (!student) return;
+      document.getElementById('studentId').value = student.studentId;
+      document.getElementById('studentSearchInput').value = `${student.studentId} - ${student.fullName}`;
+      const dropdown = document.getElementById('studentSearchDropdown');
+      if (dropdown) dropdown.style.display = 'none';
+      highlightedStudentIndex = -1;
+    }
+
+    function handleStudentKeydown(e) {
+      const dropdown = document.getElementById('studentSearchDropdown');
+      if (!dropdown || dropdown.style.display === 'none') {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          openStudentDropdown();
+          e.preventDefault();
+        }
+        return;
+      }
+
+      const items = dropdown.querySelectorAll('.searchable-select-item');
+      if (!items.length) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        highlightedStudentIndex = Math.min(highlightedStudentIndex + 1, items.length - 1);
+        updateHighlight(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        highlightedStudentIndex = Math.max(highlightedStudentIndex - 1, 0);
+        updateHighlight(items);
+      } else if (e.key === 'Enter') {
+        if (highlightedStudentIndex >= 0 && highlightedStudentIndex < filteredStudents.length) {
+          e.preventDefault();
+          selectStudent(filteredStudents[highlightedStudentIndex]);
+        }
+      } else if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+        highlightedStudentIndex = -1;
       }
     }
 
+    function updateHighlight(items) {
+      items.forEach((item, idx) => {
+        if (idx === highlightedStudentIndex) {
+          item.classList.add('highlighted');
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          item.classList.remove('highlighted');
+        }
+      });
+    }
+
+    // Close student searchable dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      const container = document.querySelector('.searchable-select-container');
+      const dropdown = document.getElementById('studentSearchDropdown');
+      if (container && dropdown && !container.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+
+    /* --- SANITIZATION & HELPERS --- */
     function decodeSanitized(value) {
       if (value === null || value === undefined) return '';
       return String(value)
@@ -347,41 +502,43 @@
       return select.value === activeAcademicYear;
     }
 
+    /* --- ACADEMIC YEARS POPULATION --- */
     function populateAcademicYearOptions(years) {
-      const select = document.getElementById('academicYear');
+      const formSelect = document.getElementById('academicYear');
       const filterSelect = document.getElementById('academicYearFilter');
-      
-      if (!select) return;
       
       academicYearsList = years || [];
       const activeYears = academicYearsList.filter(isActiveAcademicYear);
       activeAcademicYear = activeYears.length ? String(activeYears[0].academicYear || '').trim() : '';
       
-      // Populate form dropdown (only active years)
-      select.innerHTML = '<option value="" disabled selected>Select Year</option>';
-      activeYears.forEach(y => {
-        const opt = document.createElement('option');
-        opt.value = y.academicYear;
-        opt.textContent = `${y.academicYear} (Active)`;
-        if (y.academicYear === activeAcademicYear) {
-          opt.selected = true;
-        }
-        select.appendChild(opt);
-      });
+      // Populate form dropdown (only active years by default)
+      if (formSelect) {
+        formSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
+        activeYears.forEach(y => {
+          const opt = document.createElement('option');
+          opt.value = y.academicYear;
+          opt.textContent = `${y.academicYear} (Active)`;
+          if (y.academicYear === activeAcademicYear) {
+            opt.selected = true;
+          }
+          formSelect.appendChild(opt);
+        });
 
-      if (activeAcademicYear) {
-        selectActiveAcademicYear();
-      } else {
-        const option = document.createElement('option');
-        option.value = '';
-        option.disabled = true;
-        option.textContent = 'No active academic year configured';
-        select.appendChild(option);
-        select.selectedIndex = select.options.length - 1;
+        if (activeAcademicYear) {
+          selectActiveAcademicYear();
+        } else {
+          const option = document.createElement('option');
+          option.value = '';
+          option.disabled = true;
+          option.textContent = 'No active academic year configured';
+          formSelect.appendChild(option);
+          formSelect.selectedIndex = formSelect.options.length - 1;
+        }
       }
       
-      // Populate filter dropdown (all years)
+      // Populate filter dropdown (all years) and select active year
       if (filterSelect) {
+        const currentFilterVal = filterSelect.value;
         filterSelect.innerHTML = '<option value="">All Academic Years</option>';
         
         // Add active year first
@@ -389,7 +546,6 @@
           const activeOpt = document.createElement('option');
           activeOpt.value = activeAcademicYear;
           activeOpt.textContent = `${activeAcademicYear} (Active)`;
-          activeOpt.selected = true; // Select active year by default
           filterSelect.appendChild(activeOpt);
         }
         
@@ -402,11 +558,17 @@
             filterSelect.appendChild(opt);
           }
         });
+
+        // Set filter to active year by default, or keep user's existing selection
+        if (currentFilterVal && Array.from(filterSelect.options).some(o => o.value === currentFilterVal)) {
+          filterSelect.value = currentFilterVal;
+        } else if (activeAcademicYear) {
+          filterSelect.value = activeAcademicYear;
+        }
       }
     }
 
-    // Keep a historical invoice editable without offering inactive years when
-    // a new invoice is being created.
+    // Keep a historical invoice editable without offering inactive years when a new invoice is created
     function ensureAcademicYearOption(year) {
       const select = document.getElementById('academicYear');
       if (!select || !year) return;
@@ -431,6 +593,7 @@
       }
     }
 
+    /* --- INITIALIZATION --- */
     document.addEventListener('DOMContentLoaded', function() {
       // Set default dates
       const today = new Date().toISOString().split('T')[0];
@@ -439,6 +602,18 @@
       loadDropdowns();
       refreshData();
     });
+
+    function loadDropdowns() {
+      // Load Students
+      google.script.run.withSuccessHandler(function(students) {
+        studentsList = students || [];
+      }).getStudentIdNamePairs();
+
+      // Load Academic Years
+      google.script.run.withSuccessHandler(function(years) {
+        populateAcademicYearOptions(years);
+      }).getAcademicYearsData();
+    }
 
     function refreshData() {
       document.getElementById('loading').style.display = 'block';
@@ -470,26 +645,7 @@
         .getAcademicYearsData();
     }
 
-    function loadDropdowns() {
-      // Load Students (uses existing function from Code.gs)
-      google.script.run.withSuccessHandler(function(students) {
-        studentsList = students || [];
-        const datalist = document.getElementById('studentList');
-        datalist.innerHTML = '';
-        studentsList.forEach(s => {
-          let opt = document.createElement('option');
-          opt.value = `${s.studentId} - ${s.fullName}`;
-          opt.setAttribute('data-student-id', s.studentId);
-          datalist.appendChild(opt);
-        });
-      }).getStudentIdNamePairs();
-
-      // Load Academic Years
-      google.script.run.withSuccessHandler(function(years) {
-        populateAcademicYearOptions(years);
-      }).getAcademicYearsData();
-    }
-
+    /* --- TABLE RENDERING & FILTERING --- */
     function renderTable(data) {
       invList = (data || []).map(row => ({
         invoiceId: decodeSanitized(row.invoiceId),
@@ -524,6 +680,7 @@
       invList.forEach(row => {
         const tr = document.createElement('tr');
         tr.setAttribute('data-status', row.status || '');
+        tr.setAttribute('data-academic-year', row.academicYear || '');
         tr.setAttribute('data-invoice-id', row.invoiceId);
 
         let statusClass = 'status-unpaid';
@@ -531,9 +688,13 @@
         else if(row.status === 'Partial') statusClass = 'status-partial';
         else if(row.status === 'Overdue') statusClass = 'status-overdue';
 
+        const studentDisplay = row.studentName 
+          ? `<strong>${escapeHtml(row.studentId)}</strong><div style="font-size:12px;color:#64748b;">${escapeHtml(row.studentName)}</div>`
+          : `<strong>${escapeHtml(row.studentId)}</strong>`;
+
         tr.innerHTML = `
           <td><strong>${escapeHtml(row.invoiceId)}</strong></td>
-          <td>${escapeHtml(row.studentId)}</td>
+          <td>${studentDisplay}</td>
           <td>${escapeHtml(row.issueDate)}</td>
           <td>${escapeHtml(row.dueDate)}</td>
           <td>${escapeHtml(row.category)}</td>
@@ -560,9 +721,9 @@
     }
 
     function filterTable() {
-      const searchVal = document.getElementById('searchInput').value.toLowerCase();
-      const statusVal = document.getElementById('statusFilter').value.toLowerCase();
-      const yearVal = document.getElementById('academicYearFilter').value.toLowerCase();
+      const searchVal = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+      const statusVal = (document.getElementById('statusFilter').value || '').trim().toLowerCase();
+      const yearVal = (document.getElementById('academicYearFilter').value || '').trim().toLowerCase();
       const rows = document.querySelectorAll('#tableBody tr');
       const countBadge = document.getElementById('invCount');
       let visibleCount = 0;
@@ -570,12 +731,12 @@
       rows.forEach(row => {
         if (row.cells.length === 1 && row.cells[0].getAttribute('colspan')) return;
         const text = row.innerText.toLowerCase();
-        const rowStatus = (row.getAttribute('data-status') || '').toLowerCase();
-        const rowYear = (row.cells[7] ? row.cells[7].innerText.toLowerCase() : ''); // Academic Year column
+        const rowStatus = (row.getAttribute('data-status') || '').toLowerCase().trim();
+        const rowYear = (row.getAttribute('data-academic-year') || (row.cells[7] ? row.cells[7].innerText : '')).toLowerCase().trim();
         
-        const matchSearch = text.includes(searchVal);
-        const matchStatus = statusVal === '' || rowStatus === statusVal;
-        const matchYear = yearVal === '' || rowYear.includes(yearVal);
+        const matchSearch = !searchVal || text.includes(searchVal);
+        const matchStatus = !statusVal || rowStatus === statusVal;
+        const matchYear = !yearVal || rowYear === yearVal;
 
         if (matchSearch && matchStatus && matchYear) {
           row.style.display = ''; visibleCount++;
@@ -583,18 +744,29 @@
           row.style.display = 'none';
         }
       });
-      countBadge.innerText = visibleCount;
+      if (countBadge) countBadge.innerText = visibleCount;
     }
 
     /* --- MODAL LOGIC --- */
     function openAddModal() { 
       document.getElementById('invForm').reset();
       document.getElementById('formInvoiceId').value = '';
-      document.getElementById('studentSearch').value = '';
+      document.getElementById('studentSearchInput').value = '';
       document.getElementById('studentId').value = '';
+      const dropdown = document.getElementById('studentSearchDropdown');
+      if (dropdown) dropdown.style.display = 'none';
+
       document.getElementById('modalTitle').innerText = 'Create New Invoice';
       document.getElementById('saveBtn').innerText = 'Save Invoice';
-      document.getElementById('issueDate').value = new Date().toISOString().split('T')[0];
+      
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('issueDate').value = today;
+      
+      // Default due date to 14 days from today
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 14);
+      document.getElementById('dueDate').value = dueDate.toISOString().split('T')[0];
+
       // Dropdown data may have loaded before or after the button was clicked.
       // Apply the active year again so a new form never retains an old value.
       selectActiveAcademicYear();
@@ -610,13 +782,17 @@
       // Set student search field
       const student = studentsList.find(s => s.studentId === invoice.studentId);
       if (student) {
-        document.getElementById('studentSearch').value = `${student.studentId} - ${student.fullName}`;
+        document.getElementById('studentSearchInput').value = `${student.studentId} - ${student.fullName}`;
         document.getElementById('studentId').value = student.studentId;
       } else {
-        document.getElementById('studentSearch').value = invoice.studentId;
+        const display = invoice.studentName ? `${invoice.studentId} - ${invoice.studentName}` : invoice.studentId;
+        document.getElementById('studentSearchInput').value = display;
         document.getElementById('studentId').value = invoice.studentId;
       }
       
+      const dropdown = document.getElementById('studentSearchDropdown');
+      if (dropdown) dropdown.style.display = 'none';
+
       document.getElementById('issueDate').value = invoice.issueDate;
       document.getElementById('dueDate').value = invoice.dueDate;
       ensureCategoryOption(invoice.category);
@@ -648,16 +824,40 @@
       refreshData();
     };
 
-    function closeModal() { document.getElementById('invModal').classList.remove('active'); }
+    function closeModal() { 
+      document.getElementById('invModal').classList.remove('active'); 
+      const dropdown = document.getElementById('studentSearchDropdown');
+      if (dropdown) dropdown.style.display = 'none';
+    }
 
     function handleSubmit(e) {
       e.preventDefault();
+      
+      let studentId = document.getElementById('studentId').value;
+      if (!studentId) {
+        // Try auto-resolving from input value
+        const query = document.getElementById('studentSearchInput').value.trim().toLowerCase();
+        const match = studentsList.find(s => 
+          s.studentId.toLowerCase() === query || 
+          `${s.studentId} - ${s.fullName}`.toLowerCase() === query ||
+          s.fullName.toLowerCase() === query
+        );
+        if (match) {
+          selectStudent(match);
+          studentId = match.studentId;
+        } else {
+          alert('Please search and select a valid student from the list.');
+          document.getElementById('studentSearchInput').focus();
+          openStudentDropdown();
+          return;
+        }
+      }
+
+      const selectedStudent = studentsList.find(student => student.studentId === studentId) || {};
       const btn = document.getElementById('saveBtn');
       btn.disabled = true; btn.innerText = 'Saving...';
       
       const invoiceId = document.getElementById('formInvoiceId').value;
-      const studentId = document.getElementById('studentId').value;
-      const selectedStudent = studentsList.find(student => student.studentId === studentId) || {};
       const data = {
         studentId: studentId,
         // Save the selected student's current name and class with the invoice.
@@ -689,7 +889,7 @@
               return;
             }
             btn.disabled = false; btn.innerText = isUpdate ? 'Update Invoice' : 'Save Invoice';
-            if(res.success) {
+            if(res && res.success) {
               closeModal();
               refreshData();
               if (!isUpdate) alert(`Invoice created! ID: ${res.invoiceId}`);
@@ -699,7 +899,7 @@
           })
           .withFailureHandler(function(err) {
             btn.disabled = false; btn.innerText = isUpdate ? 'Update Invoice' : 'Save Invoice';
-            alert('Error: ' + err.message);
+            alert('Error: ' + (err && err.message ? err.message : 'Unknown error'));
           });
 
         if (isUpdate) {
@@ -738,10 +938,10 @@
               return;
             }
             btn.disabled = false; btn.innerText = 'Delete';
-            if(res.success) { closeDeleteModal(); refreshData(); }
+            if(res && res.success) { closeDeleteModal(); refreshData(); }
             else { alert('Error: ' + (res && res.message ? res.message : 'Failed to delete invoice')); }
           })
-          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Delete'; alert('Error: ' + err.message); })
+          .withFailureHandler(function(err) { btn.disabled = false; btn.innerText = 'Delete'; alert('Error: ' + (err && err.message ? err.message : 'Unknown error')); })
           .deleteInvoice(currentDeleteId, options || null);
       }
 
