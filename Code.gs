@@ -471,159 +471,223 @@ function isAttendancePresentStatus(statusVal, statusesList) {
   return false;
 }
 
-// Function to get the dashboard data (Mocking data since your screenshot is empty)
-// You can replace these numbers with real formulas later.
+// ============================================================
+// DASHBOARD STATS (Index page)
+// ------------------------------------------------------------
+// Filter semantics, matching the filter bar in Index.html:
+//   * Academic Year + Term -> Attendance, Invoices and Payments.
+//     When the year dropdown is left on its default, the ACTIVE academic year
+//     is used, so the billing snapshot always reflects the current year.
+//     The sentinel value DASHBOARD_ALL_YEARS ("ALL") opts out of year filtering.
+//   * Date -> Attendance only. Invoices and payments are a year + term snapshot
+//     and are deliberately NOT narrowed down to a single day.
+//   * Students and Courses are never filtered: neither the Students sheet nor
+//     the Courses sheet has an Academic Year column, so "Total Students" and
+//     "Students by Class" always report the whole student population.
+// ============================================================
+
+// Sentinel value used by the dashboard year dropdown for "All Academic Years".
+var DASHBOARD_ALL_YEARS = "ALL";
+
+// Normalise an academic year for comparison so "2025/2026", "2025-2026" and
+// the sanitized "2025&#x2F;2026" all collapse to the same key.
+function normalizeAcademicYearKey(value) {
+  const raw = typeof decodeSanitizedHtml === "function" ? decodeSanitizedHtml(value) : value;
+  return String(raw || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Resolve the dashboard year filter.
+// "" (default) -> the active academic year, "ALL" -> no year filtering,
+// anything else -> that exact year.
+function resolveDashboardAcademicYear(selectedYear) {
+  const requested = String(
+    selectedYear === null || selectedYear === undefined ? "" : selectedYear
+  ).trim();
+
+  if (requested.toUpperCase() === DASHBOARD_ALL_YEARS) {
+    return { year: "", wantsAllYears: true };
+  }
+
+  if (requested !== "") {
+    return { year: requested, wantsAllYears: false };
+  }
+
+  // Nothing picked -> fall back to the active academic year so billing never
+  // silently mixes several academic years together.
+  let active = "";
+  try {
+    if (typeof getActiveAcademicYearValue === "function") {
+      active = String(getActiveAcademicYearValue() || "").trim();
+    }
+  } catch (e) {
+    active = "";
+  }
+
+  return { year: active, wantsAllYears: false };
+}
+
+// Invoice rows carry free text payment statuses ("Paid", "Unpaid", "Partial",
+// "Overdue", ...). Bucket them for the Quick Insights breakdown.
+function classifyInvoicePaymentStatus(statusValue) {
+  const s = String(statusValue || "").trim().toLowerCase();
+  if (s === "" || s.indexOf("unpaid") !== -1 || s.indexOf("pending") !== -1 || s.indexOf("due") !== -1) {
+    return "unpaid";
+  }
+  if (s.indexOf("partial") !== -1 || s.indexOf("part ") !== -1) {
+    return "partial";
+  }
+  if (s.indexOf("paid") !== -1 || s.indexOf("settled") !== -1 || s.indexOf("cleared") !== -1) {
+    return "paid";
+  }
+  return "unpaid";
+}
+
 function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
   requireLogin();
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  const normYear = selectedYear ? String(selectedYear).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-  const normTerm = selectedTerm ? String(selectedTerm).trim().toLowerCase() : '';
-  
-  // Parse selected date if provided
-  let filterDate = parseDashboardDate(selectedDate);
+  // getStudentsData()/getInvoicesData()/getPaymentsData() return sanitized
+  // values, while the year/term filters arrive raw. Decode before comparing.
+  const decode =
+    typeof decodeSanitizedHtml === "function"
+      ? decodeSanitizedHtml
+      : function (v) {
+          return v;
+        };
+
+  // --- Resolve the filters ---------------------------------------------
+  const yearFilter = resolveDashboardAcademicYear(selectedYear);
+  const normYear = yearFilter.year ? normalizeAcademicYearKey(yearFilter.year) : "";
+  const normTerm = selectedTerm ? String(decode(selectedTerm)).trim().toLowerCase() : "";
+
+  // Date filter: attendance only. Billing is a year/term snapshot.
+  const filterDate = parseDashboardDate(selectedDate);
+
+  function matchYear(itemYear) {
+    if (!normYear) return true; // "All Academic Years"
+    const y = normalizeAcademicYearKey(itemYear);
+    // Records without an academic year are not attributed to the selected year
+    // (same rule as the Invoices/Payments page year filters).
+    return y !== "" && y === normYear;
+  }
+
+  function matchTerm(itemTerm) {
+    if (!normTerm) return true;
+    const t = String(decode(itemTerm) || "").trim().toLowerCase();
+    if (!t) return true; // legacy rows without a term still count
+    return t === normTerm || t.indexOf(normTerm) !== -1 || normTerm.indexOf(t) !== -1;
+  }
 
   function matchYT(itemYear, itemTerm) {
-    const rawYear = typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(itemYear) : itemYear;
-    const rawTerm = typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(itemTerm) : itemTerm;
-    if (normYear) {
-      const y = String(rawYear || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (y && !normYear.includes(y) && !y.includes(normYear)) return false;
-    }
-    if (normTerm) {
-      const t = String(rawTerm || '').trim().toLowerCase();
-      if (t && t !== normTerm && !t.includes(normTerm) && !normTerm.includes(t)) return false;
-    }
-    return true;
+    return matchYear(itemYear) && matchTerm(itemTerm);
   }
-  
+
   function matchDate(itemDate) {
     if (!filterDate) return true;
     if (!itemDate) return false;
-    
+
     try {
       const compareDate = parseDashboardDate(itemDate);
       if (!compareDate) return false;
-      
+
       // Match if the dates are on the same day
-      return compareDate.getFullYear() === filterDate.getFullYear() &&
-             compareDate.getMonth() === filterDate.getMonth() &&
-             compareDate.getDate() === filterDate.getDate();
+      return (
+        compareDate.getFullYear() === filterDate.getFullYear() &&
+        compareDate.getMonth() === filterDate.getMonth() &&
+        compareDate.getDate() === filterDate.getDate()
+      );
     } catch (e) {
       return false;
     }
   }
 
-  // Count total students and class breakdown
+  const scopeYearLabel = yearFilter.year ? decode(yearFilter.year) : "All academic years";
+  const scopeTermLabel = normTerm ? String(decode(selectedTerm)).trim() : "All terms";
+  const billingScopeLabel = scopeYearLabel + " · " + scopeTermLabel;
+
+  // --- Students: whole population, independent of every dashboard filter --
+  // The Students sheet has no Academic Year column, so students are never
+  // filtered by year, term or date.
   let totalStudents = 0;
   const studentClassCounts = {};
+  let allStudents = [];
   try {
-    const students = typeof getStudentsData === 'function' ? getStudentsData() : [];
-    
-    // When NO filters are selected, show all students
-    // When filters ARE selected, only show students with matching activity records
-    let filteredStudents = students;
-    if (normYear || normTerm || filterDate) {
-      const activeStudentIds = new Set();
-      
-      try {
-        const att = typeof getAttendanceData === 'function' ? getAttendanceData() : [];
-        att.forEach(r => {
-          if (matchYT(r.academicYear, r.term) && matchDate(r.date) && r.studentId) {
-            activeStudentIds.add(String(r.studentId).trim());
-          }
-        });
-      } catch(e) {}
-
-      try {
-        const pay = typeof getPaymentsData === 'function' ? getPaymentsData() : [];
-        pay.forEach(p => {
-          if (matchYT(p.academicYear, p.term) && matchDate(p.paymentDate || p.date) && p.studentId) {
-            activeStudentIds.add(String(p.studentId).trim());
-          }
-        });
-      } catch(e) {}
-
-      // Only filter students if we found matching records AND filters are active
-      if (activeStudentIds.size > 0) {
-        filteredStudents = students.filter(s => activeStudentIds.has(String(s.studentId).trim()));
-      } else {
-        // If filters are active but no matching records, show empty (not all students)
-        filteredStudents = [];
-      }
-    }
-
-    totalStudents = filteredStudents.length;
-    filteredStudents.forEach(function(student) {
-      const className = String(student.class || student.Class || student['Class Name'] || '').trim() || 'Unassigned';
-      studentClassCounts[className] = (studentClassCounts[className] || 0) + 1;
-    });
-  } catch(e) {
-    totalStudents = 0;
+    allStudents = typeof getStudentsData === "function" ? getStudentsData() : [];
+  } catch (e) {
+    allStudents = [];
   }
 
-  // Count active courses - independent of academic year and date filters
+  totalStudents = allStudents.length;
+  allStudents.forEach(function (student) {
+    const className =
+      String(student.class || student.Class || student["Class Name"] || "").trim() || "Unassigned";
+    studentClassCounts[className] = (studentClassCounts[className] || 0) + 1;
+  });
+
+  // --- Active courses: independent of academic year and date filters ------
   let activeCourses = 0;
   const coursesSheet = ss.getSheetByName("Courses");
   if (coursesSheet) {
     const lastRow = coursesSheet.getLastRow();
     if (lastRow >= 3) {
       const data = coursesSheet.getRange(3, 2, lastRow - 2, 7).getValues();
-      activeCourses = data.filter(
-        (row) => {
-          const id = String(row[0]).trim();
-          const status = String(row[5] || row[4] || '').trim().toLowerCase();
-          if (id === '') return false;
-          if (status !== 'active') return false;
-          return true; // Count all active courses regardless of year/term
-        }
-      ).length;
+      activeCourses = data.filter((row) => {
+        const id = String(row[0]).trim();
+        const status = String(row[5] || row[4] || "").trim().toLowerCase();
+        if (id === "") return false;
+        if (status !== "active") return false;
+        return true; // Count all active courses regardless of year/term
+      }).length;
     }
   }
 
-  // Calculate average attendance and attendance trend
+  // --- Attendance: year + term, plus the single day when one is selected --
   let avgAttendance = "0%";
   const attendanceTrend = [];
   const attendanceSheet = ss.getSheetByName("Attendance");
   if (attendanceSheet) {
     const lastRow = attendanceSheet.getLastRow();
     if (lastRow >= 3) {
-      const attendanceData = typeof getAttendanceData === 'function' ? getAttendanceData() : [];
+      const rawAttendanceData = typeof getAttendanceData === "function" ? getAttendanceData() : [];
       // getAttendanceData() returns HTML-escaped values, while the year/term
       // filters arrive raw. Decode so names like "2025/2026" match correctly.
-      const decodeAtt = typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml : function (v) { return v; };
-      const decodedAttendanceData = attendanceData.map(function (row) {
+      const attendanceData = rawAttendanceData.map(function (row) {
         return Object.assign({}, row, {
-          academicYear: decodeAtt(row.academicYear),
-          term: decodeAtt(row.term),
-          status: decodeAtt(row.status)
+          academicYear: decode(row.academicYear),
+          term: decode(row.term),
+          status: decode(row.status),
         });
       });
-      const statuses = typeof getAttendanceStatuses === 'function' ? getAttendanceStatuses() : [];
+      const statuses = typeof getAttendanceStatuses === "function" ? getAttendanceStatuses() : [];
 
       // Valid records matching Year, Term, and Date filter (if selected)
-      const validRecords = decodedAttendanceData.filter((row) => matchYT(row.academicYear, row.term) && matchDate(row.date));
+      const validRecords = attendanceData.filter(
+        (row) => matchYT(row.academicYear, row.term) && matchDate(row.date)
+      );
 
       if (validRecords.length > 0) {
-        const presentCount = validRecords.filter(
-          (row) => isAttendancePresentStatus(row.status, statuses)
+        const presentCount = validRecords.filter((row) =>
+          isAttendancePresentStatus(row.status, statuses)
         ).length;
-        const percentage = Math.round(
-          (presentCount / validRecords.length) * 100,
-        );
+        const percentage = Math.round((presentCount / validRecords.length) * 100);
         avgAttendance = percentage + "%";
       }
 
-      // Year & Term records for monthly trend chart (independent of single date filter)
-      const yearTermRecords = decodedAttendanceData.filter((row) => matchYT(row.academicYear, row.term));
+      // Year & Term records for the monthly trend chart (independent of the
+      // single date filter)
+      const yearTermRecords = attendanceData.filter((row) => matchYT(row.academicYear, row.term));
 
       const trendMap = {};
       yearTermRecords.forEach((row) => {
         const dateValue = parseDashboardDate(row.date);
         if (!dateValue || isNaN(dateValue.getTime())) return;
 
-        const monthLabel = Utilities.formatDate(dateValue, Session.getScriptTimeZone(), "MMM yyyy");
+        const monthLabel = Utilities.formatDate(
+          dateValue,
+          Session.getScriptTimeZone(),
+          "MMM yyyy"
+        );
         const sortKey = dateValue.getFullYear() * 100 + (dateValue.getMonth() + 1);
 
         if (!trendMap[monthLabel]) {
@@ -635,7 +699,9 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
         }
       });
 
-      const sortedTrendKeys = Object.keys(trendMap).sort((a, b) => trendMap[a].sortKey - trendMap[b].sortKey);
+      const sortedTrendKeys = Object.keys(trendMap).sort(
+        (a, b) => trendMap[a].sortKey - trendMap[b].sortKey
+      );
       sortedTrendKeys.slice(-6).forEach((key) => {
         const item = trendMap[key];
         attendanceTrend.push({
@@ -648,67 +714,78 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
     }
   }
 
-  // Invoices and Payments filtered by year/term (not by date for billing snapshot)
+  // --- Invoices and payments: academic year + term only -------------------
   let invoiceCount = 0;
   let totalInvoiced = 0;
   let totalPaid = 0;
   let totalUnpaid = 0;
-  
-  // Class-based payment statistics (independent of date filter)
-  const classPaymentStats = {};
-  
-  try {
-    const invoices = typeof getInvoicesData === 'function' ? getInvoicesData() : [];
-    const payments = typeof getPaymentsData === 'function' ? getPaymentsData() : [];
+  let paymentCount = 0;
+  const invoiceStatusCounts = { paid: 0, partial: 0, unpaid: 0 };
 
-    const filteredInvoices = invoices.filter(inv => matchYT(inv.academicYear, inv.term) && matchDate(inv.invoiceDate || inv.date));
-    const filteredPayments = payments.filter(p => matchYT(p.academicYear, p.term) && matchDate(p.paymentDate || p.date));
+  // Class-based payment statistics (year/term scoped, never date scoped)
+  const classPaymentStats = {};
+
+  try {
+    const invoices = typeof getInvoicesData === "function" ? getInvoicesData() : [];
+    const payments = typeof getPaymentsData === "function" ? getPaymentsData() : [];
+
+    // NOTE: invoices expose issueDate/dueDate (there is no invoiceDate field),
+    // so billing is intentionally not narrowed by the dashboard date filter.
+    const filteredInvoices = invoices.filter((inv) => matchYT(inv.academicYear, inv.term));
+    const filteredPayments = payments.filter((p) => matchYT(p.academicYear, p.term));
 
     invoiceCount = filteredInvoices.length;
-    totalInvoiced = filteredInvoices.reduce((sum, inv) => sum + (Number(inv.amountDue) || 0), 0);
+    totalInvoiced = filteredInvoices.reduce(
+      (sum, inv) => sum + (Number(inv.amountDue) || 0),
+      0
+    );
 
+    paymentCount = filteredPayments.length;
     totalPaid = filteredPayments.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
     totalUnpaid = Math.max(0, totalInvoiced - totalPaid);
-    
-    // Build class payment statistics (using year/term filters, but NOT date filter)
-    const allStudents = typeof getStudentsData === 'function' ? getStudentsData() : [];
-    const yearTermInvoices = invoices.filter(inv => matchYT(inv.academicYear, inv.term));
-    const yearTermPayments = payments.filter(p => matchYT(p.academicYear, p.term));
-    
-    // Get unique students who have made payments
-    const paidStudentIds = new Set();
-    yearTermPayments.forEach(p => {
-      if (p.studentId) {
-        paidStudentIds.add(String(p.studentId).trim());
-      }
+
+    filteredInvoices.forEach((inv) => {
+      invoiceStatusCounts[classifyInvoicePaymentStatus(decode(inv.paymentStatus))] += 1;
     });
-    
-    // Group students by class
-    allStudents.forEach(student => {
-      const className = String(student.class || student.Class || student['Class Name'] || '').trim() || 'Unassigned';
-      const studentId = String(student.studentId || '').trim();
-      
+
+    // Students are not year scoped, so every student is counted per class and
+    // "paid" means the student has at least one payment in the selected
+    // academic year/term.
+    const paidStudentIds = new Set();
+    filteredPayments.forEach((p) => {
+      const id = String(p.studentId || "").trim();
+      if (id) paidStudentIds.add(id);
+    });
+
+    allStudents.forEach((student) => {
+      const className =
+        String(student.class || student.Class || student["Class Name"] || "").trim() ||
+        "Unassigned";
+      const studentId = String(student.studentId || "").trim();
+
       if (!classPaymentStats[className]) {
-        classPaymentStats[className] = {
-          totalStudents: 0,
-          paidStudents: 0
-        };
+        classPaymentStats[className] = { totalStudents: 0, paidStudents: 0 };
       }
-      
+
       classPaymentStats[className].totalStudents += 1;
-      
-      // Check if this student has made payment
-      if (paidStudentIds.has(studentId)) {
+
+      if (studentId && paidStudentIds.has(studentId)) {
         classPaymentStats[className].paidStudents += 1;
       }
     });
-    
   } catch (e) {
+    invoiceCount = 0;
     totalInvoiced = 0;
     totalPaid = 0;
     totalUnpaid = 0;
-    invoiceCount = 0;
+    paymentCount = 0;
   }
+
+  // Collected vs outstanding always add up to 100% of what was billed.
+  const collectionRate =
+    totalInvoiced > 0
+      ? Math.round((Math.min(totalPaid, totalInvoiced) / totalInvoiced) * 100)
+      : 0;
 
   return {
     totalStudents: totalStudents,
@@ -718,6 +795,13 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
     totalInvoiced: totalInvoiced,
     totalPaid: totalPaid,
     totalUnpaid: totalUnpaid,
+    paymentCount: paymentCount,
+    paidInvoiceCount: invoiceStatusCounts.paid,
+    partialInvoiceCount: invoiceStatusCounts.partial,
+    unpaidInvoiceCount: invoiceStatusCounts.unpaid,
+    collectionRate: collectionRate,
+    billingAcademicYear: yearFilter.year,
+    billingScopeLabel: billingScopeLabel,
     attendanceTrend: attendanceTrend,
     studentClassCounts: studentClassCounts,
     classPaymentStats: classPaymentStats,
