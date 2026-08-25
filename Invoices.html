@@ -256,7 +256,34 @@
 
   <script>
     let invList = [];
+    let studentsList = [];
     let currentDeleteId = null;
+    let activeAcademicYear = '';
+
+    function isActiveAcademicYear(year) {
+      return String(year && year.status || '').trim().toLowerCase() === 'active';
+    }
+
+    function selectActiveAcademicYear() {
+      const select = document.getElementById('academicYear');
+      if (!select || !activeAcademicYear) return false;
+      select.value = activeAcademicYear;
+      return select.value === activeAcademicYear;
+    }
+
+    // Keep a historical invoice editable without offering inactive years when
+    // a new invoice is being created.
+    function ensureAcademicYearOption(year) {
+      const select = document.getElementById('academicYear');
+      if (!select || !year) return;
+      const exists = Array.from(select.options).some(option => option.value === year);
+      if (!exists) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = `${year} (Inactive / historical)`;
+        select.appendChild(option);
+      }
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
       // Set default dates
@@ -276,9 +303,10 @@
     function loadDropdowns() {
       // Load Students (uses existing function from Code.gs)
       google.script.run.withSuccessHandler(function(students) {
+        studentsList = students || [];
         const select = document.getElementById('studentId');
         select.innerHTML = '<option value="" disabled selected>Select Student</option>';
-        students.forEach(s => {
+        studentsList.forEach(s => {
           let opt = document.createElement('option');
           opt.value = s.studentId;
           opt.innerText = `${s.studentId} - ${s.fullName}`;
@@ -286,16 +314,31 @@
         });
       }).getStudentIdNamePairs();
 
-      // Load Academic Years
+      // New invoices must use the currently active academic year.  We only
+      // show active years here and select the first one automatically.
       google.script.run.withSuccessHandler(function(years) {
         const select = document.getElementById('academicYear');
+        const activeYears = (years || []).filter(isActiveAcademicYear);
+        activeAcademicYear = activeYears.length ? String(activeYears[0].academicYear || '').trim() : '';
         select.innerHTML = '<option value="" disabled selected>Select Year</option>';
-        years.forEach(y => {
-          let opt = document.createElement('option');
-          opt.value = y.academicYear; 
-          opt.innerText = y.academicYear;
+
+        activeYears.forEach(y => {
+          const opt = document.createElement('option');
+          opt.value = y.academicYear;
+          opt.textContent = `${y.academicYear} (Active)`;
           select.appendChild(opt);
         });
+
+        if (activeAcademicYear) {
+          selectActiveAcademicYear();
+        } else {
+          const option = document.createElement('option');
+          option.value = '';
+          option.disabled = true;
+          option.textContent = 'No active academic year configured';
+          select.appendChild(option);
+          select.selectedIndex = select.options.length - 1;
+        }
       }).getAcademicYearsData();
     }
 
@@ -384,6 +427,9 @@
       document.getElementById('modalTitle').innerText = 'Create New Invoice';
       document.getElementById('saveBtn').innerText = 'Save Invoice';
       document.getElementById('issueDate').value = new Date().toISOString().split('T')[0];
+      // Dropdown data may have loaded before or after the button was clicked.
+      // Apply the active year again so a new form never retains an old value.
+      selectActiveAcademicYear();
       document.getElementById('invModal').classList.add('active'); 
     }
 
@@ -398,6 +444,7 @@
       document.getElementById('category').value = invoice.category;
       document.getElementById('amountDue').value = invoice.amountDue;
       document.getElementById('status').value = invoice.status;
+      ensureAcademicYearOption(invoice.academicYear);
       document.getElementById('academicYear').value = invoice.academicYear;
       document.getElementById('term').value = invoice.term;
 
@@ -430,8 +477,14 @@
       btn.disabled = true; btn.innerText = 'Saving...';
       
       const invoiceId = document.getElementById('formInvoiceId').value;
+      const studentId = document.getElementById('studentId').value;
+      const selectedStudent = studentsList.find(student => student.studentId === studentId) || {};
       const data = {
-        studentId: document.getElementById('studentId').value,
+        studentId: studentId,
+        // Save the selected student's current name and class with the invoice.
+        // This prevents newly-created invoices from having blank student details.
+        studentName: selectedStudent.fullName || '',
+        studentClass: selectedStudent.studentClass || '',
         issueDate: document.getElementById('issueDate').value,
         dueDate: document.getElementById('dueDate').value,
         category: document.getElementById('category').value,
