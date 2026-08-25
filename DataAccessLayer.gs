@@ -290,40 +290,31 @@ function getPerformanceData() {
 // ==================== INVOICES ====================
 
 function getInvoicesDataUncached() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Invoices");
-  if (!sheet) return [];
-  
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 3) return [];
-  
-  const data = sheet.getRange(3, 2, lastRow - 2, 8).getValues();
-  
-  return data.map(row => ({
-    invoiceId: String(row[0]).trim(),
-    studentId: String(row[1]).trim(),
-    studentName: String(row[2]).trim(),
-    category: String(row[3]).trim(),
-    amountDue: Number(row[4]) || 0,
-    status: String(row[5]).trim(),
-    academicYear: String(row[6]).trim(),
-    term: String(row[7]).trim()
-  }));
+  if (typeof getInvoicesDataFromSheet === "function") {
+    return getInvoicesDataFromSheet();
+  }
+  return [];
 }
 
 function getInvoicesData() {
   const cachedData = getCachedData('data_Invoices', getInvoicesDataUncached, 300); // 5 min
+  if (!Array.isArray(cachedData)) return [];
   
   return cachedData.map(function(inv) {
     return {
       invoiceId: sanitizeHtml(inv.invoiceId),
       studentId: sanitizeHtml(inv.studentId),
       studentName: sanitizeHtml(inv.studentName),
-      category: sanitizeHtml(inv.category),
-      amountDue: inv.amountDue,
-      status: sanitizeHtml(inv.status),
+      studentClass: sanitizeHtml(inv.studentClass),
       academicYear: sanitizeHtml(inv.academicYear),
-      term: sanitizeHtml(inv.term)
+      term: sanitizeHtml(inv.term),
+      category: sanitizeHtml(inv.category),
+      items: sanitizeHtml(inv.items),
+      amountDue: Number(inv.amountDue) || 0,
+      issueDate: sanitizeHtml(inv.issueDate),
+      dueDate: sanitizeHtml(inv.dueDate),
+      status: sanitizeHtml(inv.status),
+      paymentStatus: sanitizeHtml(inv.paymentStatus)
     };
   });
 }

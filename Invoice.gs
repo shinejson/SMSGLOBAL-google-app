@@ -22,8 +22,8 @@ function populateInvoiceStudentDetails(invData, existingInvoice) {
   return invData;
 }
 
-// 1. Fetch Invoices Data
-function getInvoicesData() {
+// 1. Fetch Invoices Data from Sheet (authoritative reader)
+function getInvoicesDataFromSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Invoices");
   if (!sheet) return [];
@@ -173,7 +173,8 @@ function addInvoice(invData) {
     ]
   ]);
 
-  const createdInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(nextId).trim()) || buildAuditSnapshot({
+  const rawInvoices = getInvoicesDataFromSheet();
+  const createdInvoice = rawInvoices.find((invoice) => String(invoice.invoiceId).trim() === String(nextId).trim()) || buildAuditSnapshot({
     invoiceId: nextId,
     studentId: invData.studentId || '',
     studentName: invData.studentName || '',
@@ -188,6 +189,10 @@ function addInvoice(invData) {
     status: invData.status || 'Pending',
     paymentStatus: invData.paymentStatus || 'Unpaid'
   });
+
+  if (typeof invalidateFinancialCache === 'function') {
+    invalidateFinancialCache();
+  }
 
   safeLogAuditEvent(
     'Create',
@@ -208,7 +213,8 @@ function updateInvoice(invoiceId, invData) {
   const sheet = ss.getSheetByName("Invoices");
   if (!sheet) throw new Error("Invoices worksheet not found.");
 
-  const existingInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || null;
+  const rawInvoices = getInvoicesDataFromSheet();
+  const existingInvoice = rawInvoices.find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || null;
   populateInvoiceStudentDetails(invData, existingInvoice);
   const pendingUpdatedInvoice = buildAuditSnapshot(Object.assign({}, existingInvoice || {}, invData, { invoiceId: invoiceId }));
   const updateInvoiceYearGuard = enforceAcademicYearCrudSecurity({
@@ -253,7 +259,11 @@ function updateInvoice(invoiceId, invData) {
     ]
   ]);
 
-  const updatedInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || buildAuditSnapshot(Object.assign({}, existingInvoice || {}, invData, { invoiceId: invoiceId }));
+  const updatedInvoice = getInvoicesDataFromSheet().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || buildAuditSnapshot(Object.assign({}, existingInvoice || {}, invData, { invoiceId: invoiceId }));
+
+  if (typeof invalidateFinancialCache === 'function') {
+    invalidateFinancialCache();
+  }
 
   safeLogAuditEvent(
     'Update',
@@ -273,7 +283,8 @@ function deleteInvoice(invoiceId) {
   const sheet = ss.getSheetByName("Invoices");
   if (!sheet) throw new Error("Invoices worksheet not found.");
 
-  const existingInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || null;
+  const rawInvoices = getInvoicesDataFromSheet();
+  const existingInvoice = rawInvoices.find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || null;
   const deleteInvoiceYearGuard = enforceAcademicYearCrudSecurity({
     action: 'Delete',
     module: 'Invoices',
@@ -287,6 +298,10 @@ function deleteInvoice(invoiceId) {
   if (row === -1) throw new Error("Invoice record not found.");
 
   sheet.deleteRow(row);
+
+  if (typeof invalidateFinancialCache === 'function') {
+    invalidateFinancialCache();
+  }
 
   safeLogAuditEvent(
     'Delete',

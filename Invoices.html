@@ -260,6 +260,27 @@
     let currentDeleteId = null;
     let activeAcademicYear = '';
 
+    function decodeSanitized(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&#x2F;/gi, '/')
+        .replace(/&amp;/g, '&'); // last, to avoid double-decoding
+    }
+
+    function escapeHtml(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     function isActiveAcademicYear(year) {
       return String(year && year.status || '').trim().toLowerCase() === 'active';
     }
@@ -269,6 +290,35 @@
       if (!select || !activeAcademicYear) return false;
       select.value = activeAcademicYear;
       return select.value === activeAcademicYear;
+    }
+
+    function populateAcademicYearOptions(years) {
+      const select = document.getElementById('academicYear');
+      if (!select) return;
+      const activeYears = (years || []).filter(isActiveAcademicYear);
+      activeAcademicYear = activeYears.length ? String(activeYears[0].academicYear || '').trim() : '';
+      select.innerHTML = '<option value="" disabled selected>Select Year</option>';
+
+      activeYears.forEach(y => {
+        const opt = document.createElement('option');
+        opt.value = y.academicYear;
+        opt.textContent = `${y.academicYear} (Active)`;
+        if (y.academicYear === activeAcademicYear) {
+          opt.selected = true;
+        }
+        select.appendChild(opt);
+      });
+
+      if (activeAcademicYear) {
+        selectActiveAcademicYear();
+      } else {
+        const option = document.createElement('option');
+        option.value = '';
+        option.disabled = true;
+        option.textContent = 'No active academic year configured';
+        select.appendChild(option);
+        select.selectedIndex = select.options.length - 1;
+      }
     }
 
     // Keep a historical invoice editable without offering inactive years when
@@ -297,7 +347,31 @@
     function refreshData() {
       document.getElementById('loading').style.display = 'block';
       document.getElementById('invTable').style.display = 'none';
-      google.script.run.withSuccessHandler(renderTable).getInvoicesData();
+      google.script.run
+        .withSuccessHandler(function(years) {
+          if (years && years.length) {
+            populateAcademicYearOptions(years);
+          }
+          google.script.run
+            .withSuccessHandler(renderTable)
+            .withFailureHandler(function(err) {
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('invTable').style.display = 'table';
+              document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Error loading invoices: ' + (err && err.message ? err.message : 'Unknown error') + '</td></tr>';
+            })
+            .getInvoicesData();
+        })
+        .withFailureHandler(function() {
+          google.script.run
+            .withSuccessHandler(renderTable)
+            .withFailureHandler(function(err) {
+              document.getElementById('loading').style.display = 'none';
+              document.getElementById('invTable').style.display = 'table';
+              document.getElementById('tableBody').innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#ef4444;">Error loading invoices: ' + (err && err.message ? err.message : 'Unknown error') + '</td></tr>';
+            })
+            .getInvoicesData();
+        })
+        .getAcademicYearsData();
     }
 
     function loadDropdowns() {
@@ -314,36 +388,28 @@
         });
       }).getStudentIdNamePairs();
 
-      // New invoices must use the currently active academic year.  We only
-      // show active years here and select the first one automatically.
+      // Load Academic Years
       google.script.run.withSuccessHandler(function(years) {
-        const select = document.getElementById('academicYear');
-        const activeYears = (years || []).filter(isActiveAcademicYear);
-        activeAcademicYear = activeYears.length ? String(activeYears[0].academicYear || '').trim() : '';
-        select.innerHTML = '<option value="" disabled selected>Select Year</option>';
-
-        activeYears.forEach(y => {
-          const opt = document.createElement('option');
-          opt.value = y.academicYear;
-          opt.textContent = `${y.academicYear} (Active)`;
-          select.appendChild(opt);
-        });
-
-        if (activeAcademicYear) {
-          selectActiveAcademicYear();
-        } else {
-          const option = document.createElement('option');
-          option.value = '';
-          option.disabled = true;
-          option.textContent = 'No active academic year configured';
-          select.appendChild(option);
-          select.selectedIndex = select.options.length - 1;
-        }
+        populateAcademicYearOptions(years);
       }).getAcademicYearsData();
     }
 
     function renderTable(data) {
-      invList = data || [];
+      invList = (data || []).map(row => ({
+        invoiceId: decodeSanitized(row.invoiceId),
+        studentId: decodeSanitized(row.studentId),
+        studentName: decodeSanitized(row.studentName),
+        studentClass: decodeSanitized(row.studentClass),
+        academicYear: decodeSanitized(row.academicYear),
+        term: decodeSanitized(row.term),
+        category: decodeSanitized(row.category),
+        items: decodeSanitized(row.items),
+        amountDue: Number(row.amountDue) || 0,
+        issueDate: decodeSanitized(row.issueDate),
+        dueDate: decodeSanitized(row.dueDate),
+        status: decodeSanitized(row.status),
+        paymentStatus: decodeSanitized(row.paymentStatus)
+      }));
       const tbody = document.getElementById('tableBody');
       const loading = document.getElementById('loading');
       const table = document.getElementById('invTable');
@@ -370,21 +436,21 @@
         else if(row.status === 'Overdue') statusClass = 'status-overdue';
 
         tr.innerHTML = `
-          <td><strong>${row.invoiceId}</strong></td>
-          <td>${row.studentId}</td>
-          <td>${row.issueDate}</td>
-          <td>${row.dueDate}</td>
-          <td>${row.category}</td>
-          <td>GHS ${row.amountDue.toFixed(2)}</td>
-          <td><span class="status-badge ${statusClass}">${row.status}</span></td>
-          <td>${row.academicYear}</td>
-          <td>${row.term}</td>
+          <td><strong>${escapeHtml(row.invoiceId)}</strong></td>
+          <td>${escapeHtml(row.studentId)}</td>
+          <td>${escapeHtml(row.issueDate)}</td>
+          <td>${escapeHtml(row.dueDate)}</td>
+          <td>${escapeHtml(row.category)}</td>
+          <td>GHS ${(row.amountDue || 0).toFixed(2)}</td>
+          <td><span class="status-badge ${statusClass}">${escapeHtml(row.status)}</span></td>
+          <td>${escapeHtml(row.academicYear)}</td>
+          <td>${escapeHtml(row.term)}</td>
           <td style="text-align: center;">
             <div class="actions-cell">
-              <button class="action-icon-btn edit-btn" onclick="openEditModal('${row.invoiceId}')" title="Edit Invoice">
+              <button class="action-icon-btn edit-btn" onclick="openEditModal('${escapeHtml(row.invoiceId)}')" title="Edit Invoice">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
               </button>
-              <button class="action-icon-btn delete-btn" onclick="openDeleteModal('${row.invoiceId}')" title="Delete Invoice">
+              <button class="action-icon-btn delete-btn" onclick="openDeleteModal('${escapeHtml(row.invoiceId)}')" title="Delete Invoice">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
               </button>
             </div>

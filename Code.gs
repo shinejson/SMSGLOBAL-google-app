@@ -485,12 +485,14 @@ function getDashboardStats(selectedYear, selectedTerm, selectedDate) {
   let filterDate = parseDashboardDate(selectedDate);
 
   function matchYT(itemYear, itemTerm) {
+    const rawYear = typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(itemYear) : itemYear;
+    const rawTerm = typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(itemTerm) : itemTerm;
     if (normYear) {
-      const y = String(itemYear || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const y = String(rawYear || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       if (y && !normYear.includes(y) && !y.includes(normYear)) return false;
     }
     if (normTerm) {
-      const t = String(itemTerm || '').trim().toLowerCase();
+      const t = String(rawTerm || '').trim().toLowerCase();
       if (t && t !== normTerm && !t.includes(normTerm) && !normTerm.includes(t)) return false;
     }
     return true;

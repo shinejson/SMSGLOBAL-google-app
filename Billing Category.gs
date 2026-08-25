@@ -403,6 +403,10 @@ function generateStudentBillings(data) {
       })
     );
 
+    if (typeof invalidateFinancialCache === 'function') {
+      invalidateFinancialCache();
+    }
+
     return { 
       success: true, 
       count: successCount,
@@ -413,25 +417,6 @@ function generateStudentBillings(data) {
     Logger.log('ERROR in generateStudentBillings: ' + error.toString());
     return { success: false, message: error.toString() };
   }
-}
-
-// Helper function to generate next Invoice ID
-function generateNextInvoiceId(sheet) {
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 3) return "INV-1001";
-
-  const values = sheet.getRange(3, 2, lastRow - 2, 1).getValues();
-  let maxIdNum = 1000;
-  values.forEach((row) => {
-    const idStr = String(row[0]).trim();
-    if (idStr.startsWith("INV-")) {
-      const num = parseInt(idStr.substring(4), 10);
-      if (!isNaN(num) && num > maxIdNum) {
-        maxIdNum = num;
-      }
-    }
-  });
-  return "INV-" + (maxIdNum + 1);
 }
 
 // 8. Generate Pupil's Bill PDF (matching template format)
