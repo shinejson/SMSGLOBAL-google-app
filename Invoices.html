@@ -63,6 +63,27 @@
     .form-label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; color: #475569; margin-bottom: 6px; }
     .form-input, .form-select { width: 100%; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; color: #0f172a; background: #fff; transition: border-color 0.15s; }
     .form-input:focus, .form-select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    
+    /* Searchable Input Styling */
+    .searchable-input {
+      position: relative;
+    }
+    .searchable-input input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #0f172a;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+    .searchable-input input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+    
     .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
     .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
     
@@ -125,6 +146,9 @@
       </div>
     </div>
     <div class="toolbar-right">
+      <select id="academicYearFilter" class="form-select" onchange="filterTable()">
+        <option value="">All Academic Years</option>
+      </select>
       <select id="statusFilter" class="form-select" onchange="filterTable()">
         <option value="">All Statuses</option>
         <option value="Paid">Paid</option>
@@ -168,10 +192,20 @@
         <input type="hidden" id="formInvoiceId">
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label" for="studentId">Student</label>
-            <select id="studentId" class="form-select" required>
-              <option value="" disabled selected>Select Student</option>
-            </select>
+            <label class="form-label" for="studentSearch">Student</label>
+            <div class="searchable-input">
+              <input 
+                type="text" 
+                id="studentSearch" 
+                list="studentList" 
+                placeholder="Type to search student..." 
+                autocomplete="off"
+                required
+                oninput="handleStudentSearch(this.value)"
+              >
+              <datalist id="studentList"></datalist>
+              <input type="hidden" id="studentId">
+            </div>
           </div>
           <div class="form-grid-2">
             <div class="form-group">
@@ -260,8 +294,26 @@
   <script>
     let invList = [];
     let studentsList = [];
+    let academicYearsList = [];
     let currentDeleteId = null;
     let activeAcademicYear = '';
+
+    function handleStudentSearch(value) {
+      const trimmedValue = value.trim();
+      const hidden = document.getElementById('studentId');
+      
+      // Find matching student
+      const matchingStudent = studentsList.find(s => {
+        const displayText = `${s.studentId} - ${s.fullName}`;
+        return displayText === trimmedValue || s.studentId === trimmedValue;
+      });
+      
+      if (matchingStudent) {
+        hidden.value = matchingStudent.studentId;
+      } else {
+        hidden.value = '';
+      }
+    }
 
     function decodeSanitized(value) {
       if (value === null || value === undefined) return '';
@@ -297,11 +349,16 @@
 
     function populateAcademicYearOptions(years) {
       const select = document.getElementById('academicYear');
+      const filterSelect = document.getElementById('academicYearFilter');
+      
       if (!select) return;
-      const activeYears = (years || []).filter(isActiveAcademicYear);
+      
+      academicYearsList = years || [];
+      const activeYears = academicYearsList.filter(isActiveAcademicYear);
       activeAcademicYear = activeYears.length ? String(activeYears[0].academicYear || '').trim() : '';
+      
+      // Populate form dropdown (only active years)
       select.innerHTML = '<option value="" disabled selected>Select Year</option>';
-
       activeYears.forEach(y => {
         const opt = document.createElement('option');
         opt.value = y.academicYear;
@@ -321,6 +378,30 @@
         option.textContent = 'No active academic year configured';
         select.appendChild(option);
         select.selectedIndex = select.options.length - 1;
+      }
+      
+      // Populate filter dropdown (all years)
+      if (filterSelect) {
+        filterSelect.innerHTML = '<option value="">All Academic Years</option>';
+        
+        // Add active year first
+        if (activeAcademicYear) {
+          const activeOpt = document.createElement('option');
+          activeOpt.value = activeAcademicYear;
+          activeOpt.textContent = `${activeAcademicYear} (Active)`;
+          activeOpt.selected = true; // Select active year by default
+          filterSelect.appendChild(activeOpt);
+        }
+        
+        // Add other years
+        academicYearsList.forEach(y => {
+          if (y.academicYear !== activeAcademicYear) {
+            const opt = document.createElement('option');
+            opt.value = y.academicYear;
+            opt.textContent = y.academicYear;
+            filterSelect.appendChild(opt);
+          }
+        });
       }
     }
 
@@ -393,13 +474,13 @@
       // Load Students (uses existing function from Code.gs)
       google.script.run.withSuccessHandler(function(students) {
         studentsList = students || [];
-        const select = document.getElementById('studentId');
-        select.innerHTML = '<option value="" disabled selected>Select Student</option>';
+        const datalist = document.getElementById('studentList');
+        datalist.innerHTML = '';
         studentsList.forEach(s => {
           let opt = document.createElement('option');
-          opt.value = s.studentId;
-          opt.innerText = `${s.studentId} - ${s.fullName}`;
-          select.appendChild(opt);
+          opt.value = `${s.studentId} - ${s.fullName}`;
+          opt.setAttribute('data-student-id', s.studentId);
+          datalist.appendChild(opt);
         });
       }).getStudentIdNamePairs();
 
@@ -481,6 +562,7 @@
     function filterTable() {
       const searchVal = document.getElementById('searchInput').value.toLowerCase();
       const statusVal = document.getElementById('statusFilter').value.toLowerCase();
+      const yearVal = document.getElementById('academicYearFilter').value.toLowerCase();
       const rows = document.querySelectorAll('#tableBody tr');
       const countBadge = document.getElementById('invCount');
       let visibleCount = 0;
@@ -489,10 +571,13 @@
         if (row.cells.length === 1 && row.cells[0].getAttribute('colspan')) return;
         const text = row.innerText.toLowerCase();
         const rowStatus = (row.getAttribute('data-status') || '').toLowerCase();
+        const rowYear = (row.cells[7] ? row.cells[7].innerText.toLowerCase() : ''); // Academic Year column
+        
         const matchSearch = text.includes(searchVal);
         const matchStatus = statusVal === '' || rowStatus === statusVal;
+        const matchYear = yearVal === '' || rowYear.includes(yearVal);
 
-        if (matchSearch && matchStatus) {
+        if (matchSearch && matchStatus && matchYear) {
           row.style.display = ''; visibleCount++;
         } else {
           row.style.display = 'none';
@@ -505,6 +590,8 @@
     function openAddModal() { 
       document.getElementById('invForm').reset();
       document.getElementById('formInvoiceId').value = '';
+      document.getElementById('studentSearch').value = '';
+      document.getElementById('studentId').value = '';
       document.getElementById('modalTitle').innerText = 'Create New Invoice';
       document.getElementById('saveBtn').innerText = 'Save Invoice';
       document.getElementById('issueDate').value = new Date().toISOString().split('T')[0];
@@ -519,7 +606,17 @@
       if (!invoice) return alert('Error: Invoice not found.');
 
       document.getElementById('formInvoiceId').value = invoice.invoiceId;
-      document.getElementById('studentId').value = invoice.studentId;
+      
+      // Set student search field
+      const student = studentsList.find(s => s.studentId === invoice.studentId);
+      if (student) {
+        document.getElementById('studentSearch').value = `${student.studentId} - ${student.fullName}`;
+        document.getElementById('studentId').value = student.studentId;
+      } else {
+        document.getElementById('studentSearch').value = invoice.studentId;
+        document.getElementById('studentId').value = invoice.studentId;
+      }
+      
       document.getElementById('issueDate').value = invoice.issueDate;
       document.getElementById('dueDate').value = invoice.dueDate;
       ensureCategoryOption(invoice.category);
