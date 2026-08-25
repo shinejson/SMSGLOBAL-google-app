@@ -4741,7 +4741,24 @@ function generateSingleTerminalReport(reportData, student) {
     const performanceSheet = ss.getSheetByName('Performance');
     if (!performanceSheet) throw new Error('Performance sheet not found');
     
-    const performanceData = getPerformanceData();
+    const rawPerformanceData = typeof getPerformanceDataFromSheet === 'function' ? getPerformanceDataFromSheet() : getPerformanceData();
+    const performanceData = (rawPerformanceData || []).map(function(p) {
+      return {
+        performanceId: typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(p.performanceId) : p.performanceId,
+        studentId: typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(p.studentId) : p.studentId,
+        studentName: typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(p.studentName) : p.studentName,
+        studentClass: typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(p.studentClass) : p.studentClass,
+        academicYear: typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(p.academicYear) : p.academicYear,
+        term: typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(p.term) : p.term,
+        course: typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(p.course) : p.course,
+        classScore: p.classScore,
+        examScore100: p.examScore100,
+        examScore60: p.examScore60,
+        examScore50: p.examScore50,
+        total: p.total,
+        rank: typeof decodeSanitizedHtml === 'function' ? decodeSanitizedHtml(p.rank) : p.rank
+      };
+    });
     Logger.log('Total performance records: ' + performanceData.length);
     
     // Improved matching: normalize IDs and names, require class/term/year, prefer ID, then name equality, then substring fallback

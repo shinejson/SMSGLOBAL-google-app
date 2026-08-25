@@ -892,6 +892,85 @@
       document.getElementById(dropdownId).style.display = 'none';
     }
 
+    function decodeSanitized(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&#x2F;/gi, '/')
+        .replace(/&amp;/g, '&'); // last, to avoid double-decoding
+    }
+
+    function escapeHtml(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function populateAcademicYearDropdowns(years) {
+      const addSelect    = document.getElementById('yearSelect');
+      const editSelect   = document.getElementById('edit_academicYear');
+      const filterSel    = document.getElementById('yearFilter');
+      const bulkSelect   = document.getElementById('bulk_yearSelect');
+      const activeYears  = (years || []).filter(y => y.status === 'Active');
+      activeAcademicYearValue = activeYears.length ? activeYears[0].academicYear : '';
+      knownAcademicYears = (years || []).map(y => y.academicYear).filter(Boolean);
+
+      // Rebuild add modal year select (active years only)
+      if (addSelect) {
+        addSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
+        activeYears.forEach(y => {
+          const o = document.createElement('option');
+          o.value = y.academicYear;
+          o.innerText = y.academicYear + ' (Active)';
+          addSelect.appendChild(o);
+        });
+        if (activeAcademicYearValue) addSelect.value = activeAcademicYearValue;
+      }
+
+      // Rebuild edit modal year select (all years)
+      if (editSelect) {
+        editSelect.innerHTML = '<option value="" disabled>Select Year</option>';
+        (years || []).forEach(y => {
+          const o = document.createElement('option');
+          o.value = y.academicYear;
+          o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : ' (Inactive)');
+          editSelect.appendChild(o);
+        });
+        if (activeAcademicYearValue) editSelect.value = activeAcademicYearValue;
+      }
+
+      // Rebuild bulk modal year select (active years only)
+      if (bulkSelect) {
+        bulkSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
+        activeYears.forEach(y => {
+          const o = document.createElement('option');
+          o.value = y.academicYear;
+          o.innerText = y.academicYear + ' (Active)';
+          bulkSelect.appendChild(o);
+        });
+        if (activeAcademicYearValue) bulkSelect.value = activeAcademicYearValue;
+      }
+
+      // Rebuild year FILTER dropdown (all years) and select active year
+      if (filterSel) {
+        filterSel.innerHTML = '<option value="">All Years</option>';
+        (years || []).forEach(y => {
+          const o = document.createElement('option');
+          o.value = y.academicYear;
+          o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : '');
+          filterSel.appendChild(o);
+        });
+        if (activeAcademicYearValue) filterSel.value = activeAcademicYearValue;
+      }
+    }
+
     function loadDropdowns() {
       google.script.run.withSuccessHandler(function(classes) {
         const addSelect = document.getElementById('classSelect');
@@ -909,49 +988,6 @@
           const o = document.createElement('option'); o.value = c; o.innerText = c; filter.appendChild(o);
         });
       }).getClassNames();
-
-      google.script.run.withSuccessHandler(function(years) {
-        const addSelect = document.getElementById('yearSelect');
-        const editSelect = document.getElementById('edit_academicYear');
-        const filter = document.getElementById('yearFilter');
-        const bulkSelect = document.getElementById('bulk_yearSelect');
-        addSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
-        editSelect.innerHTML = '<option value="" disabled>Select Year</option>';
-        if (bulkSelect) bulkSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
-        const activeYears = years.filter(y => y.status === 'Active');
-        activeAcademicYearValue = activeYears.length ? activeYears[0].academicYear : '';
-        
-        // Populate add/edit/bulk modals with active years and label them
-        activeYears.forEach(y => {
-          [addSelect, editSelect, bulkSelect].filter(Boolean).forEach(sel => {
-            const o = document.createElement('option'); 
-            o.value = y.academicYear; 
-            o.innerText = y.academicYear + ' (Active)'; 
-            sel.appendChild(o);
-          });
-        });
-        
-        // Default all modal year selectors to the active academic year
-        if (activeAcademicYearValue) {
-          addSelect.value = activeAcademicYearValue;
-          editSelect.value = activeAcademicYearValue;
-          if (bulkSelect) bulkSelect.value = activeAcademicYearValue;
-        }
-        
-        // Populate filter with all years and auto-select active
-        knownAcademicYears = (years || []).map(function(y) { return y.academicYear; }).filter(Boolean);
-        years.forEach(y => {
-          const o = document.createElement('option'); 
-          o.value = y.academicYear; 
-          o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : ''); 
-          filter.appendChild(o);
-        });
-        
-        // Auto-select active year in filter (apply after data loads)
-        if (activeAcademicYearValue) {
-          filter.value = activeAcademicYearValue;
-        }
-      }).withFailureHandler(function(err) { console.error('Error loading years:', err); }).getAcademicYearsData();
 
       google.script.run.withSuccessHandler(function(courses) {
         const addSelect = document.getElementById('courseSelect');
@@ -981,62 +1017,7 @@
       google.script.run
         .withSuccessHandler(function(years) {
           if (years && years.length) {
-            const addSelect    = document.getElementById('yearSelect');
-            const editSelect   = document.getElementById('edit_academicYear');
-            const filterSel    = document.getElementById('yearFilter');
-            const bulkSelect   = document.getElementById('bulk_yearSelect');
-            const activeYears  = years.filter(y => y.status === 'Active');
-            activeAcademicYearValue = activeYears.length ? activeYears[0].academicYear : '';
-            knownAcademicYears = years.map(y => y.academicYear).filter(Boolean);
-
-            // Rebuild add modal year select (active years only)
-            if (addSelect) {
-              addSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
-              activeYears.forEach(y => {
-                const o = document.createElement('option');
-                o.value = y.academicYear;
-                o.innerText = y.academicYear + ' (Active)';
-                addSelect.appendChild(o);
-              });
-              if (activeAcademicYearValue) addSelect.value = activeAcademicYearValue;
-            }
-
-            // Rebuild edit modal year select (all years)
-            if (editSelect) {
-              editSelect.innerHTML = '<option value="" disabled>Select Year</option>';
-              years.forEach(y => {
-                const o = document.createElement('option');
-                o.value = y.academicYear;
-                o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : ' (Inactive)');
-                editSelect.appendChild(o);
-              });
-              if (activeAcademicYearValue) editSelect.value = activeAcademicYearValue;
-            }
-
-            // Rebuild bulk modal year select (active years only)
-            if (bulkSelect) {
-              bulkSelect.innerHTML = '<option value="" disabled selected>Select Year</option>';
-              activeYears.forEach(y => {
-                const o = document.createElement('option');
-                o.value = y.academicYear;
-                o.innerText = y.academicYear + ' (Active)';
-                bulkSelect.appendChild(o);
-              });
-              if (activeAcademicYearValue) bulkSelect.value = activeAcademicYearValue;
-            }
-
-            // Rebuild year FILTER dropdown (all years) and select active year.
-            // This is the critical step: the option must exist before setting .value.
-            if (filterSel) {
-              filterSel.innerHTML = '<option value="">All Years</option>';
-              years.forEach(y => {
-                const o = document.createElement('option');
-                o.value = y.academicYear;
-                o.innerText = y.academicYear + (y.status === 'Active' ? ' (Active)' : '');
-                filterSel.appendChild(o);
-              });
-              if (activeAcademicYearValue) filterSel.value = activeAcademicYearValue;
-            }
+            populateAcademicYearDropdowns(years);
           }
           // Now load performance data — filterTable() inside renderTable will
           // use the freshly-set yearFilter value and show the correct records.
@@ -1072,7 +1053,23 @@
     }
 
     function renderTable(data) {
-      performanceList = computeRanks(data || []);
+      const decodedData = (data || []).map(row => ({
+        performanceId: decodeSanitized(row.performanceId),
+        rowNumber: row.rowNumber,
+        studentId: decodeSanitized(row.studentId),
+        studentName: decodeSanitized(row.studentName),
+        studentClass: decodeSanitized(row.studentClass),
+        academicYear: decodeSanitized(row.academicYear),
+        term: decodeSanitized(row.term),
+        course: decodeSanitized(row.course),
+        classScore: row.classScore,
+        examScore100: row.examScore100,
+        examScore60: row.examScore60,
+        examScore50: row.examScore50,
+        total: row.total,
+        rank: decodeSanitized(row.rank)
+      }));
+      performanceList = computeRanks(decodedData);
       const tbody = document.getElementById('tableBody');
       const loading = document.getElementById('loading');
       const table = document.getElementById('performanceTable');
@@ -1092,18 +1089,18 @@
         tr.setAttribute('data-year', row.academicYear || '');
         const examWeighted = row.examScore50 !== undefined ? row.examScore50 : (row.examScore60 !== undefined ? row.examScore60 : '-');
         tr.innerHTML = `
-          <td><strong>${row.performanceId || '-'}</strong></td>
-          <td>${row.studentName || '-'}</td>
-          <td>${row.studentClass || '-'}</td>
-          <td>${row.term || '-'}</td>
-          <td>${row.academicYear || '-'}</td>
-          <td>${row.course || '-'}</td>
+          <td><strong>${escapeHtml(row.performanceId) || '-'}</strong></td>
+          <td>${escapeHtml(row.studentName) || '-'}</td>
+          <td>${escapeHtml(row.studentClass) || '-'}</td>
+          <td>${escapeHtml(row.term) || '-'}</td>
+          <td>${escapeHtml(row.academicYear) || '-'}</td>
+          <td>${escapeHtml(row.course) || '-'}</td>
           <td>${row.classScore !== undefined ? row.classScore : '-'}</td>
           <td>${row.examScore100 !== undefined ? row.examScore100 : '-'}</td>
           <td>${examWeighted}</td>
           <td><strong>${row.total !== undefined ? row.total : '-'}</strong></td>
-          <td><span style="font-weight:600; color:#3b82f6;">${row.rank || '-'}</span></td>
-          <td style="white-space:nowrap;"><button class="icon-btn edit" title="Edit" onclick="openEditModal('${row.performanceId || ''}')">✏️</button><button class="icon-btn delete" title="Delete" onclick="confirmDelete('${row.performanceId || ''}')">🗑️</button></td>`;
+          <td><span style="font-weight:600; color:#3b82f6;">${escapeHtml(row.rank) || '-'}</span></td>
+          <td style="white-space:nowrap;"><button class="icon-btn edit" title="Edit" onclick="openEditModal('${escapeHtml(row.performanceId) || ''}')">✏️</button><button class="icon-btn delete" title="Delete" onclick="confirmDelete('${escapeHtml(row.performanceId) || ''}')">🗑️</button></td>`;
         tbody.appendChild(tr);
       });
       filterTable();
