@@ -645,6 +645,12 @@
       document.getElementById('date').value = new Date().toISOString().split('T')[0];
       document.getElementById('selectedItemsPreview').innerHTML = '';
       document.getElementById('totalAmount').value = 'GHS 0.00';
+      
+      // Auto-select the active academic year in the form
+      if (activeAcademicYear) {
+        document.getElementById('academicYear').value = activeAcademicYear;
+      }
+      
       renderItemsCheckboxes();
       document.getElementById('catModal').classList.add('active');
     };
@@ -672,6 +678,7 @@
     let currentDeleteId = null;
     let billingItemsMap = {}; // Key: Item Name, Value: Price
     let billingItemsList = []; // Full list of billing items
+    let activeAcademicYear = null; // Store the active academic year
 
     function renderItemsCheckboxes(selectedItems) {
       const container = document.getElementById('itemsCheckboxList');
@@ -732,6 +739,11 @@
         select.innerHTML = '<option value="" disabled selected>Select Year</option>';
         
         const activeYears = years.filter(y => y.status === 'Active');
+        
+        // Store the first active academic year
+        if (activeYears.length > 0) {
+          activeAcademicYear = activeYears[0].academicYear;
+        }
         
         // Add active years with label
         activeYears.forEach(y => {
@@ -927,14 +939,21 @@
       termSelect.innerHTML = '<option value="">All Terms</option>' + terms.map(t => `<option value="${t}">${t}</option>`).join('');
       categorySelect.innerHTML = '<option value="">All Categories</option>' + categories.map(c => `<option value="${c}">${c}</option>`).join('');
       
-      // Auto-select active academic year
-      google.script.run.withSuccessHandler(function(academicYears) {
-        const activeYear = academicYears.find(y => y.status === 'Active');
-        if (activeYear && years.includes(activeYear.academicYear)) {
-          yearSelect.value = activeYear.academicYear;
-          filterTable(); // Apply the filter
-        }
-      }).getAcademicYearsData();
+      // Auto-select active academic year using the stored variable
+      if (activeAcademicYear && years.includes(activeAcademicYear)) {
+        yearSelect.value = activeAcademicYear;
+        filterTable(); // Apply the filter
+      } else if (!activeAcademicYear) {
+        // Fallback: fetch from server if not yet loaded
+        google.script.run.withSuccessHandler(function(academicYears) {
+          const activeYear = academicYears.find(y => y.status === 'Active');
+          if (activeYear && years.includes(activeYear.academicYear)) {
+            activeAcademicYear = activeYear.academicYear;
+            yearSelect.value = activeYear.academicYear;
+            filterTable();
+          }
+        }).getAcademicYearsData();
+      }
     }
 
     function resetFilters() {
