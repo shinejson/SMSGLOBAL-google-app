@@ -1,5 +1,27 @@
 // --- INVOICES FUNCTIONS ---
 
+// Fill invoice student details from the authoritative Students sheet.  The
+// browser sends these details for a responsive UI, but this keeps direct/API
+// calls correct too and preserves historical details if a student was removed.
+function populateInvoiceStudentDetails(invData, existingInvoice) {
+  if (!invData) return invData;
+  const studentId = String(invData.studentId || '').trim();
+  const student = studentId && typeof getStudentIdNamePairs === 'function'
+    ? getStudentIdNamePairs().find(function(item) {
+        return String(item.studentId || '').trim() === studentId;
+      })
+    : null;
+
+  if (student) {
+    invData.studentName = student.fullName || '';
+    invData.studentClass = student.studentClass || '';
+  } else if (existingInvoice) {
+    invData.studentName = invData.studentName || existingInvoice.studentName || '';
+    invData.studentClass = invData.studentClass || existingInvoice.studentClass || '';
+  }
+  return invData;
+}
+
 // 1. Fetch Invoices Data
 function getInvoicesData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -82,6 +104,13 @@ function findInvoiceRowById(sheet, invoiceId) {
 
 // 4. Add New Invoice (Create)
 function addInvoice(invData) {
+  invData = invData || {};
+  // Default to the active year if this endpoint is called outside the form.
+  if (!String(invData.academicYear || '').trim() && typeof getActiveAcademicYearValue === 'function') {
+    invData.academicYear = getActiveAcademicYearValue();
+  }
+  populateInvoiceStudentDetails(invData);
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Invoices");
   if (!sheet) throw new Error("Invoices worksheet not found.");
@@ -174,11 +203,13 @@ function addInvoice(invData) {
 
 // 5. Update Invoice (Update)
 function updateInvoice(invoiceId, invData) {
+  invData = invData || {};
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Invoices");
   if (!sheet) throw new Error("Invoices worksheet not found.");
 
   const existingInvoice = getInvoicesData().find((invoice) => String(invoice.invoiceId).trim() === String(invoiceId).trim()) || null;
+  populateInvoiceStudentDetails(invData, existingInvoice);
   const pendingUpdatedInvoice = buildAuditSnapshot(Object.assign({}, existingInvoice || {}, invData, { invoiceId: invoiceId }));
   const updateInvoiceYearGuard = enforceAcademicYearCrudSecurity({
     action: 'Update',
