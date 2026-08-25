@@ -723,12 +723,12 @@
     .insight-list {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 10px;
     }
 
     .insight-item {
       background: #f8fafc;
-      padding: 16px;
+      padding: 12px 14px;
       border-radius: 12px;
       border: 1px solid #e2e8f0;
     }
@@ -737,14 +737,72 @@
       display: block;
       color: #475569;
       font-size: 13px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
 
     .insight-item strong {
       display: block;
-      font-size: 18px;
+      font-size: 17px;
       color: #0f172a;
       font-weight: 700;
+    }
+
+    .insight-sub {
+      display: block;
+      margin-top: 4px;
+      font-style: normal;
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+    }
+
+    body.dark-mode .insight-item .insight-sub {
+      color: #94a3b8;
+    }
+
+    /* Small "what scope is this?" chip next to a card / filter title */
+    .card-scope {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 600;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .card-scope-billing {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+    }
+
+    body.dark-mode .card-scope {
+      background: #0f172a;
+      border-color: #334155;
+      color: #94a3b8;
+    }
+
+    body.dark-mode .card-scope-billing {
+      background: #172554;
+      border-color: #1e3a8a;
+      color: #93c5fd;
+    }
+
+    .dashboard-filter-hint {
+      margin: -12px 0 24px;
+      padding: 0 4px;
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    body.dark-mode .dashboard-filter-hint {
+      color: #94a3b8;
     }
 
     /* --- RESPONSIVE BREAKPOINTS --- */
@@ -977,37 +1035,44 @@
           <span>Filter Dashboard Data</span>
         </div>
         <div class="filter-controls">
-          <select id="dashYearFilter" class="form-select" onchange="loadDashboardStatsWithFilters()">
-            <option value="">All Academic Years</option>
+          <select id="dashYearFilter" class="form-select" onchange="loadDashboardStatsWithFilters()"
+                  title="Filters attendance, invoices and payments. Students and courses are never filtered by academic year.">
+            <option value="">Active Academic Year</option>
+            <option value="ALL">All Academic Years</option>
           </select>
-          <select id="dashTermFilter" class="form-select" onchange="loadDashboardStatsWithFilters()">
+          <select id="dashTermFilter" class="form-select" onchange="loadDashboardStatsWithFilters()"
+                  title="Filters attendance, invoices and payments.">
             <option value="">All Terms</option>
             <option value="Term 1">Term 1</option>
             <option value="Term 2">Term 2</option>
             <option value="Term 3">Term 3</option>
           </select>
-          <input type="date" id="dashDateFilter" class="form-input" onchange="loadDashboardStatsWithFilters()" />
+          <input type="date" id="dashDateFilter" class="form-input" onchange="loadDashboardStatsWithFilters()"
+                 title="Filters attendance only. Invoices and payments follow the academic year, not a single day." />
         </div>
+      </div>
+      <div class="dashboard-filter-hint">
+        🎓 Students and 📚 courses always show every record. Attendance, invoices and payments follow the selected academic year — the date picker only narrows attendance.
       </div>
 
       <!-- DASHBOARD STATS -->
       <div class="stats-grid">
-        <div class="stat-card">
+        <div class="stat-card" title="All students on record — not filtered by academic year, term or date.">
           <div class="card-icon">🎓</div>
           <div class="stat-label">Total Students</div>
           <div class="stat-value" id="statStudents">0</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" title="All active courses — not filtered by academic year, term or date.">
           <div class="card-icon">📚</div>
           <div class="stat-label">Active Courses</div>
           <div class="stat-value" id="statCourses">0</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" title="Attendance for the selected academic year / term and the selected day.">
           <div class="card-icon">📈</div>
           <div class="stat-label">Average Attendance</div>
           <div class="stat-value" id="statAttendance">0%</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" title="Invoices raised in the selected academic year / term.">
           <div class="card-icon">💰</div>
           <div class="stat-label">Total Invoices</div>
           <div class="stat-value" id="statInvoices">0</div>
@@ -1016,7 +1081,7 @@
 
       <div class="dashboard-charts">
         <div class="chart-card">
-          <h3>💰 Payment Status by Class</h3>
+          <h3>💰 Payment Status by Class <span class="card-scope" id="billingChartScope"></span></h3>
           <canvas id="billingChart"></canvas>
         </div>
         <div class="chart-card">
@@ -1024,26 +1089,31 @@
           <canvas id="attendanceChart"></canvas>
         </div>
         <div class="chart-card">
-          <h3>🏫 Students by Class</h3>
+          <h3>🏫 Students by Class <span class="card-scope" title="Students are not filtered by academic year">all years</span></h3>
           <canvas id="classChart"></canvas>
         </div>
         <div class="chart-card">
-          <h3>✨ Quick Insights</h3>
+          <h3>✨ Quick Insights <span class="card-scope card-scope-billing" id="insightScope" title="Invoices and payments are filtered by academic year">All academic years</span></h3>
           <div class="insight-list">
             <div class="insight-item">
               <span>Invoices</span>
               <strong id="insightInvoices">0</strong>
+              <em class="insight-sub" id="insightInvoiceBreakdown">0 paid · 0 partial · 0 unpaid</em>
             </div>
             <div class="insight-item">
               <span>Total Billed</span>
               <strong id="insightTotalBilled">GHS 0.00</strong>
+              <em class="insight-sub" id="insightPaymentsCount">0 payments recorded</em>
             </div>
             <div class="insight-item">
-              <span>Paid / Unpaid</span>
-              <div style="display:flex; gap:8px; align-items:center;">
-                <strong id="insightPaid" style="color:#10b981; font-size:16px;">0% paid</strong>
-                <strong id="insightUnpaid" style="color:#ef4444; font-size:16px;">0% unpaid</strong>
-              </div>
+              <span>Collected</span>
+              <strong id="insightCollected" style="color:#059669;">GHS 0.00</strong>
+              <em class="insight-sub" id="insightPaid" style="color:#059669;">0% collected</em>
+            </div>
+            <div class="insight-item">
+              <span>Outstanding</span>
+              <strong id="insightOutstanding" style="color:#dc2626;">GHS 0.00</strong>
+              <em class="insight-sub" id="insightUnpaid" style="color:#dc2626;">0% outstanding</em>
             </div>
           </div>
         </div>
@@ -1726,58 +1796,76 @@
           .getParameters();
       })();
 
-      // Load Academic Years into the Dashboard filter dropdown
+      // Load Academic Years into the Dashboard filter dropdown.
+      // The dropdown keeps two special options:
+      //   ""    -> "Active Academic Year" (server resolves it to the active year,
+      //            so billing is always scoped to the current academic year)
+      //   "ALL" -> "All Academic Years" (opt out of year filtering)
       (function loadAcademicYearsForDashboard() {
+        const setDefaultDate = function() {
+          const dateInput = document.getElementById('dashDateFilter');
+          if (!dateInput) return;
+          const today = new Date();
+          const yyyy = today.getFullYear();
+          const mm = String(today.getMonth() + 1).padStart(2, '0');
+          const dd = String(today.getDate()).padStart(2, '0');
+          dateInput.value = yyyy + '-' + mm + '-' + dd;
+        };
+
         google.script.run
           .withSuccessHandler(function(years) {
             const select = document.getElementById('dashYearFilter');
-            if (!select || !years) return;
-            select.innerHTML = '<option value="">All Academic Years</option>';
             let activeYear = null;
-            years.forEach(function(item) {
-              const y = typeof item === 'object' ? (item.academicYear || item.year) : item;
-              const status = typeof item === 'object' ? (item.status || '').trim() : '';
-              if (y) {
+
+            if (select) {
+              // Only honour a previous choice once the list has been built at
+              // least once, so the very first load defaults to the active year.
+              const previous = select.dataset.initialized ? select.value : null;
+              select.innerHTML =
+                '<option value="">Active Academic Year</option>' +
+                '<option value="ALL">All Academic Years</option>';
+
+              (years || []).forEach(function(item) {
+                const y = typeof item === 'object' ? (item.academicYear || item.year) : item;
+                const status = typeof item === 'object' ? String(item.status || '').trim() : '';
+                if (!y) return;
+
                 const opt = document.createElement('option');
                 opt.value = y;
                 opt.textContent = y + (status.toLowerCase() === 'active' ? ' (Active)' : '');
                 select.appendChild(opt);
-                
+
                 // Track the active year
                 if (status.toLowerCase() === 'active' && !activeYear) {
                   activeYear = y;
                 }
+              });
+
+              // Keep a previous user choice if it is still available, otherwise
+              // default to the active academic year.
+              const stillAvailable =
+                previous !== null &&
+                Array.prototype.some.call(select.options, function(o) {
+                  return o.value === previous;
+                });
+              if (stillAvailable) {
+                select.value = previous;
+              } else {
+                select.value = activeYear || '';
               }
-            });
-            
-            // Select the active year by default
-            if (activeYear) {
-              select.value = activeYear;
+              select.dataset.initialized = '1';
             }
-            
-            // Set date filter to today's date by default
-            const dateInput = document.getElementById('dashDateFilter');
-            if (dateInput) {
-              const today = new Date();
-              const yyyy = today.getFullYear();
-              const mm = String(today.getMonth() + 1).padStart(2, '0');
-              const dd = String(today.getDate()).padStart(2, '0');
-              dateInput.value = yyyy + '-' + mm + '-' + dd;
-            }
-            
-            // Trigger the filter to load data with active year
+
+            // Set date filter to today's date by default (attendance only)
+            setDefaultDate();
+
+            // Trigger the filter to load data with the active year
             loadDashboardStatsWithFilters();
           })
           .withFailureHandler(function() {
-            // If academic years fail to load, set date filter to today and load stats
-            const dateInput = document.getElementById('dashDateFilter');
-            if (dateInput) {
-              const today = new Date();
-              const yyyy = today.getFullYear();
-              const mm = String(today.getMonth() + 1).padStart(2, '0');
-              const dd = String(today.getDate()).padStart(2, '0');
-              dateInput.value = yyyy + '-' + mm + '-' + dd;
-            }
+            // If academic years fail to load, set date filter to today and load
+            // stats anyway — the server falls back to the active academic year.
+            setDefaultDate();
             loadDashboardStatsWithFilters();
           })
           .getAcademicYearsData();
@@ -1799,16 +1887,66 @@
             const totalPaid = Number(stats.totalPaid) || 0;
             const totalUnpaid = Number(stats.totalUnpaid) || 0;
 
+            const setInsight = function(id, text) {
+              const el = document.getElementById(id);
+              if (el) el.innerText = text;
+            };
+            const money = function(value) {
+              return 'GHS ' + (Number(value) || 0).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              });
+            };
+
+            // Scope chip: which academic year the billing numbers belong to.
+            const setChip = function(id, text, title) {
+              const el = document.getElementById(id);
+              if (!el) return;
+              el.innerText = text;
+              el.title = title || '';
+            };
+            const scopeLabel = stats.billingScopeLabel || 'All academic years';
+            setChip(
+              'insightScope',
+              scopeLabel,
+              'Invoices and payments are filtered by academic year. Students and courses are not.'
+            );
+            setChip(
+              'billingChartScope',
+              scopeLabel,
+              'Payments counted in ' + scopeLabel + '. Every student is counted per class.'
+            );
+
             document.getElementById('statStudents').innerText   = stats.totalStudents || 0;
             document.getElementById('statCourses').innerText    = stats.activeCourses || 0;
             document.getElementById('statAttendance').innerText = stats.avgAttendance || '0%';
             document.getElementById('statInvoices').innerText   = stats.invoiceCount || 0;
-            document.getElementById('insightInvoices').innerText = stats.invoiceCount || 0;
-            document.getElementById('insightTotalBilled').innerText = 'GHS ' + totalInvoiced.toFixed(2);
-            const paidPct = totalInvoiced > 0 ? Math.round((totalPaid / totalInvoiced) * 100) : 0;
-            const unpaidPct = totalInvoiced > 0 ? Math.round((totalUnpaid / totalInvoiced) * 100) : 0;
-            document.getElementById('insightPaid').innerText = paidPct + '% paid';
-            document.getElementById('insightUnpaid').innerText = unpaidPct + '% unpaid';
+
+            // --- Quick Insights (invoices + payments, scoped to the year) ---
+            setInsight('insightInvoices', stats.invoiceCount || 0);
+            setInsight(
+              'insightInvoiceBreakdown',
+              (stats.paidInvoiceCount || 0) + ' paid · ' +
+              (stats.partialInvoiceCount || 0) + ' partial · ' +
+              (stats.unpaidInvoiceCount || 0) + ' unpaid'
+            );
+
+            setInsight('insightTotalBilled', money(totalInvoiced));
+            setInsight('insightPaymentsCount', (stats.paymentCount || 0) + ' payments recorded');
+
+            setInsight('insightCollected', money(totalPaid));
+            setInsight('insightOutstanding', money(totalUnpaid));
+
+            // Percentages always add up to 100% of what was billed.
+            const collectedPct = typeof stats.collectionRate === 'number'
+              ? stats.collectionRate
+              : (totalInvoiced > 0
+                  ? Math.round((Math.min(totalPaid, totalInvoiced) / totalInvoiced) * 100)
+                  : 0);
+            const outstandingPct = totalInvoiced > 0 ? 100 - collectedPct : 0;
+            setInsight('insightPaid', collectedPct + '% collected');
+            setInsight('insightUnpaid', outstandingPct + '% outstanding');
+
             renderDashboardCharts(stats);
           })
           .withFailureHandler(function(err) {
