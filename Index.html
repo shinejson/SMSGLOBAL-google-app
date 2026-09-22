@@ -1372,7 +1372,7 @@
         </div>
         <div class="filter-controls">
           <select id="dashYearFilter" class="form-select" onchange="loadDashboardStatsWithFilters()"
-                  title="Filters attendance, invoices and payments. Students and courses are never filtered by academic year.">
+                  title="Filters attendance, invoices and payments. Students and subjects are never filtered by academic year.">
             <option value="">Active Academic Year</option>
             <option value="ALL">All Academic Years</option>
           </select>
@@ -1388,7 +1388,7 @@
         </div>
       </div>
       <div class="dashboard-filter-hint">
-        🎓 Students and 📚 courses always show every record. Attendance, invoices and payments follow the selected academic year — the date picker only narrows attendance.
+        🎓 Students and 📚 subjects always show every record. Attendance, invoices and payments follow the selected academic year — the date picker only narrows attendance.
       </div>
 
       <!-- DASHBOARD STATS -->
@@ -1398,9 +1398,9 @@
           <div class="stat-label">Total Students</div>
           <div class="stat-value" id="statStudents">0</div>
         </div>
-        <div class="stat-card" title="All active courses — not filtered by academic year, term or date.">
+        <div class="stat-card" title="All active subjects — not filtered by academic year, term or date.">
           <div class="card-icon">📚</div>
-          <div class="stat-label">Active Courses</div>
+          <div class="stat-label">Active Subjects</div>
           <div class="stat-value" id="statCourses">0</div>
         </div>
         <div class="stat-card" title="Attendance for the selected academic year / term and the selected day.">
@@ -2214,7 +2214,7 @@
         'billing categories': { page: 'Billing Categories', title: 'Billing Categories' },
         'billings':           { page: 'Billings',     title: 'Billing' },
         'student':            { page: 'Student',      title: 'Student Directory' },
-        'course':             { page: 'Courses',      title: 'Course Catalog' },
+        'subject':            { page: 'Courses',      title: 'Subject Catalog' },
         'attendance':         { page: 'Attendance',   title: 'Attendance Records' },
         'enroll':             { page: 'Enrollments',  title: 'Enrollments' },
         'classes':            { page: 'Classes',      title: 'Classes' },
@@ -2623,7 +2623,7 @@
             setChip(
               'insightScope',
               scopeLabel,
-              'Invoices and payments are filtered by academic year. Students and courses are not.'
+              'Invoices and payments are filtered by academic year. Students and subjects are not.'
             );
             setChip(
               'billingChartScope',
