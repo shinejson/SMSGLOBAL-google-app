@@ -2336,7 +2336,11 @@
             else if (nameLower.includes('permission'))  icon = '<i class="fas fa-shield-alt"></i>';
             else if (nameLower.includes('report'))      icon = '<i class="fas fa-chart-bar"></i>';
 
-            item.innerHTML = `<span class="nav-icon">${icon}</span><span class="nav-text">${sheetName}</span>`;
+            // Display label mapping (sheet name -> display name)
+            let displayLabel = sheetName;
+            if (nameLower.includes('course')) displayLabel = 'Subjects';
+
+            item.innerHTML = `<span class="nav-icon">${icon}</span><span class="nav-text">${displayLabel}</span>`;
 
             const routeEntry = Object.entries(PAGE_ROUTES).find(([kw]) => nameLower.includes(kw));
             const route = routeEntry ? routeEntry[1] : null;
