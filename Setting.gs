@@ -27,6 +27,19 @@ function getParameters() {
   const params = getSystemParameters();
   const map = {};
   params.forEach(function(item) { map[item.param] = item.value; });
+  try {
+    if (typeof isTestModeActive === 'function') {
+      const tm = isTestModeActive();
+      if (tm && tm.active) {
+        map['License Status'] = 'Test Mode';
+        map['Student Limit'] = 999999;
+        map['isTestMode'] = true;
+        map['testModeDeadline'] = tm.deadline;
+      }
+    }
+  } catch (e) {
+    Logger.log('Error checking test mode in getParameters: ' + e.message);
+  }
   return map;
 }
 

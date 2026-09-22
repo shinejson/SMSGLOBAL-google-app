@@ -820,7 +820,291 @@ function getLicenseDetails() {
   const limitValue = parseInt(getSystemParameter('Student Limit'), 10);
   const limit = isNaN(limitValue) ? 10 : limitValue;
   const devEmail = String(getSystemParameter('Developer Email') || '').trim();
+
+  // Test Mode overrides Demo restrictions — grant unlimited access
+  const testMode = isTestModeActive();
+  if (testMode.active) {
+    return {
+      status: 'Test Mode',
+      limit: 999999,
+      developerEmail: devEmail,
+      testMode: true,
+      testModeDeadline: testMode.deadline
+    };
+  }
+
   return { status: status, limit: limit, developerEmail: devEmail };
+}
+
+// --- TEST MODE ---
+// Owner constant — the only account that can activate/deactivate Test Mode
+var TEST_MODE_OWNER_EMAIL = 'shineakakpo08@gmail.com';
+
+/**
+ * Checks whether Test Mode is currently active.
+ * If the deadline has already passed it auto-clears the stored flags.
+ * Returns { active: Boolean, deadline: ISO-string | null }
+ */
+function isTestModeActive() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const active   = props.getProperty('test_mode_active');
+    const deadline = props.getProperty('test_mode_deadline');
+
+    if (active !== 'true') return { active: false, deadline: null };
+
+    // Check if deadline has expired
+    if (deadline) {
+      const deadlineMs = parseInt(deadline, 10);
+      if (!isNaN(deadlineMs) && Date.now() > deadlineMs) {
+        // Expired — clear and return inactive
+        props.deleteProperty('test_mode_active');
+        props.deleteProperty('test_mode_deadline');
+        return { active: false, deadline: null };
+      }
+      return { active: true, deadline: new Date(deadlineMs).toISOString() };
+    }
+
+    return { active: true, deadline: null };
+  } catch (e) {
+    return { active: false, deadline: null };
+  }
+}
+
+/**
+ * Generates and emails a one-time OTP to the owner email for Test Mode activation.
+ */
+function generateTestModeOtp() {
+  requireLogin();
+  const userEmail = getLoggedInUserEmail_();
+  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+    return { success: false, message: 'Only the system owner can activate Test Mode.' };
+  }
+
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const timestamp = Date.now();
+
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('test_mode_otp', code);
+  props.setProperty('test_mode_otp_ts', String(timestamp));
+
+  const subject = '🧪 SMS Test Mode Activation Code';
+  const body =
+    'Your Test Mode activation code is: ' + code + '\n\n' +
+    'This code expires in 10 minutes.\n' +
+    'Use it in the SMS application to enable Test Mode.\n\n' +
+    'If you did not request this, please ignore this email.';
+
+  try {
+    GmailApp.sendEmail(TEST_MODE_OWNER_EMAIL, subject, body, {
+      name: 'SMS School App',
+      noReply: true
+    });
+    return { success: true, message: 'OTP sent to ' + TEST_MODE_OWNER_EMAIL };
+  } catch (e1) {
+    try {
+      MailApp.sendEmail({ to: TEST_MODE_OWNER_EMAIL, subject: subject, body: body, name: 'SMS School App' });
+      return { success: true, message: 'OTP sent to ' + TEST_MODE_OWNER_EMAIL };
+    } catch (e2) {
+      // Clean up stored OTP on failure
+      props.deleteProperty('test_mode_otp');
+      props.deleteProperty('test_mode_otp_ts');
+      return { success: false, message: 'Failed to send OTP: ' + e2.message };
+    }
+  }
+}
+
+/**
+ * Verifies the OTP code to confirm the owner email before setting the deadline.
+ * Valid for 15 minutes to allow setting the deadline.
+ */
+function confirmTestModeOwnerEmail(providedCode) {
+  requireLogin();
+  const userEmail = getLoggedInUserEmail_();
+  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+    return { success: false, message: 'Only the system owner can confirm this email.' };
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  const storedCode = props.getProperty('test_mode_otp');
+  const storedTs   = props.getProperty('test_mode_otp_ts');
+
+  if (!storedCode || !storedTs) {
+    return { success: false, message: 'No confirmation code found. Please request a new one.' };
+  }
+
+  // OTP expires in 10 minutes
+  if (Date.now() - parseInt(storedTs, 10) > 600000) {
+    props.deleteProperty('test_mode_otp');
+    props.deleteProperty('test_mode_otp_ts');
+    return { success: false, message: 'Confirmation code has expired. Please request a new one.' };
+  }
+
+  if (String(providedCode).trim() !== String(storedCode).trim()) {
+    return { success: false, message: 'Incorrect confirmation code. Please check and try again.' };
+  }
+
+  // Code is valid! Mark email as confirmed (valid for 15 minutes to configure deadline)
+  props.deleteProperty('test_mode_otp');
+  props.deleteProperty('test_mode_otp_ts');
+  props.setProperty('test_mode_owner_confirmed', String(Date.now()));
+
+  return { success: true, message: 'Email confirmed successfully! You can now set the deadline.' };
+}
+
+/**
+ * Activates Test Mode after the email has been confirmed.
+ * Accepts durationMs OR customDeadlineIso.
+ */
+function activateTestModeWithDeadline(durationMs, customDeadlineIso) {
+  requireLogin();
+  const userEmail = getLoggedInUserEmail_();
+  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+    return { success: false, message: 'Only the system owner can activate Test Mode.' };
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  const confirmedTs = props.getProperty('test_mode_owner_confirmed');
+  if (!confirmedTs || (Date.now() - parseInt(confirmedTs, 10) > 900000)) {
+    return { success: false, message: 'Confirmation expired. Please verify your email again.' };
+  }
+
+  let deadlineMs = 0;
+  if (customDeadlineIso) {
+    const parsed = new Date(customDeadlineIso).getTime();
+    if (!isNaN(parsed) && parsed > Date.now()) {
+      deadlineMs = parsed;
+    }
+  }
+
+  if (!deadlineMs && durationMs) {
+    deadlineMs = Date.now() + Number(durationMs);
+  }
+
+  if (!deadlineMs || deadlineMs <= Date.now()) {
+    deadlineMs = Date.now() + 86400000; // Default 24 hours
+  }
+
+  props.deleteProperty('test_mode_owner_confirmed');
+  props.setProperty('test_mode_active', 'true');
+  props.setProperty('test_mode_deadline', String(deadlineMs));
+
+  return {
+    success: true,
+    message: 'Test Mode activated!',
+    deadline: new Date(deadlineMs).toISOString()
+  };
+}
+
+/**
+ * Activates Test Mode after verifying the OTP and setting a deadline (all-in-one fallback).
+ * @param {string} providedCode   - The 6-digit OTP the user entered.
+ * @param {number} durationMs     - Duration in milliseconds (e.g. 3600000 = 1 hour).
+ */
+function activateTestMode(providedCode, durationMs) {
+  requireLogin();
+  const userEmail = getLoggedInUserEmail_();
+  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+    return { success: false, message: 'Only the system owner can activate Test Mode.' };
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  const storedCode = props.getProperty('test_mode_otp');
+  const storedTs   = props.getProperty('test_mode_otp_ts');
+
+  if (!storedCode || !storedTs) {
+    return { success: false, message: 'No OTP found. Please request a new one.' };
+  }
+
+  // OTP expires in 10 minutes
+  if (Date.now() - parseInt(storedTs, 10) > 600000) {
+    props.deleteProperty('test_mode_otp');
+    props.deleteProperty('test_mode_otp_ts');
+    return { success: false, message: 'OTP has expired. Please request a new one.' };
+  }
+
+  if (String(providedCode).trim() !== String(storedCode)) {
+    return { success: false, message: 'Incorrect OTP. Please try again.' };
+  }
+
+  // OTP is valid — activate Test Mode
+  props.deleteProperty('test_mode_otp');
+  props.deleteProperty('test_mode_otp_ts');
+
+  const deadlineMs = Date.now() + Number(durationMs);
+  props.setProperty('test_mode_active', 'true');
+  props.setProperty('test_mode_deadline', String(deadlineMs));
+
+  return {
+    success: true,
+    message: 'Test Mode activated!',
+    deadline: new Date(deadlineMs).toISOString()
+  };
+}
+
+/**
+ * Deactivates Test Mode immediately (owner only).
+ */
+function deactivateTestMode() {
+  requireLogin();
+  const userEmail = getLoggedInUserEmail_();
+  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+    return { success: false, message: 'Only the system owner can deactivate Test Mode.' };
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  props.deleteProperty('test_mode_active');
+  props.deleteProperty('test_mode_deadline');
+  props.deleteProperty('test_mode_otp');
+  props.deleteProperty('test_mode_otp_ts');
+
+  return { success: true, message: 'Test Mode deactivated.' };
+}
+
+/**
+ * Returns the current Test Mode status — safe to call from the client.
+ * Also returns whether the calling user is the owner (to show/hide the UI toggle).
+ */
+function getTestModeStatus() {
+  requireLogin();
+  const userEmail = getLoggedInUserEmail_();
+  const isOwner = userEmail.toLowerCase() === TEST_MODE_OWNER_EMAIL.toLowerCase();
+  const testMode = isTestModeActive();
+  return {
+    isOwner: isOwner,
+    active: testMode.active,
+    deadline: testMode.deadline
+  };
+}
+
+/**
+ * Internal helper: resolves the googleEmail for the currently logged-in user
+ * by looking up their userId in the Users sheet.
+ * @returns {string} lowercase email, or '' if not found.
+ */
+function getLoggedInUserEmail_() {
+  try {
+    const user = getLoggedInUser();
+    if (!user || !user.userId) return '';
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Users');
+    if (!sheet) return '';
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 3) return '';
+
+    // Users sheet: col B = userId, col C = googleEmail
+    const data = sheet.getRange(3, 2, lastRow - 2, 2).getValues();
+    for (let i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(user.userId).trim()) {
+        return String(data[i][1]).trim().toLowerCase();
+      }
+    }
+    return '';
+  } catch (e) {
+    return '';
+  }
 }
 
 function activateFullLicense(providedPassword) {

@@ -539,6 +539,224 @@
     body.dark-mode .license-badge.plan-diamond { background:#1e1b4b; border-color:#818cf8; color:#a5b4fc; }
     body.dark-mode .license-badge.plan-gold    { background:#292107; border-color:#eab308; color:#fde68a; }
     body.dark-mode .license-badge.plan-demo    { background:#2a0d10; border-color:#f43f5e; color:#fda4af; }
+    .license-badge.plan-test    { background:#ecfdf5; border-color:#10b981; color:#065f46; }
+    body.dark-mode .license-badge.plan-test    { background:#022c22; border-color:#10b981; color:#6ee7b7; }
+
+    /* --- PROFILE DROPDOWN --- */
+    .user-profile {
+      position: relative;
+    }
+    .profile-dropdown-panel {
+      display: none;
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      min-width: 240px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.12), 0 4px 10px -5px rgba(0,0,0,0.08);
+      z-index: 2000;
+      overflow: hidden;
+      animation: dropdownFadeIn 0.15s ease;
+    }
+    .profile-dropdown-panel.open { display: block; }
+    @keyframes dropdownFadeIn {
+      from { opacity:0; transform: translateY(-6px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+    .profile-dropdown-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .profile-dropdown-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #0f172a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .profile-dropdown-role {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 1px;
+    }
+    .profile-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      font-size: 14px;
+      color: #334155;
+      cursor: pointer;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      transition: background 0.15s;
+    }
+    .profile-dropdown-item:hover { background: #f8fafc; }
+    .profile-dropdown-item.danger { color: #ef4444; }
+    .profile-dropdown-item.danger:hover { background: #fff1f2; }
+    .profile-dropdown-divider { border: none; border-top: 1px solid #f1f5f9; margin: 4px 0; }
+    .profile-dropdown-chevron {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-left: 2px;
+      transition: transform 0.2s;
+    }
+    .user-profile.dropdown-open .profile-dropdown-chevron { transform: rotate(180deg); }
+    .test-mode-status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #ecfdf5;
+      border: 1px solid #10b981;
+      color: #065f46;
+      margin-left: auto;
+    }
+    body.dark-mode .test-mode-status-chip { background:#022c22; border-color:#10b981; color:#6ee7b7; }
+    body.dark-mode .profile-dropdown-panel {
+      background: #1e293b;
+      border-color: #334155;
+    }
+    body.dark-mode .profile-dropdown-header { border-color: #334155; }
+    body.dark-mode .profile-dropdown-name { color: #f1f5f9; }
+    body.dark-mode .profile-dropdown-role { color: #94a3b8; }
+    body.dark-mode .profile-dropdown-item { color: #cbd5e1; }
+    body.dark-mode .profile-dropdown-item:hover { background: #0f172a; }
+    body.dark-mode .profile-dropdown-item.danger { color: #f87171; }
+    body.dark-mode .profile-dropdown-item.danger:hover { background: #2a0d10; }
+    body.dark-mode .profile-dropdown-divider { border-color: #334155; }
+
+    /* --- TEST MODE MODAL --- */
+    .test-mode-modal-backdrop {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: rgba(15,23,42,0.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 4000;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+    .test-mode-modal-backdrop.active { opacity:1; pointer-events:auto; }
+    .test-mode-modal-content {
+      background: #fff;
+      width: 92%; max-width: 460px;
+      border-radius: 14px;
+      box-shadow: 0 20px 40px -10px rgba(0,0,0,0.15);
+      overflow: hidden;
+      transform: translateY(-8px);
+      transition: transform 0.18s ease;
+    }
+    .test-mode-modal-backdrop.active .test-mode-modal-content { transform: translateY(0); }
+    .test-mode-modal-header {
+      padding: 16px 18px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+    }
+    .test-mode-modal-header h3 { margin:0; font-size:16px; color:#065f46; }
+    .test-mode-modal-body { padding: 20px 20px 8px; }
+    .test-mode-modal-footer { padding: 12px 20px 16px; display:flex; gap:8px; justify-content:flex-end; }
+    .test-mode-step { display: none; }
+    .test-mode-step.active { display: block; }
+    .test-mode-info-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #166534;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .test-mode-deadline-select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #0f172a;
+      background: #fff;
+      margin-bottom: 12px;
+    }
+    .test-mode-otp-input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 18px;
+      text-align: center;
+      letter-spacing: 6px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 12px;
+      box-sizing: border-box;
+    }
+    .test-mode-otp-input:focus { outline:none; border-color:#10b981; }
+    .test-mode-success-icon { text-align:center; font-size:48px; margin-bottom:10px; }
+    .test-mode-deadline-display {
+      text-align: center;
+      font-size: 13px;
+      color: #475569;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    .btn-test-primary {
+      padding: 9px 18px;
+      border-radius: 8px;
+      background: #10b981;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    .btn-test-primary:hover { background:#059669; }
+    .btn-test-primary:disabled { background:#94a3b8; cursor:not-allowed; }
+    .btn-test-secondary {
+      padding: 9px 18px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-test-danger {
+      padding: 9px 18px;
+      border-radius: 8px;
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .btn-test-danger:hover { background:#dc2626; }
+    body.dark-mode .test-mode-modal-content { background:#1e293b; }
+    body.dark-mode .test-mode-modal-header { background: linear-gradient(135deg,#022c22 0%,#064e3b 100%); border-color:#334155; }
+    body.dark-mode .test-mode-modal-body { color:#f1f5f9; }
+    body.dark-mode .test-mode-info-box { background:#022c22; border-color:#065f46; color:#6ee7b7; }
+    body.dark-mode .test-mode-deadline-select { background:#0f172a; border-color:#334155; color:#f1f5f9; }
+    body.dark-mode .test-mode-otp-input { background:#0f172a; border-color:#334155; color:#f1f5f9; }
+    body.dark-mode .test-mode-deadline-display { background:#0f172a; border-color:#334155; color:#94a3b8; }
+    body.dark-mode .btn-test-secondary { background:#1e293b; border-color:#334155; color:#cbd5e1; }
+    body.dark-mode .modal-footer { background:#1e293b; border-color:#334155; }
 
     /* --- DASHBOARD FILTER BAR STYLES --- */
     .dashboard-filter-bar {
@@ -997,6 +1215,95 @@
     </div>
   </div>
 
+  <!-- TEST MODE MODAL -->
+  <div class="test-mode-modal-backdrop" id="testModeModal">
+    <div class="test-mode-modal-content">
+      <div class="test-mode-modal-header">
+        <h3>🧪 Test Mode Configuration</h3>
+        <button class="modal-close" onclick="closeTestModeModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#065f46;">×</button>
+      </div>
+
+      <div class="test-mode-modal-body">
+
+        <!-- STEP 1: Request Email Confirmation -->
+        <div class="test-mode-step active" id="tmStep1">
+          <div class="test-mode-info-box">
+            🔐 <strong>Owner Confirmation Required</strong><br><br>
+            Test Mode completely overrides Demo limits, unlocking full access and unlimited student registrations.<br><br>
+            A security verification code will be sent to the owner email:<br>
+            <strong>shineakakpo08@gmail.com</strong>
+          </div>
+          <p style="font-size:13px;color:#475569;margin-bottom:12px;">Click below to send the confirmation code to your email.</p>
+          <p id="tmStep1Error" style="color:#ef4444;font-size:13px;margin:0;display:none;"></p>
+        </div>
+
+        <!-- STEP 2: Enter Confirmation Code -->
+        <div class="test-mode-step" id="tmStep2">
+          <div class="test-mode-info-box">
+            📧 A 6-digit confirmation code was sent to <strong>shineakakpo08@gmail.com</strong>.<br>
+            Please check your inbox (or spam) and enter it below to confirm owner authorization.
+          </div>
+          <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px;">6-DIGIT CODE</label>
+          <input type="text" inputmode="numeric" maxlength="6" class="test-mode-otp-input" id="tmOtpInput" placeholder="123456" autocomplete="off">
+          <p id="tmStep2Error" style="color:#ef4444;font-size:13px;margin:4px 0 0;display:none;"></p>
+        </div>
+
+        <!-- STEP 3: Set Deadline -->
+        <div class="test-mode-step" id="tmStep3">
+          <div class="test-mode-info-box" style="background:#ecfdf5;border-color:#a7f3d0;color:#065f46;">
+            ✅ <strong>Owner Email Confirmed!</strong><br>
+            Now set the deadline for Test Mode. When the deadline arrives, the system will automatically revert to Demo mode (resuming registration restrictions).
+          </div>
+          <label style="font-size:12px;font-weight:600;color:#334155;display:block;margin-bottom:6px;">TEST MODE DURATION / DEADLINE</label>
+          <select class="test-mode-deadline-select" id="tmDurationSelect" onchange="tmOnDurationChange()">
+            <option value="3600000">1 Hour</option>
+            <option value="21600000">6 Hours</option>
+            <option value="43200000">12 Hours</option>
+            <option value="86400000" selected>24 Hours (1 Day)</option>
+            <option value="172800000">2 Days</option>
+            <option value="259200000">3 Days</option>
+            <option value="604800000">7 Days</option>
+            <option value="custom">📅 Custom Date & Time...</option>
+          </select>
+
+          <!-- Custom Date/Time input (hidden by default) -->
+          <div id="tmCustomDateContainer" style="display:none;margin-bottom:12px;">
+            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Select Expiration Date & Time:</label>
+            <input type="datetime-local" id="tmCustomDateTime" class="test-mode-deadline-select" style="margin-bottom:0;">
+          </div>
+
+          <p id="tmStep3Error" style="color:#ef4444;font-size:13px;margin:4px 0 0;display:none;"></p>
+        </div>
+
+        <!-- STEP 4: Success View -->
+        <div class="test-mode-step" id="tmStep4">
+          <div class="test-mode-success-icon">🎉</div>
+          <p style="text-align:center;font-size:16px;font-weight:700;color:#065f46;margin:0 0 6px;">Test Mode Activated!</p>
+          <p style="text-align:center;font-size:13px;color:#475569;margin:0 0 12px;">Demo limits have been overridden. Full system registration and operations are now enabled.</p>
+          <div class="test-mode-deadline-display">
+            ⏰ <strong>Active Deadline:</strong><br>
+            <span id="tmDeadlineDisplay" style="font-size:15px;font-weight:700;color:#0f172a;">—</span>
+          </div>
+        </div>
+
+        <!-- DEACTIVATE VIEW (shown when already active) -->
+        <div class="test-mode-step" id="tmDeactivateView">
+          <div class="test-mode-info-box" style="background:#fff7ed;border-color:#fed7aa;color:#92400e;">
+            🧪 Test Mode is currently <strong>ACTIVE</strong>.<br><br>
+            <span id="tmActiveDeadlineText"></span>
+          </div>
+          <p style="font-size:13px;color:#475569;margin-bottom:0;">Demo restrictions are currently bypassed. You can end Test Mode early to revert back to Demo mode immediately, or let it expire at the deadline.</p>
+          <p id="tmDeactivateError" style="color:#ef4444;font-size:13px;margin:6px 0 0;display:none;"></p>
+        </div>
+
+      </div>
+
+      <div class="test-mode-modal-footer" id="tmFooter">
+        <!-- Buttons are injected by JS based on step -->
+      </div>
+    </div>
+  </div>
+
   <!-- MAIN CONTENT -->
   <div class="main-content">
 
@@ -1019,9 +1326,38 @@
           <input id="globalSearchInput" list="searchSuggestions" type="text" placeholder="Search..." autocomplete="off">
           <datalist id="searchSuggestions"></datalist>
         </div>
-        <div class="user-profile" id="userProfile">
+        <div class="user-profile" id="userProfile" onclick="toggleProfileDropdown(event)">
           <div class="user-avatar" id="userAvatar">U</div>
           <span style="font-size: 14px; font-weight: 500;" id="userFullName">Loading...</span>
+          <span class="profile-dropdown-chevron">▼</span>
+
+          <!-- PROFILE DROPDOWN PANEL -->
+          <div class="profile-dropdown-panel" id="profileDropdownPanel">
+            <!-- Header: name + role -->
+            <div class="profile-dropdown-header">
+              <div class="user-avatar" id="dropdownAvatar" style="min-width:32px;">U</div>
+              <div>
+                <div class="profile-dropdown-name" id="dropdownName">Loading...</div>
+                <div class="profile-dropdown-role" id="dropdownRole">—</div>
+              </div>
+            </div>
+
+            <!-- Test Mode row — hidden by default, shown only for owner -->
+            <div id="testModeDropdownRow" style="display:none;">
+              <hr class="profile-dropdown-divider">
+              <button class="profile-dropdown-item" id="testModeDropdownBtn" onclick="openTestModeModal(event)">
+                <span>🧪</span>
+                <span>Test Mode</span>
+                <span class="test-mode-status-chip" id="testModeChip" style="display:none;">ON</span>
+              </button>
+            </div>
+
+            <hr class="profile-dropdown-divider">
+            <button class="profile-dropdown-item danger" onclick="closeProfileDropdown(); handleLogout();">
+              <span>🚪</span>
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
       </div>
     </nav>
@@ -1206,14 +1542,381 @@
       google.script.run
         .withSuccessHandler(function(user) {
           if (user) {
-            document.getElementById('userAvatar').textContent = user.initials;
-            document.getElementById('userFullName').textContent = user.fullName;
+            const initials = user.initials || 'U';
+            const fullName = user.fullName || 'User';
+            const role     = user.role     || '';
+            // Topnav pill
+            document.getElementById('userAvatar').textContent    = initials;
+            document.getElementById('userFullName').textContent  = fullName;
+            // Dropdown header
+            document.getElementById('dropdownAvatar').textContent = initials;
+            document.getElementById('dropdownName').textContent   = fullName;
+            document.getElementById('dropdownRole').textContent   = role;
           }
         })
-        .withFailureHandler(function(err) {
+        .withFailureHandler(function() {
           document.getElementById('userFullName').textContent = 'User';
         })
         .getLoggedInUser();
+
+      // --- LOAD TEST MODE STATUS (sets owner toggle visibility + badge) ---
+      function loadTestModeStatus() {
+        google.script.run
+          .withSuccessHandler(function(status) {
+            if (!status) return;
+            // Show/hide the Test Mode row in the dropdown
+            const row = document.getElementById('testModeDropdownRow');
+            if (row) row.style.display = status.isOwner ? 'block' : 'none';
+
+            // Update the "ON" chip in the dropdown row
+            const chip = document.getElementById('testModeChip');
+            if (chip) chip.style.display = status.active ? 'inline-flex' : 'none';
+
+            // Update the license badge
+            const badge = document.getElementById('licenseBadge');
+            if (status.active) {
+              if (badge) {
+                badge.className = 'license-badge plan-test';
+                badge.textContent = '🧪 Test';
+                badge.title = status.deadline ? 'Test Mode Active (Expires: ' + new Date(status.deadline).toLocaleString() + ')' : 'Test Mode Active';
+                badge.style.opacity = '1';
+              }
+            } else {
+              // If previously in test mode, restore normal license badge
+              if (badge && badge.classList.contains('plan-test') && typeof window.loadLicenseBadge === 'function') {
+                window.loadLicenseBadge();
+              }
+            }
+          })
+          .withFailureHandler(function() { /* silently ignore */ })
+          .getTestModeStatus();
+      }
+      loadTestModeStatus();
+      // Refresh test mode status every 60 seconds (catches auto-expiry)
+      setInterval(loadTestModeStatus, 60000);
+
+      // --- PROFILE DROPDOWN TOGGLE ---
+      window.toggleProfileDropdown = function(e) {
+        e.stopPropagation();
+        const profile = document.getElementById('userProfile');
+        const panel   = document.getElementById('profileDropdownPanel');
+        if (!profile || !panel) return;
+        const isOpen = panel.classList.contains('open');
+        if (isOpen) {
+          panel.classList.remove('open');
+          profile.classList.remove('dropdown-open');
+        } else {
+          panel.classList.add('open');
+          profile.classList.add('dropdown-open');
+        }
+      };
+
+      window.closeProfileDropdown = function() {
+        const profile = document.getElementById('userProfile');
+        const panel   = document.getElementById('profileDropdownPanel');
+        if (panel) panel.classList.remove('open');
+        if (profile) profile.classList.remove('dropdown-open');
+      };
+
+      // Close dropdown when clicking anywhere outside it
+      document.addEventListener('click', function(e) {
+        const profile = document.getElementById('userProfile');
+        if (profile && !profile.contains(e.target)) {
+          window.closeProfileDropdown();
+        }
+      });
+
+      // --- TEST MODE MODAL JS ---
+      var _tmCurrentStep = 'tmStep1'; // 'tmStep1' | 'tmStep2' | 'tmStep3' | 'tmStep4' | 'tmDeactivateView'
+
+      window.tmOnDurationChange = function() {
+        const select = document.getElementById('tmDurationSelect');
+        const customContainer = document.getElementById('tmCustomDateContainer');
+        if (!select || !customContainer) return;
+        if (select.value === 'custom') {
+          customContainer.style.display = 'block';
+          const dtInput = document.getElementById('tmCustomDateTime');
+          if (dtInput && !dtInput.value) {
+            // Default custom date to tomorrow same time
+            const tomorrow = new Date(Date.now() + 86400000);
+            const yyyy = tomorrow.getFullYear();
+            const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+            const dd = String(tomorrow.getDate()).padStart(2, '0');
+            const hh = String(tomorrow.getHours()).padStart(2, '0');
+            const min = String(tomorrow.getMinutes()).padStart(2, '0');
+            dtInput.value = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+          }
+        } else {
+          customContainer.style.display = 'none';
+        }
+      };
+
+      function tmShowStep(stepId) {
+        ['tmStep1', 'tmStep2', 'tmStep3', 'tmStep4', 'tmDeactivateView'].forEach(function(id) {
+          const el = document.getElementById(id);
+          if (el) el.classList.remove('active');
+        });
+        const target = document.getElementById(stepId);
+        if (target) target.classList.add('active');
+        _tmCurrentStep = stepId;
+        tmRenderFooter();
+      }
+
+      function tmRenderFooter() {
+        const footer = document.getElementById('tmFooter');
+        if (!footer) return;
+        footer.innerHTML = '';
+
+        if (_tmCurrentStep === 'tmStep1') {
+          footer.innerHTML =
+            '<button class="btn-test-secondary" onclick="closeTestModeModal()">Cancel</button>' +
+            '<button class="btn-test-primary" id="tmSendOtpBtn" onclick="tmRequestOtp()">Send Confirmation Code →</button>';
+        } else if (_tmCurrentStep === 'tmStep2') {
+          footer.innerHTML =
+            '<button class="btn-test-secondary" onclick="tmShowStep(\'tmStep1\')">← Back</button>' +
+            '<button class="btn-test-primary" id="tmVerifyOtpBtn" onclick="tmVerifyOtp()">Confirm Email Code →</button>';
+        } else if (_tmCurrentStep === 'tmStep3') {
+          footer.innerHTML =
+            '<button class="btn-test-secondary" onclick="closeTestModeModal()">Cancel</button>' +
+            '<button class="btn-test-primary" id="tmActivateBtn" onclick="tmSetDeadlineAndActivate()">Activate Test Mode & Set Deadline</button>';
+        } else if (_tmCurrentStep === 'tmStep4') {
+          footer.innerHTML =
+            '<button class="btn-test-primary" onclick="closeTestModeModal()">Done ✓</button>';
+        } else if (_tmCurrentStep === 'tmDeactivateView') {
+          footer.innerHTML =
+            '<button class="btn-test-secondary" onclick="closeTestModeModal()">Keep Active</button>' +
+            '<button class="btn-test-danger" id="tmDeactivateBtn" onclick="tmDeactivate()">End Test Mode Now</button>';
+        }
+      }
+
+      window.openTestModeModal = function(e) {
+        if (e) e.stopPropagation();
+        window.closeProfileDropdown();
+
+        // Check current status first
+        google.script.run
+          .withSuccessHandler(function(status) {
+            const modal = document.getElementById('testModeModal');
+            if (!modal) return;
+            modal.classList.add('active');
+
+            if (status && status.active) {
+              // Already active — show deactivate view
+              const deadlineText = document.getElementById('tmActiveDeadlineText');
+              if (deadlineText && status.deadline) {
+                try {
+                  const d = new Date(status.deadline);
+                  deadlineText.innerHTML = '<strong>Scheduled Expiration:</strong> ' + d.toLocaleString();
+                } catch(e) {
+                  deadlineText.textContent = 'Active until deadline.';
+                }
+              }
+              tmShowStep('tmDeactivateView');
+            } else {
+              // Not active — start fresh from step 1
+              const otpInput = document.getElementById('tmOtpInput');
+              if (otpInput) otpInput.value = '';
+              ['tmStep1Error', 'tmStep2Error', 'tmStep3Error', 'tmDeactivateError'].forEach(function(id) {
+                const el = document.getElementById(id);
+                if (el) { el.textContent = ''; el.style.display = 'none'; }
+              });
+              const customContainer = document.getElementById('tmCustomDateContainer');
+              if (customContainer) customContainer.style.display = 'none';
+              const select = document.getElementById('tmDurationSelect');
+              if (select) select.value = '86400000';
+              tmShowStep('tmStep1');
+            }
+          })
+          .withFailureHandler(function() {
+            const modal = document.getElementById('testModeModal');
+            if (modal) modal.classList.add('active');
+            tmShowStep('tmStep1');
+          })
+          .getTestModeStatus();
+      };
+
+      window.closeTestModeModal = function() {
+        const modal = document.getElementById('testModeModal');
+        if (modal) modal.classList.remove('active');
+      };
+
+      // STEP 1: Request OTP
+      window.tmRequestOtp = function() {
+        const btn = document.getElementById('tmSendOtpBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Sending Code…'; }
+        const errEl = document.getElementById('tmStep1Error');
+        if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Send Confirmation Code →'; }
+            if (!res || !res.success) {
+              if (errEl) { errEl.textContent = (res && res.message) || 'Failed to send confirmation code.'; errEl.style.display = 'block'; }
+              return;
+            }
+            // Advance to Step 2
+            const otpInput = document.getElementById('tmOtpInput');
+            if (otpInput) otpInput.value = '';
+            tmShowStep('tmStep2');
+            setTimeout(function() { const o = document.getElementById('tmOtpInput'); if(o) o.focus(); }, 100);
+          })
+          .withFailureHandler(function(err) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Send Confirmation Code →'; }
+            if (errEl) { errEl.textContent = 'Error: ' + (err && err.message ? err.message : String(err)); errEl.style.display = 'block'; }
+          })
+          .generateTestModeOtp();
+      };
+
+      // STEP 2: Verify OTP
+      window.tmVerifyOtp = function() {
+        const otpInput = document.getElementById('tmOtpInput');
+        const code = otpInput ? otpInput.value.trim() : '';
+        const errEl = document.getElementById('tmStep2Error');
+        if (!code || code.length !== 6) {
+          if (errEl) { errEl.textContent = 'Please enter the complete 6-digit confirmation code.'; errEl.style.display = 'block'; }
+          return;
+        }
+
+        const btn = document.getElementById('tmVerifyOtpBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Verifying…'; }
+        if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Confirm Email Code →'; }
+            if (!res || !res.success) {
+              if (errEl) { errEl.textContent = (res && res.message) || 'Invalid code. Please try again.'; errEl.style.display = 'block'; }
+              return;
+            }
+            // Email confirmed! Now advance to Step 3: Set Deadline
+            tmShowStep('tmStep3');
+          })
+          .withFailureHandler(function(err) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Confirm Email Code →'; }
+            if (errEl) { errEl.textContent = 'Error: ' + (err && err.message ? err.message : String(err)); errEl.style.display = 'block'; }
+          })
+          .confirmTestModeOwnerEmail(code);
+      };
+
+      // STEP 3: Set Deadline and Activate
+      window.tmSetDeadlineAndActivate = function() {
+        const select = document.getElementById('tmDurationSelect');
+        const durationVal = select ? select.value : '86400000';
+        let durationMs = 0;
+        let customDateIso = null;
+
+        if (durationVal === 'custom') {
+          const dtInput = document.getElementById('tmCustomDateTime');
+          if (!dtInput || !dtInput.value) {
+            const errEl = document.getElementById('tmStep3Error');
+            if (errEl) { errEl.textContent = 'Please select a custom deadline date and time.'; errEl.style.display = 'block'; }
+            return;
+          }
+          const chosenDate = new Date(dtInput.value);
+          if (isNaN(chosenDate.getTime()) || chosenDate.getTime() <= Date.now()) {
+            const errEl = document.getElementById('tmStep3Error');
+            if (errEl) { errEl.textContent = 'The custom deadline must be a future date and time.'; errEl.style.display = 'block'; }
+            return;
+          }
+          customDateIso = chosenDate.toISOString();
+        } else {
+          durationMs = Number(durationVal);
+        }
+
+        const btn = document.getElementById('tmActivateBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Activating Test Mode…'; }
+        const errEl = document.getElementById('tmStep3Error');
+        if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Activate Test Mode & Set Deadline'; }
+            if (!res || !res.success) {
+              if (errEl) { errEl.textContent = (res && res.message) || 'Activation failed.'; errEl.style.display = 'block'; }
+              return;
+            }
+            // Show Step 4 (Success confirmation)
+            const deadlineDisplay = document.getElementById('tmDeadlineDisplay');
+            if (deadlineDisplay && res.deadline) {
+              try {
+                deadlineDisplay.textContent = new Date(res.deadline).toLocaleString();
+              } catch(e) { deadlineDisplay.textContent = res.deadline; }
+            }
+            tmShowStep('tmStep4');
+            // Refresh badge & profile dropdown chip
+            loadTestModeStatus();
+          })
+          .withFailureHandler(function(err) {
+            if (btn) { btn.disabled = false; btn.textContent = 'Activate Test Mode & Set Deadline'; }
+            if (errEl) { errEl.textContent = 'Error: ' + (err && err.message ? err.message : String(err)); errEl.style.display = 'block'; }
+          })
+          .activateTestModeWithDeadline(durationMs, customDateIso);
+      };
+
+      // DEACTIVATE TEST MODE
+      window.tmDeactivate = function() {
+        const btn = document.getElementById('tmDeactivateBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Ending…'; }
+        const errEl = document.getElementById('tmDeactivateError');
+        if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (!res || !res.success) {
+              if (btn) { btn.disabled = false; btn.textContent = 'End Test Mode Now'; }
+              if (errEl) { errEl.textContent = (res && res.message) || 'Failed to deactivate.'; errEl.style.display = 'block'; }
+              return;
+            }
+            closeTestModeModal();
+            loadTestModeStatus();
+            // Re-fetch parameters to reset the license badge
+            if (typeof loadLicenseBadge === 'function') {
+              loadLicenseBadge();
+            } else {
+              google.script.run
+                .withSuccessHandler(function(params) {
+                  const badge = document.getElementById('licenseBadge');
+                  if (!badge || !params) return;
+                  const status = (params['License Status'] || 'Demo').trim();
+                  const limit  = Number(params['Student Limit']) || 0;
+                  let planName = 'Demo', planClass = 'plan-demo', planIcon = '🔒';
+                  if (limit >= 200) { planName = 'Gold'; planClass = 'plan-gold'; planIcon = '🏆'; }
+                  else if (limit >= 150) { planName = 'Diamond'; planClass = 'plan-diamond'; planIcon = '💎'; }
+                  else if (limit >= 100) { planName = 'Silver'; planClass = 'plan-silver'; planIcon = '🥈'; }
+                  else if (limit >= 50) { planName = 'Copper'; planClass = 'plan-copper'; planIcon = '🥉'; }
+                  badge.className = 'license-badge ' + planClass;
+                  badge.textContent = planIcon + ' ' + planName;
+                  badge.title = status + ' — ' + (limit || '—') + ' student limit';
+                  badge.style.opacity = '1';
+                })
+                .withFailureHandler(function(){})
+                .getParameters();
+            }
+          })
+          .withFailureHandler(function(err) {
+            if (btn) { btn.disabled = false; btn.textContent = 'End Test Mode Now'; }
+            if (errEl) { errEl.textContent = 'Error: ' + (err && err.message ? err.message : String(err)); errEl.style.display = 'block'; }
+          })
+          .deactivateTestMode();
+      };
+
+      // Close test mode modal on backdrop click
+      (function() {
+        const modal = document.getElementById('testModeModal');
+        if (!modal) return;
+        modal.addEventListener('click', function(e) {
+          if (e.target === modal) closeTestModeModal();
+        });
+      })();
+
+      // Close test mode modal on backdrop click
+      (function() {
+        const modal = document.getElementById('testModeModal');
+        if (!modal) return;
+        modal.addEventListener('click', function(e) {
+          if (e.target === modal) closeTestModeModal();
+        });
+      })();
 
       // --- LOGOUT HANDLER ---
       window.handleLogout = function() { openLogoutModal(); };
@@ -1759,11 +2462,21 @@
         .getSheetNames();
 
       // 2. Load License Badge
-      (function loadLicenseBadge() {
+      window.loadLicenseBadge = function() {
         google.script.run
           .withSuccessHandler(function(params) {
             const badge = document.getElementById('licenseBadge');
             if (!badge || !params) return;
+
+            // Check if Test Mode is active
+            const isTest = params['isTestMode'] === true || String(params['isTestMode']) === 'true' || String(params['License Status'] || '').toLowerCase().indexOf('test') !== -1;
+            if (isTest) {
+              badge.className = 'license-badge plan-test';
+              badge.textContent = '🧪 Test';
+              badge.title = 'Test Mode Active — Demo limits bypassed';
+              badge.style.opacity = '1';
+              return;
+            }
 
             const status = (params['License Status'] || 'Demo').trim();
             const limit  = Number(params['Student Limit']) || 0;
@@ -1794,7 +2507,8 @@
             // silently hide on failure
           })
           .getParameters();
-      })();
+      };
+      window.loadLicenseBadge();
 
       // Load Academic Years into the Dashboard filter dropdown.
       // The dropdown keeps two special options:
