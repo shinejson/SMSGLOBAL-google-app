@@ -258,7 +258,7 @@ function getPageNameFromSheetName(sheetName) {
   if (nameLower.includes("billing categories")) return "Billing Categories";
   if (nameLower.includes("billings")) return "Billings";
   if (nameLower.includes("student")) return "Student";
-  if (nameLower.includes("course")) return "Courses";
+  if (nameLower.includes("course") || nameLower.includes("subject")) return "Courses";
   if (nameLower.includes("attend")) return "Attendance";
   if (nameLower.includes("enroll")) return "Enrollments";
   if (nameLower.includes("classes")) return "Classes";

@@ -2214,7 +2214,8 @@
         'billing categories': { page: 'Billing Categories', title: 'Billing Categories' },
         'billings':           { page: 'Billings',     title: 'Billing' },
         'student':            { page: 'Student',      title: 'Student Directory' },
-        'subject':            { page: 'Courses',      title: 'Subject Catalog' },
+        'course':             { page: 'Courses',      title: 'Course Catalog' },
+        'subject':            { page: 'Courses',      title: 'Course Catalog' },
         'attendance':         { page: 'Attendance',   title: 'Attendance Records' },
         'enroll':             { page: 'Enrollments',  title: 'Enrollments' },
         'classes':            { page: 'Classes',      title: 'Classes' },
@@ -2314,14 +2315,13 @@
             const nameLower = sheetName.trim().toLowerCase();
             const item = document.createElement('li');
             item.className = 'nav-item';
-            item.setAttribute('data-label', sheetName);
 
             // Icon picker
             let icon = '<i class="fas fa-file"></i>';
             if      (nameLower.includes('billing categories')) icon = '<i class="fas fa-list"></i>';
             else if (nameLower.includes('billings'))    icon = '<i class="fas fa-file-invoice-dollar"></i>';
             else if (nameLower.includes('student'))     icon = '<i class="fas fa-user"></i>';
-            else if (nameLower.includes('course'))      icon = '<i class="fas fa-book"></i>';
+            else if (nameLower.includes('course') || nameLower.includes('subject')) icon = '<i class="fas fa-book"></i>';
             else if (nameLower.includes('enroll'))      icon = '<i class="fas fa-pen-to-square"></i>';
             else if (nameLower.includes('attend'))      icon = '<i class="fas fa-check-circle"></i>';
             else if (nameLower.includes('classes'))     icon = '<i class="fas fa-layer-group"></i>';
@@ -2338,8 +2338,9 @@
 
             // Display label mapping (sheet name -> display name)
             let displayLabel = sheetName;
-            if (nameLower.includes('course')) displayLabel = 'Subjects';
+            if (nameLower.includes('course') || nameLower.includes('subject')) displayLabel = 'Subject';
 
+            item.setAttribute('data-label', displayLabel);
             item.innerHTML = `<span class="nav-icon">${icon}</span><span class="nav-text">${displayLabel}</span>`;
 
             const routeEntry = Object.entries(PAGE_ROUTES).find(([kw]) => nameLower.includes(kw));
