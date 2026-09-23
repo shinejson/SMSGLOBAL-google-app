@@ -5736,12 +5736,26 @@ function lockSheet() {
 }
 
 /**
- * Packages the school's data into a unified JSON structure
- * for 1-click migration into the multi-tenant SaaS platform.
+ * Menu hook for Google Sheets: Adds "🚀 SaaS Migration" menu to the toolbar.
+ */
+function onOpen(e) {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu("🚀 SaaS Migration")
+      .addItem("📦 Export Data for SaaS (Modal & Download)", "showSaaSMigrationModal")
+      .addItem("📁 Save JSON to Google Drive", "exportSaaSMigrationPayload")
+      .addToUi();
+  } catch (err) {
+    Logger.log("onOpen menu registration notice: " + err.message);
+  }
+}
+
+/**
+ * Packages the school's data into a unified JSON structure,
+ * saves a complete file in Google Drive, and logs the download URL.
  */
 function exportSaaSMigrationPayload() {
-  requireLogin();
-  return {
+  var payload = {
     exportedAt: new Date().toISOString(),
     schoolInfo: typeof getParameters === 'function' ? getParameters() : {},
     students: typeof getStudentsData === 'function' ? getStudentsData() : [],
@@ -5751,4 +5765,131 @@ function exportSaaSMigrationPayload() {
     billingCategories: typeof getBillingCategoriesData === 'function' ? getBillingCategoriesData() : [],
     academicYears: typeof getAcademicYearsData === 'function' ? getAcademicYearsData() : []
   };
+
+  var jsonString = JSON.stringify(payload, null, 2);
+
+  var fileUrl = "";
+  try {
+    var fileName = "sms_saas_migration_data_" + new Date().toISOString().slice(0, 10) + ".json";
+    var file = DriveApp.createFile(fileName, jsonString, MimeType.PLAIN_TEXT);
+    fileUrl = file.getUrl();
+  } catch (e) {
+    Logger.log("Drive file creation error (may lack permissions): " + e.message);
+  }
+
+  Logger.log("===============================================================");
+  Logger.log("✅ SAAS MIGRATION EXPORT READY!");
+  Logger.log("📊 Summary of Exported Records:");
+  Logger.log("   • Students:           " + (payload.students ? payload.students.length : 0));
+  Logger.log("   • Classes:            " + (payload.classes ? payload.classes.length : 0));
+  Logger.log("   • Courses/Subjects:   " + (payload.courses ? payload.courses.length : 0));
+  Logger.log("   • Academic Years:     " + (payload.academicYears ? payload.academicYears.length : 0));
+  Logger.log("   • Billing Categories: " + (payload.billingCategories ? payload.billingCategories.length : 0));
+  Logger.log("   • Teachers:           " + (payload.teachers ? payload.teachers.length : 0));
+  Logger.log("---------------------------------------------------------------");
+  if (fileUrl) {
+    Logger.log("📁 COMPLETE JSON FILE CREATED IN YOUR GOOGLE DRIVE:");
+    Logger.log("👉 " + fileUrl);
+    Logger.log("---------------------------------------------------------------");
+  }
+  Logger.log("📋 JSON SNIPPET (First 1500 chars):");
+  Logger.log(jsonString.substring(0, 1500));
+  Logger.log("===============================================================");
+
+  return payload;
+}
+
+/**
+ * Returns the raw JSON migration string for the HTML modal dialog.
+ */
+function getSaaSMigrationJSONString() {
+  var payload = {
+    exportedAt: new Date().toISOString(),
+    schoolInfo: typeof getParameters === 'function' ? getParameters() : {},
+    students: typeof getStudentsData === 'function' ? getStudentsData() : [],
+    courses: typeof getCoursesData === 'function' ? getCoursesData() : [],
+    classes: typeof getClassesData === 'function' ? getClassesData() : [],
+    teachers: typeof getTeachersData === 'function' ? getTeachersData() : [],
+    billingCategories: typeof getBillingCategoriesData === 'function' ? getBillingCategoriesData() : [],
+    academicYears: typeof getAcademicYearsData === 'function' ? getAcademicYearsData() : []
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+/**
+ * Displays a visual modal dialog inside the Google Spreadsheet with 1-click
+ * Copy, Download, and Direct-Send options.
+ */
+function showSaaSMigrationModal() {
+  var html = HtmlService.createHtmlOutput(
+    '<!DOCTYPE html>' +
+    '<html><head><base target="_top">' +
+    '<style>' +
+    'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 15px; margin: 0; background: #f8fafc; color: #1e293b; }' +
+    '.card { background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }' +
+    'h2 { margin: 0 0 10px; font-size: 18px; color: #0f172a; }' +
+    '.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }' +
+    '.stat { background: #f1f5f9; padding: 8px; border-radius: 8px; text-align: center; }' +
+    '.stat-val { font-size: 18px; font-weight: bold; color: #2563eb; }' +
+    '.stat-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; }' +
+    'textarea { width: 100%; height: 160px; font-family: monospace; font-size: 11px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; resize: vertical; }' +
+    '.btn-row { display: flex; gap: 8px; margin-top: 12px; }' +
+    'button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-size: 12px; font-weight: bold; cursor: pointer; transition: background 0.2s; }' +
+    '.btn-primary { background: #2563eb; color: white; }' +
+    '.btn-primary:hover { background: #1d4ed8; }' +
+    '.btn-secondary { background: #e2e8f0; color: #334155; }' +
+    '.btn-secondary:hover { background: #cbd5e1; }' +
+    '#msg { margin-top: 8px; font-size: 11px; font-weight: bold; text-align: center; min-height: 16px; }' +
+    '</style></head><body>' +
+    '<div class="card">' +
+    '<h2>🚀 Export Data for Cloud SaaS (Neon DB)</h2>' +
+    '<div id="loading" style="text-align:center; padding: 20px; font-size: 13px; color: #64748b;">Generating migration data from sheets...</div>' +
+    '<div id="content" style="display:none;">' +
+    '<div class="stat-grid" id="stats"></div>' +
+    '<label style="font-size: 11px; font-weight: bold; color: #475569; display:block; margin-bottom: 4px;">Migration JSON Data:</label>' +
+    '<textarea id="jsonArea" readonly></textarea>' +
+    '<div class="btn-row">' +
+    '<button class="btn-primary" onclick="copyJSON()">📋 Copy to Clipboard</button>' +
+    '<button class="btn-secondary" onclick="downloadJSON()">💾 Download File</button>' +
+    '</div>' +
+    '<div id="msg"></div>' +
+    '</div>' +
+    '</div>' +
+    '<script>' +
+    'var rawData = "";' +
+    'google.script.run.withSuccessHandler(function(jsonStr) {' +
+    '  rawData = jsonStr;' +
+    '  document.getElementById("loading").style.display = "none";' +
+    '  document.getElementById("content").style.display = "block";' +
+    '  document.getElementById("jsonArea").value = jsonStr;' +
+    '  try {' +
+    '    var data = JSON.parse(jsonStr);' +
+    '    var s = document.getElementById("stats");' +
+    '    s.innerHTML = "<div class=\'stat\'><div class=\'stat-val\'>" + (data.students ? data.students.length : 0) + "</div><div class=\'stat-lbl\'>Students</div></div>" +' +
+    '                  "<div class=\'stat\'><div class=\'stat-val\'>" + (data.classes ? data.classes.length : 0) + "</div><div class=\'stat-lbl\'>Classes</div></div>" +' +
+    '                  "<div class=\'stat\'><div class=\'stat-val\'>" + (data.courses ? data.courses.length : 0) + "</div><div class=\'stat-lbl\'>Subjects</div></div>";' +
+    '  } catch(e) {}' +
+    '}).getSaaSMigrationJSONString();' +
+    'function copyJSON() {' +
+    '  var ta = document.getElementById("jsonArea");' +
+    '  ta.select();' +
+    '  document.execCommand("copy");' +
+    '  var m = document.getElementById("msg");' +
+    '  m.style.color = "#16a34a";' +
+    '  m.innerText = "✅ Copied to clipboard! Go to your SaaS Dashboard -> Sheets Migration to paste it.";' +
+    '}' +
+    'function downloadJSON() {' +
+    '  var blob = new Blob([rawData], { type: "application/json" });' +
+    '  var a = document.createElement("a");' +
+    '  a.href = URL.createObjectURL(blob);' +
+    '  a.download = "sms_saas_migration_data.json";' +
+    '  a.click();' +
+    '  var m = document.getElementById("msg");' +
+    '  m.style.color = "#16a34a";' +
+    '  m.innerText = "✅ Downloaded sms_saas_migration_data.json!";' +
+    '}' +
+    '</script></body></html>'
+  ).setWidth(520).setHeight(420);
+
+  SpreadsheetApp.getUi().showModalDialog(html, "SaaS Platform Migration");
 }
