@@ -120,8 +120,14 @@ Optional: `testUserCredential("username", "password")` returns
 * **Sessions are shared.** With "Execute as: Me", every visitor runs as the deployer, so the
   session store is shared. If two people sign in at once they can overwrite each other's
   session. Deploying with "Execute as: the user accessing" avoids this.
-* **Owner-only features.** `TEST_MODE_OWNER_EMAIL` in `Code.gs` is hard-coded to
-  `shineakakpo08@gmail.com`, and `Index.html` prints that address in the UI. Test Mode and
-  licence activation therefore only work for the user whose `Users` sheet row has that
-  address in the `googleEmail` column. Tell me if you want this driven by the
-  *Developer Email* setting instead.
+* **Owner-only features.** Test Mode and licence activation only work for the user whose
+  `Users` sheet row has the system-owner address in the `googleEmail` column. That address is
+  no longer hard-coded; `getSystemOwnerEmail()` resolves it in this order:
+
+  1. the script property `OWNER_EMAIL` — set it by running
+     **`setSystemOwnerEmail('you@yourdomain.com')`** in the Apps Script editor;
+  2. a **System Owner Email** row in the `Settings` sheet;
+  3. the `TEST_MODE_OWNER_EMAIL` constant in `Code.gs` (the original address, kept as fallback).
+
+  The Test Mode dialog in `Index.html` now prints whatever address is in force instead of a
+  hard-coded one.
