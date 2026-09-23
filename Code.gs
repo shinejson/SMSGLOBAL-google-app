@@ -5734,3 +5734,21 @@ function lockSheet() {
     protection.setDomainEdit(false);
   }
 }
+
+/**
+ * Packages the school's data into a unified JSON structure
+ * for 1-click migration into the multi-tenant SaaS platform.
+ */
+function exportSaaSMigrationPayload() {
+  requireLogin();
+  return {
+    exportedAt: new Date().toISOString(),
+    schoolInfo: typeof getParameters === 'function' ? getParameters() : {},
+    students: typeof getStudentsData === 'function' ? getStudentsData() : [],
+    courses: typeof getCoursesData === 'function' ? getCoursesData() : [],
+    classes: typeof getClassesData === 'function' ? getClassesData() : [],
+    teachers: typeof getTeachersData === 'function' ? getTeachersData() : [],
+    billingCategories: typeof getBillingCategoriesData === 'function' ? getBillingCategoriesData() : [],
+    academicYears: typeof getAcademicYearsData === 'function' ? getAcademicYearsData() : []
+  };
+}
