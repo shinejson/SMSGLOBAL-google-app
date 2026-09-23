@@ -5576,13 +5576,12 @@ function hashString(value) {
   }).join('');
 }
 
-function verifyPassword(candidate, storedValue) {
-  if (!storedValue) return false;
-  if (String(storedValue).startsWith('sha256:')) {
-    return hashString(candidate) === String(storedValue).slice(7);
-  }
-  return String(candidate) === String(storedValue);
-}
+// NOTE: verifyPassword() used to be defined here as well as in Security.gs.
+// Apps Script puts every .gs file in one global namespace, so with two functions
+// of the same name the winner depends on file order - which changes which
+// password format works. That duplicate has been removed; the single canonical
+// implementation now lives in Security.gs and supports the salted, "sha256:"
+// prefixed and plain-text formats.
 
 function getSystemParameter(paramName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5747,6 +5746,18 @@ function onOpen(e) {
       .addToUi();
   } catch (err) {
     Logger.log("onOpen menu registration notice: " + err.message);
+  }
+
+  // Login repair tools - see CrossAccountLoginFix.gs
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu("🔑 Login Fix")
+      .addItem("1️⃣ Publish salt to this sheet (run on the original project)", "publishPasswordSaltToSheet")
+      .addItem("2️⃣ Sync salt from this sheet (run on the imported copy)", "syncPasswordSaltFromSheet")
+      .addItem("🔍 Run login diagnostics", "showLoginDiagnostics")
+      .addToUi();
+  } catch (err) {
+    Logger.log("onOpen login-fix menu notice: " + err.message);
   }
 }
 

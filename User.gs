@@ -45,6 +45,53 @@ function resetUserLoginLock_(sheet, rowNum) {
   sheet.getRange(rowNum, 9, 1, 2).setValues([[0, '']]);
 }
 
+/**
+ * Same as resetUserLoginLock_() but never throws.
+ * Clearing the failed-attempt counter is bookkeeping; it must not be able to
+ * block a successful sign-in (e.g. when the effective account can only view the
+ * spreadsheet, which is a common state on an imported copy of the project).
+ */
+function safeResetUserLoginLock_(sheet, rowNum) {
+  try {
+    resetUserLoginLock_(sheet, rowNum);
+    return true;
+  } catch (e) {
+    Logger.log('Could not reset login lock for row ' + rowNum + ': ' + e.message);
+    return false;
+  }
+}
+
+/**
+ * Same as recordFailedLoginAttempt_() but degrades gracefully: if the counter
+ * cannot be written we still report "invalid credentials" instead of crashing.
+ */
+function safeRecordFailedLoginAttempt_(sheet, rowNum, currentAttempts) {
+  try {
+    return recordFailedLoginAttempt_(sheet, rowNum, currentAttempts);
+  } catch (e) {
+    Logger.log('Could not record failed login attempt for row ' + rowNum + ': ' + e.message);
+    return { locked: false, attempts: (parseInt(currentAttempts, 10) || 0) + 1, message: 'Invalid username or password' };
+  }
+}
+
+/**
+ * Re-write a legacy-format password (plain text or "sha256:" prefixed) using the
+ * current salt, so every copy of the project stores the same hash.
+ * Failures are ignored on purpose.
+ */
+function safeUpgradeStoredPassword_(sheet, rowNum, plainPassword) {
+  try {
+    const newHash = hashPassword(plainPassword);
+    if (!newHash) return false;
+    sheet.getRange(rowNum, 8).setValue(newHash);
+    invalidateCacheOnModify('Users');
+    return true;
+  } catch (e) {
+    Logger.log('Could not upgrade stored password hash on row ' + rowNum + ': ' + e.message);
+    return false;
+  }
+}
+
 function recordFailedLoginAttempt_(sheet, rowNum, currentAttempts) {
   const newAttempts = (parseInt(currentAttempts, 10) || 0) + 1;
 
@@ -350,7 +397,13 @@ function deleteUser(userId) {
 
 // 7. Verify Credentials directly from the Users Sheet - SECURE VERSION
 function loginUser(username, password) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = typeof getSpreadsheet_ === 'function' ? getSpreadsheet_() : SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    return {
+      success: false,
+      message: "This Apps Script project is not connected to a spreadsheet. Open the spreadsheet, then Extensions > Apps Script, or run setSpreadsheetId('<spreadsheet id>') once."
+    };
+  }
   const sheet = ss.getSheetByName("Users");
   if (!sheet) return { success: false, message: "Users worksheet not found" };
 
@@ -377,7 +430,7 @@ function loginUser(username, password) {
 
     const lockedUntil = parseLockedUntilValue_(lockedUntilValue);
     if (lockedUntil && lockedUntil.getTime() <= Date.now()) {
-      resetUserLoginLock_(sheet, rowNum);
+      safeResetUserLoginLock_(sheet, rowNum);
     } else if (isUserAccountLocked_(loginTrials, lockedUntilValue)) {
       const minutesLeft = getRemainingLockMinutes_(lockedUntilValue) || LOGIN_LOCK_MINUTES;
       return {
@@ -390,8 +443,17 @@ function loginUser(username, password) {
       return { success: false, message: "Account is inactive. Contact administrator." };
     }
 
-    if (verifyPassword(password, storedPasswordHash)) {
-      resetUserLoginLock_(sheet, rowNum);
+    const check = verifyPasswordWithDetails_(password, storedPasswordHash);
+    if (check.matched) {
+      // A correct password must never be blocked by a bookkeeping write
+      // (e.g. the account running the script only has view access to the file).
+      safeResetUserLoginLock_(sheet, rowNum);
+
+      // Quietly normalise legacy formats to the current salted hash so that the
+      // original project and any imported copy keep agreeing on the stored hash.
+      if (check.mode !== 'salted-current' && check.mode !== 'salted-legacy') {
+        safeUpgradeStoredPassword_(sheet, rowNum, password);
+      }
 
       const sessionId = createSession(userId, normalizedUsername, role, fullName);
       storeSessionIdInProperties(sessionId);
@@ -405,7 +467,7 @@ function loginUser(username, password) {
       };
     }
 
-    const failureResult = recordFailedLoginAttempt_(sheet, rowNum, loginTrials);
+    const failureResult = safeRecordFailedLoginAttempt_(sheet, rowNum, loginTrials);
     return { success: false, message: failureResult.message };
   }
 

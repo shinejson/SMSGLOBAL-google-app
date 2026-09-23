@@ -14,52 +14,368 @@ function buildSecurityAuditSnapshot(fields) {
 }
 
 /**
- * Get or initialize the salt from Script Properties
- * The salt is stored securely and used for all password hashing
+ * ---------------------------------------------------------------------------
+ * PASSWORD SALT - NOW PORTABLE ACROSS GOOGLE ACCOUNTS
+ * ---------------------------------------------------------------------------
+ * The salt used to be stored ONLY in Script Properties. Script Properties belong
+ * to the Apps Script *project*, not to the spreadsheet. So when this project is
+ * imported/copied into another Google account, that copy starts with EMPTY
+ * script properties, silently generates a brand-new random salt, and every
+ * password hash already stored in the Users sheet (column H) stops verifying.
+ * Result: login works on the original account, but every user gets
+ * "Invalid username or password" on the copied project.
+ *
+ * Fix: the salt is now kept IN THE SPREADSHEET (hidden "_SystemConfig" sheet),
+ * so it travels with the data and is shared by every copy of the project that is
+ * bound to the same spreadsheet. Script Properties are still read and written so
+ * that existing installations keep working and the value stays recoverable.
+ * ---------------------------------------------------------------------------
  */
-function getSalt() {
-  const props = PropertiesService.getScriptProperties();
-  let salt = props.getProperty('PASSWORD_SALT');
-  
-  if (!salt) {
-    // Generate a unique salt for this installation
-    salt = Utilities.getUuid();
-    props.setProperty('PASSWORD_SALT', salt);
-  }
-  
-  return salt;
+
+var SALT_SHEET_NAME = '_SystemConfig';
+var SALT_PROPERTY_KEY = 'PASSWORD_SALT';
+var SALT_PREVIOUS_KEY = 'PASSWORD_SALT_PREVIOUS';
+var SALT_SHEET_KEY = 'Password Salt';
+
+// Resolved once per execution so hashing a whole sheet of passwords does not
+// re-read the spreadsheet on every row. Cleared whenever the salt is changed.
+var SALT_CACHE = '';
+
+/** Forget the cached salt (call after changing it). */
+function invalidateSaltCache_() {
+  SALT_CACHE = '';
 }
 
 /**
- * Hash a password using SHA-256
+ * Resolve the spreadsheet this app runs against.
+ * Container-bound scripts return the bound file. A standalone copy can be
+ * pointed at the file with setSpreadsheetId('<id>') (see CrossAccountLoginFix.gs).
+ * @returns {Spreadsheet|null}
+ */
+function getSpreadsheet_() {
+  try {
+    const active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+  } catch (e) {
+    // Not container-bound, or no active spreadsheet in this context.
+  }
+
+  try {
+    const storedId = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+    if (storedId) return SpreadsheetApp.openById(storedId);
+  } catch (e) {
+    Logger.log('Could not open spreadsheet by stored id: ' + e.message);
+  }
+
+  return null;
+}
+
+/**
+ * Get (or lazily create) the hidden key/value sheet used for portable settings.
+ * @param {Spreadsheet} ss
+ * @param {boolean} create - create the sheet when missing
+ * @returns {Sheet|null}
+ */
+function getSystemConfigSheet_(ss, create) {
+  if (!ss) return null;
+
+  let sheet = ss.getSheetByName(SALT_SHEET_NAME);
+  if (!sheet && create) {
+    try {
+      sheet = ss.insertSheet(SALT_SHEET_NAME);
+      sheet.getRange(1, 1, 1, 2).setValues([['Key', 'Value']]);
+      sheet.getRange(1, 1, 1, 2).setFontWeight('bold');
+      sheet.hideSheet();
+      sheet.setFrozenRows(1);
+    } catch (e) {
+      Logger.log('Could not create ' + SALT_SHEET_NAME + ' sheet: ' + e.message);
+      return null;
+    }
+  }
+  return sheet;
+}
+
+/**
+ * Read the salt stored inside the spreadsheet (portable across project copies).
+ * @returns {string} salt, or '' when not present / not readable
+ */
+function readSaltFromSheet_() {
+  try {
+    const ss = getSpreadsheet_();
+    const sheet = getSystemConfigSheet_(ss, false);
+    if (!sheet || sheet.getLastRow() < 2) return '';
+
+    const values = sheet.getRange(1, 1, sheet.getLastRow(), 2).getValues();
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][0]).trim().toLowerCase() === SALT_SHEET_KEY.toLowerCase()) {
+        return String(values[i][1]).trim();
+      }
+    }
+  } catch (e) {
+    Logger.log('Could not read salt from spreadsheet: ' + e.message);
+  }
+  return '';
+}
+
+/**
+ * Persist the salt inside the spreadsheet so every copy of the project that is
+ * bound to this file uses the same salt.
+ * @param {string} salt
+ * @returns {boolean} true when written
+ */
+function writeSaltToSheet_(salt) {
+  if (!salt) return false;
+  try {
+    const ss = getSpreadsheet_();
+    const sheet = getSystemConfigSheet_(ss, true);
+    if (!sheet) return false;
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      const values = sheet.getRange(1, 1, lastRow, 2).getValues();
+      for (let i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim().toLowerCase() === SALT_SHEET_KEY.toLowerCase()) {
+          sheet.getRange(i + 1, 2).setValue(salt);
+          writeSaltProvenance_(sheet);
+          return true;
+        }
+      }
+    }
+    sheet.getRange(Math.max(sheet.getLastRow(), 1) + 1, 1, 1, 2).setValues([[SALT_SHEET_KEY, salt]]);
+    writeSaltProvenance_(sheet);
+    return true;
+  } catch (e) {
+    Logger.log('Could not write salt to spreadsheet: ' + e.message);
+    return false;
+  }
+}
+
+/**
+ * Record who published the salt currently stored in the spreadsheet.
+ * Makes it obvious when a copied project has overwritten it with its own.
+ */
+function writeSaltProvenance_(sheet) {
+  try {
+    let email = '';
+    try { email = Session.getEffectiveUser().getEmail() || ''; } catch (e) { /* ignore */ }
+    const stamp = new Date().toISOString();
+    writeConfigValue_(sheet, 'Password Salt Set By', email);
+    writeConfigValue_(sheet, 'Password Salt Set At', stamp);
+  } catch (e) {
+    Logger.log('Could not write salt provenance: ' + e.message);
+  }
+}
+
+/** Upsert a key/value pair on the hidden config sheet. */
+function writeConfigValue_(sheet, key, value) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    const values = sheet.getRange(1, 1, lastRow, 2).getValues();
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][0]).trim().toLowerCase() === String(key).toLowerCase()) {
+        sheet.getRange(i + 1, 2).setValue(value);
+        return;
+      }
+    }
+  }
+  sheet.getRange(Math.max(sheet.getLastRow(), 1) + 1, 1, 1, 2).setValues([[key, value]]);
+}
+
+/** Read provenance of the salt stored in the spreadsheet (diagnostics). */
+function readSaltProvenance_() {
+  const info = { setBy: '', setAt: '' };
+  try {
+    const ss = getSpreadsheet_();
+    const sheet = ss ? ss.getSheetByName(SALT_SHEET_NAME) : null;
+    if (!sheet || sheet.getLastRow() < 2) return info;
+    const values = sheet.getRange(1, 1, sheet.getLastRow(), 2).getValues();
+    for (let i = 1; i < values.length; i++) {
+      const key = String(values[i][0]).trim().toLowerCase();
+      if (key === 'password salt set by') info.setBy = String(values[i][1] || '').trim();
+      if (key === 'password salt set at') info.setAt = String(values[i][1] || '').trim();
+    }
+  } catch (e) {
+    Logger.log('Could not read salt provenance: ' + e.message);
+  }
+  return info;
+}
+
+/**
+ * Get or initialize the salt.
+ * Resolution order: spreadsheet (portable) -> Script Properties (legacy) -> new.
+ * Whatever is found is mirrored to every store that is writable, so the original
+ * project and any imported copy end up sharing one salt.
+ * @returns {string} salt
+ */
+function getSalt() {
+  if (SALT_CACHE) return SALT_CACHE;
+
+  let scriptSalt = '';
+  try {
+    scriptSalt = String(PropertiesService.getScriptProperties().getProperty(SALT_PROPERTY_KEY) || '').trim();
+  } catch (e) {
+    Logger.log('Could not read salt from script properties: ' + e.message);
+  }
+
+  const sheetSalt = String(readSaltFromSheet_() || '').trim();
+
+  // The spreadsheet is the source of truth: it travels with the data.
+  if (sheetSalt) {
+    if (scriptSalt && scriptSalt !== sheetSalt) {
+      // A copied project generated its own salt before it could read the sheet.
+      // Remember the wrong one so old hashes can still be verified, then align.
+      try {
+        const props = PropertiesService.getScriptProperties();
+        if (props.getProperty(SALT_PREVIOUS_KEY) !== scriptSalt) {
+          props.setProperty(SALT_PREVIOUS_KEY, scriptSalt);
+        }
+        props.setProperty(SALT_PROPERTY_KEY, sheetSalt);
+      } catch (e) {
+        Logger.log('Could not align script salt with spreadsheet salt: ' + e.message);
+      }
+    } else if (!scriptSalt) {
+      try {
+        PropertiesService.getScriptProperties().setProperty(SALT_PROPERTY_KEY, sheetSalt);
+      } catch (e) {
+        Logger.log('Could not mirror salt into script properties: ' + e.message);
+      }
+    }
+    SALT_CACHE = sheetSalt;
+    return sheetSalt;
+  }
+
+  // Legacy install: salt only ever existed in Script Properties -> publish it to
+  // the spreadsheet so future copies inherit it automatically.
+  if (scriptSalt) {
+    writeSaltToSheet_(scriptSalt);
+    SALT_CACHE = scriptSalt;
+    return scriptSalt;
+  }
+
+  // Fresh install.
+  const newSalt = Utilities.getUuid();
+  try {
+    PropertiesService.getScriptProperties().setProperty(SALT_PROPERTY_KEY, newSalt);
+  } catch (e) {
+    Logger.log('Could not store new salt in script properties: ' + e.message);
+  }
+  writeSaltToSheet_(newSalt);
+  SALT_CACHE = newSalt;
+  return newSalt;
+}
+
+/** Unsalted SHA-256 hex (used by the legacy "sha256:" format). */
+function sha256Hex_(value) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    String(value),
+    Utilities.Charset.UTF_8
+  );
+  return bytes.map(function(byte) { return ('0' + (byte & 0xFF).toString(16)).slice(-2); }).join('');
+}
+
+/** Salted SHA-256 hex - the current storage format. */
+function hashWithSalt_(password, salt) {
+  return sha256Hex_(String(password) + String(salt || ''));
+}
+
+/**
+ * Hash a password using SHA-256 + the installation salt
  * @param {string} password - The plain text password to hash
  * @returns {string} The hashed password as a hexadecimal string
  */
 function hashPassword(password) {
   if (!password) return '';
-  
-  const salt = getSalt();
-  const saltedPassword = password + salt;
-  
-  const rawHash = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    saltedPassword,
-    Utilities.Charset.UTF_8
-  );
-  
-  // Convert byte array to hexadecimal string
-  return rawHash.map(byte => ('0' + (byte & 0xFF).toString(16)).slice(-2)).join('');
+  return hashWithSalt_(password, getSalt());
 }
 
 /**
- * Verify a password against a stored hash
+ * Every salt this installation has ever used, newest first.
+ * Lets passwords written by an older/other copy of the project keep verifying.
+ * @returns {string[]}
+ */
+function getKnownSalts_() {
+  const salts = [];
+  const add = function(value) {
+    const clean = String(value || '').trim();
+    if (clean && salts.indexOf(clean) === -1) salts.push(clean);
+  };
+
+  add(getSalt());
+  add(readSaltFromSheet_());
+  try {
+    const props = PropertiesService.getScriptProperties();
+    add(props.getProperty(SALT_PROPERTY_KEY));
+    add(props.getProperty(SALT_PREVIOUS_KEY));
+  } catch (e) {
+    Logger.log('Could not read extra salts: ' + e.message);
+  }
+  return salts;
+}
+
+/**
+ * Describe which storage format a stored password uses (diagnostics only).
+ * @param {string} storedValue
+ * @returns {string}
+ */
+function getPasswordHashFormat_(storedValue) {
+  const value = String(storedValue || '').trim();
+  if (!value) return 'empty';
+  if (value.indexOf('sha256:') === 0) return 'sha256-prefixed';
+  if (/^[a-f0-9]{64}$/i.test(value)) return 'hashed';
+  return 'plain-text';
+}
+
+/**
+ * Verify a password against a stored value.
+ * Supports every format this project has ever written, so an imported copy of
+ * the project can still authenticate users created on the original account:
+ *   - salted SHA-256 (current, 64 hex chars)
+ *   - "sha256:<hex>" (legacy unsalted)
+ *   - plain text (very old records / Settings master password)
  * @param {string} inputPassword - The password to verify
- * @param {string} storedHash - The stored password hash
+ * @param {string} storedHash - The stored password value
  * @returns {boolean} True if password matches
  */
 function verifyPassword(inputPassword, storedHash) {
-  if (!inputPassword || !storedHash) return false;
-  return hashPassword(inputPassword) === storedHash;
+  return verifyPasswordWithDetails_(inputPassword, storedHash).matched;
+}
+
+/**
+ * Same as verifyPassword(), but also reports which format/salt matched.
+ * Used by the diagnostics tool in CrossAccountLoginFix.gs.
+ * @returns {{matched: boolean, mode: string, salt: string}}
+ */
+function verifyPasswordWithDetails_(inputPassword, storedHash) {
+  const stored = String(storedHash || '').trim();
+  if (!inputPassword || !stored) return { matched: false, mode: 'none', salt: '' };
+
+  // Legacy: "sha256:<hex>" (unsalted)
+  if (stored.indexOf('sha256:') === 0) {
+    return {
+      matched: sha256Hex_(inputPassword) === stored.slice(7),
+      mode: 'sha256-prefixed',
+      salt: ''
+    };
+  }
+
+  // Current + historical: salted SHA-256 (64 hex chars)
+  if (/^[a-f0-9]{64}$/i.test(stored)) {
+    const salts = getKnownSalts_();
+    for (let i = 0; i < salts.length; i++) {
+      if (hashWithSalt_(inputPassword, salts[i]) === stored) {
+        return { matched: true, mode: i === 0 ? 'salted-current' : 'salted-legacy', salt: salts[i] };
+      }
+    }
+    // Very old records were hashed without any salt at all.
+    if (sha256Hex_(inputPassword) === stored) {
+      return { matched: true, mode: 'unsalted', salt: '' };
+    }
+    return { matched: false, mode: 'hashed-no-match', salt: '' };
+  }
+
+  // Legacy: plain text
+  return { matched: String(inputPassword) === stored, mode: 'plain-text', salt: '' };
 }
 
 /**
