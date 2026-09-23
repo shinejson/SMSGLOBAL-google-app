@@ -1231,7 +1231,7 @@
             🔐 <strong>Owner Confirmation Required</strong><br><br>
             Test Mode completely overrides Demo limits, unlocking full access and unlimited student registrations.<br><br>
             A security verification code will be sent to the owner email:<br>
-            <strong>shineakakpo08@gmail.com</strong>
+            <strong><?= ownerEmail || 'the system owner' ?></strong>
           </div>
           <p style="font-size:13px;color:#475569;margin-bottom:12px;">Click below to send the confirmation code to your email.</p>
           <p id="tmStep1Error" style="color:#ef4444;font-size:13px;margin:0;display:none;"></p>
@@ -1240,7 +1240,7 @@
         <!-- STEP 2: Enter Confirmation Code -->
         <div class="test-mode-step" id="tmStep2">
           <div class="test-mode-info-box">
-            📧 A 6-digit confirmation code was sent to <strong>shineakakpo08@gmail.com</strong>.<br>
+            📧 A 6-digit confirmation code was sent to <strong><?= ownerEmail || 'the system owner' ?></strong>.<br>
             Please check your inbox (or spam) and enter it below to confirm owner authorization.
           </div>
           <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:6px;">6-DIGIT CODE</label>

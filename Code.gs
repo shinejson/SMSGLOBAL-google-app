@@ -101,6 +101,11 @@ function doGet(e) {
   var template = HtmlService.createTemplateFromFile(page);
   if (page === "Index") {
     template.scriptUrl = ScriptApp.getService().getUrl();
+    try {
+      template.ownerEmail = getSystemOwnerEmail();
+    } catch (e) {
+      template.ownerEmail = '';
+    }
   }
 
   return template
@@ -841,6 +846,51 @@ function getLicenseDetails() {
 var TEST_MODE_OWNER_EMAIL = 'shineakakpo08@gmail.com';
 
 /**
+ * The Google account allowed to use owner-only features (Test Mode, licence
+ * activation). Resolved in this order:
+ *   1. Script property  OWNER_EMAIL          (set with setSystemOwnerEmail)
+ *   2. Settings sheet   System Owner Email
+ *   3. the TEST_MODE_OWNER_EMAIL constant    (fallback)
+ * @returns {string} lowercase email
+ */
+function getSystemOwnerEmail() {
+  try {
+    const configured = String(PropertiesService.getScriptProperties().getProperty('OWNER_EMAIL') || '').trim();
+    if (configured) return configured.toLowerCase();
+  } catch (e) { /* ignore */ }
+
+  try {
+    if (typeof getSystemParameter === 'function') {
+      const fromSettings = String(getSystemParameter('System Owner Email') || '').trim();
+      if (fromSettings.indexOf('@') !== -1) return fromSettings.toLowerCase();
+    }
+  } catch (e) { /* ignore */ }
+
+  return String(TEST_MODE_OWNER_EMAIL || '').trim().toLowerCase();
+}
+
+/**
+ * Change which account owns owner-only features (Test Mode / licence).
+ * Run from the Apps Script editor, or from the app while signed in as Admin.
+ * @param {string} email
+ * @returns {object}
+ */
+function setSystemOwnerEmail(email) {
+  const allowed = (typeof isRecoveryAuthorised_ === 'function') ? isRecoveryAuthorised_() : false;
+  if (!allowed) return { success: false, message: 'Run this from the Apps Script editor with an account that can edit the spreadsheet, or sign in as Admin.' };
+
+  const value = String(email || '').trim().toLowerCase();
+  if (value.indexOf('@') === -1) return { success: false, message: 'That does not look like an email address.' };
+
+  try {
+    PropertiesService.getScriptProperties().setProperty('OWNER_EMAIL', value);
+    return { success: true, ownerEmail: value, message: 'System owner set to ' + value + '.' };
+  } catch (e) {
+    return { success: false, message: 'Could not save: ' + e.message };
+  }
+}
+
+/**
  * Checks whether Test Mode is currently active.
  * If the deadline has already passed it auto-clears the stored flags.
  * Returns { active: Boolean, deadline: ISO-string | null }
@@ -877,7 +927,7 @@ function isTestModeActive() {
 function generateTestModeOtp() {
   requireLogin();
   const userEmail = getLoggedInUserEmail_();
-  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+  if (userEmail.toLowerCase() !== getSystemOwnerEmail()) {
     return { success: false, message: 'Only the system owner can activate Test Mode.' };
   }
 
@@ -895,16 +945,18 @@ function generateTestModeOtp() {
     'Use it in the SMS application to enable Test Mode.\n\n' +
     'If you did not request this, please ignore this email.';
 
+  const ownerEmail = getSystemOwnerEmail();
+
   try {
-    GmailApp.sendEmail(TEST_MODE_OWNER_EMAIL, subject, body, {
+    GmailApp.sendEmail(ownerEmail, subject, body, {
       name: 'SMS School App',
       noReply: true
     });
-    return { success: true, message: 'OTP sent to ' + TEST_MODE_OWNER_EMAIL };
+    return { success: true, message: 'OTP sent to ' + ownerEmail };
   } catch (e1) {
     try {
-      MailApp.sendEmail({ to: TEST_MODE_OWNER_EMAIL, subject: subject, body: body, name: 'SMS School App' });
-      return { success: true, message: 'OTP sent to ' + TEST_MODE_OWNER_EMAIL };
+      MailApp.sendEmail({ to: ownerEmail, subject: subject, body: body, name: 'SMS School App' });
+      return { success: true, message: 'OTP sent to ' + ownerEmail };
     } catch (e2) {
       // Clean up stored OTP on failure
       props.deleteProperty('test_mode_otp');
@@ -921,7 +973,7 @@ function generateTestModeOtp() {
 function confirmTestModeOwnerEmail(providedCode) {
   requireLogin();
   const userEmail = getLoggedInUserEmail_();
-  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+  if (userEmail.toLowerCase() !== getSystemOwnerEmail()) {
     return { success: false, message: 'Only the system owner can confirm this email.' };
   }
 
@@ -959,7 +1011,7 @@ function confirmTestModeOwnerEmail(providedCode) {
 function activateTestModeWithDeadline(durationMs, customDeadlineIso) {
   requireLogin();
   const userEmail = getLoggedInUserEmail_();
-  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+  if (userEmail.toLowerCase() !== getSystemOwnerEmail()) {
     return { success: false, message: 'Only the system owner can activate Test Mode.' };
   }
 
@@ -1004,7 +1056,7 @@ function activateTestModeWithDeadline(durationMs, customDeadlineIso) {
 function activateTestMode(providedCode, durationMs) {
   requireLogin();
   const userEmail = getLoggedInUserEmail_();
-  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+  if (userEmail.toLowerCase() !== getSystemOwnerEmail()) {
     return { success: false, message: 'Only the system owner can activate Test Mode.' };
   }
 
@@ -1048,7 +1100,7 @@ function activateTestMode(providedCode, durationMs) {
 function deactivateTestMode() {
   requireLogin();
   const userEmail = getLoggedInUserEmail_();
-  if (userEmail.toLowerCase() !== TEST_MODE_OWNER_EMAIL.toLowerCase()) {
+  if (userEmail.toLowerCase() !== getSystemOwnerEmail()) {
     return { success: false, message: 'Only the system owner can deactivate Test Mode.' };
   }
 
@@ -1068,10 +1120,11 @@ function deactivateTestMode() {
 function getTestModeStatus() {
   requireLogin();
   const userEmail = getLoggedInUserEmail_();
-  const isOwner = userEmail.toLowerCase() === TEST_MODE_OWNER_EMAIL.toLowerCase();
+  const isOwner = userEmail.toLowerCase() === getSystemOwnerEmail();
   const testMode = isTestModeActive();
   return {
     isOwner: isOwner,
+    ownerEmail: isOwner ? userEmail : getSystemOwnerEmail(),
     active: testMode.active,
     deadline: testMode.deadline
   };
@@ -5576,13 +5629,12 @@ function hashString(value) {
   }).join('');
 }
 
-function verifyPassword(candidate, storedValue) {
-  if (!storedValue) return false;
-  if (String(storedValue).startsWith('sha256:')) {
-    return hashString(candidate) === String(storedValue).slice(7);
-  }
-  return String(candidate) === String(storedValue);
-}
+// NOTE: verifyPassword() used to be defined here as well as in Security.gs.
+// Apps Script puts every .gs file in one global namespace, so with two functions
+// of the same name the winner depends on file order - which changes which
+// password format works. That duplicate has been removed; the single canonical
+// implementation now lives in Security.gs and supports the salted, "sha256:"
+// prefixed and plain-text formats.
 
 function getSystemParameter(paramName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5747,6 +5799,18 @@ function onOpen(e) {
       .addToUi();
   } catch (err) {
     Logger.log("onOpen menu registration notice: " + err.message);
+  }
+
+  // Login repair tools - see CrossAccountLoginFix.gs
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu("🔑 Login Fix")
+      .addItem("1️⃣ Publish salt to this sheet (run on the original project)", "publishPasswordSaltToSheet")
+      .addItem("2️⃣ Sync salt from this sheet (run on the imported copy)", "syncPasswordSaltFromSheet")
+      .addItem("🔍 Run login diagnostics", "showLoginDiagnostics")
+      .addToUi();
+  } catch (err) {
+    Logger.log("onOpen login-fix menu notice: " + err.message);
   }
 }
 
