@@ -258,8 +258,16 @@ function migrateOldSessionToSecure() {
     return { migrated: false, message: 'Incomplete session data' };
   }
   
+  // Look up full name from Users sheet if available
+  let fullName = username;
+  try {
+    const users = typeof getUsersData === 'function' ? getUsersData() : [];
+    const matched = users.find(u => String(u.username).trim().toLowerCase() === String(username).trim().toLowerCase());
+    if (matched && matched.fullName) fullName = matched.fullName;
+  } catch (e) {}
+
   // Create new secure session
-  const sessionId = createSession('MIGRATED', username, role, username);
+  const sessionId = createSession('MIGRATED', username, role, fullName);
   storeSessionIdInProperties(sessionId);
   
   // Clear old session data

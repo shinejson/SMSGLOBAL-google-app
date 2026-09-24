@@ -266,6 +266,15 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+      var iframeSid = '';
+      try {
+        if (window.parent && typeof window.parent.getActiveSessionId === 'function') {
+          iframeSid = window.parent.getActiveSessionId();
+        } else if (window.parent && window.parent.location) {
+          iframeSid = new URLSearchParams(window.parent.location.search).get('sessionId') || '';
+        }
+      } catch (e) {}
+
       google.script.run
         .withSuccessHandler(function(user) {
           currentUserIsAdmin = !!(user && String(user.role || '').trim().toLowerCase() === 'admin');
@@ -275,7 +284,7 @@
           currentUserIsAdmin = false;
           refreshData();
         })
-        .getLoggedInUser();
+        .getLoggedInUser(iframeSid);
     });
 
     function refreshData() {
@@ -481,6 +490,11 @@
               closeModal(); 
               refreshData(); 
               showToast('User updated successfully!', 'success');
+              try {
+                if (window.parent && typeof window.parent.refreshUserProfile === 'function') {
+                  window.parent.refreshUserProfile();
+                }
+              } catch (e) {}
             }
           })
           .withFailureHandler(function(err) { 

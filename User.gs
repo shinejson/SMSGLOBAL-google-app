@@ -509,10 +509,10 @@ function checkSession(paramSessionId) {
     return false;
   }
   
-  // If sessionId was provided externally and UserProperties is accessible, sync it
+  // If a valid sessionId was provided, keep UserProperties in sync
   try {
     const props = PropertiesService.getUserProperties();
-    if (props && !props.getProperty('CURRENT_SESSION_ID')) {
+    if (props && sessionId) {
       props.setProperty('CURRENT_SESSION_ID', sessionId);
     }
   } catch (e) {}
@@ -522,10 +522,14 @@ function checkSession(paramSessionId) {
 }
 
 // 9. Log out - SECURE VERSION
-function logoutUser() {
-  // Get session ID
-  const props = PropertiesService.getUserProperties();
-  const sessionId = props.getProperty('CURRENT_SESSION_ID');
+function logoutUser(paramSessionId) {
+  let sessionId = paramSessionId || null;
+  if (!sessionId) {
+    try {
+      const props = PropertiesService.getUserProperties();
+      sessionId = props.getProperty('CURRENT_SESSION_ID');
+    } catch (e) {}
+  }
   
   if (sessionId) {
     // Destroy the session in cache
@@ -536,46 +540,99 @@ function logoutUser() {
   storeSessionIdInProperties(null);
   
   // Also clean up old session format (backward compatibility)
-  const oldProps = PropertiesService.getScriptProperties();
-  oldProps.deleteProperty("IS_LOGGED_IN");
-  oldProps.deleteProperty("LOGGED_IN_ROLE");
-  oldProps.deleteProperty("LOGGED_IN_USER");
-  oldProps.deleteProperty("LOGGED_IN_AT");
+  try {
+    const oldProps = PropertiesService.getScriptProperties();
+    oldProps.deleteProperty("IS_LOGGED_IN");
+    oldProps.deleteProperty("LOGGED_IN_ROLE");
+    oldProps.deleteProperty("LOGGED_IN_USER");
+    oldProps.deleteProperty("LOGGED_IN_AT");
+  } catch (e) {}
   
   return { success: true };
 }
 
-// 10. Get logged-in user info - SECURE VERSION
-function getLoggedInUser() {
-  // Get session ID from user properties
-  const props = PropertiesService.getUserProperties();
-  const sessionId = props.getProperty('CURRENT_SESSION_ID');
+// 10. Get logged-in user info - SECURE & DYNAMIC VERSION
+function getLoggedInUser(paramSessionId) {
+  let sessionId = paramSessionId || null;
   
+  // 1. If not provided directly, try UserProperties
   if (!sessionId) {
-    // Try old format for backward compatibility
-    const oldProps = PropertiesService.getScriptProperties();
-    if (oldProps.getProperty("IS_LOGGED_IN") === "true") {
-      const migrationResult = migrateOldSessionToSecure();
-      if (migrationResult.migrated) {
-        return getLoggedInUser(); // Recursive call after migration
-      }
-    }
-    return null;
+    try {
+      const props = PropertiesService.getUserProperties();
+      sessionId = props.getProperty('CURRENT_SESSION_ID');
+    } catch (e) {}
   }
   
-  // Validate and get session data
+  // 2. If still no session, check for legacy migration
+  if (!sessionId) {
+    try {
+      const oldProps = PropertiesService.getScriptProperties();
+      if (oldProps && oldProps.getProperty("IS_LOGGED_IN") === "true") {
+        const migrationResult = migrateOldSessionToSecure();
+        if (migrationResult.migrated) {
+          sessionId = migrationResult.sessionId;
+        }
+      }
+    } catch (e) {}
+  }
+  
+  if (!sessionId) return null;
+  
+  // 3. Validate session from CacheService
   const session = validateSession(sessionId);
   if (!session) {
     storeSessionIdInProperties(null);
     return null;
   }
   
+  // 4. LIVE LOOKUP FROM USERS SHEET:
+  // Instead of only returning stale session.fullName from the cache, dynamically
+  // query the Users sheet so edits to Full Name, Role, or Status in the sheet or UI
+  // are immediately reflected without requiring the user to re-login!
+  let resolvedFullName = session.fullName || session.username || 'User';
+  let resolvedRole = session.role || 'User';
+  let resolvedUsername = session.username || '';
+  let resolvedUserId = session.userId || '';
+
+  try {
+    const users = typeof getUsersData === 'function' ? getUsersData() : [];
+    const matchedUser = users.find(function(u) {
+      if (resolvedUserId && String(u.userId).trim().toLowerCase() === String(resolvedUserId).trim().toLowerCase()) {
+        return true;
+      }
+      if (resolvedUsername && String(u.username).trim().toLowerCase() === String(resolvedUsername).trim().toLowerCase()) {
+        return true;
+      }
+      return false;
+    });
+
+    if (matchedUser) {
+      if (matchedUser.fullName) resolvedFullName = matchedUser.fullName;
+      if (matchedUser.role) resolvedRole = matchedUser.role;
+      if (matchedUser.username) resolvedUsername = matchedUser.username;
+      if (matchedUser.userId) resolvedUserId = matchedUser.userId;
+
+      // Keep cached session data synchronized with the sheet
+      if (session.fullName !== resolvedFullName || session.role !== resolvedRole) {
+        session.fullName = resolvedFullName;
+        session.role = resolvedRole;
+        try {
+          const cache = CacheService.getUserCache();
+          cache.put('session_' + sessionId, JSON.stringify(session), 28800);
+          CacheService.getScriptCache().put('session_' + sessionId, JSON.stringify(session), 28800);
+        } catch (cErr) {}
+      }
+    }
+  } catch (lookupErr) {
+    Logger.log('Warning in live user lookup for getLoggedInUser: ' + lookupErr.message);
+  }
+
   return {
-    userId: session.userId,
-    username: session.username,
-    fullName: session.fullName,
-    role: session.role,
-    initials: getInitials(session.fullName),
+    userId: resolvedUserId,
+    username: resolvedUsername,
+    fullName: resolvedFullName,
+    role: resolvedRole,
+    initials: getInitials(resolvedFullName),
     sessionId: sessionId
   };
 }

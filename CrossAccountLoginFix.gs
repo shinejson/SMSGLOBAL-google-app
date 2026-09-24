@@ -691,10 +691,16 @@ function resetAdminPasswordAndUnlockDialog() {
     }
   }
 
-  // Invalidate caches
+  // Invalidate caches and purge stale legacy session properties
   try {
     if (typeof invalidateCacheOnModify === 'function') invalidateCacheOnModify('Users');
     if (typeof invalidateIndex === 'function') invalidateIndex('Users');
+    PropertiesService.getUserProperties().deleteProperty('CURRENT_SESSION_ID');
+    const sp = PropertiesService.getScriptProperties();
+    sp.deleteProperty('IS_LOGGED_IN');
+    sp.deleteProperty('LOGGED_IN_USER');
+    sp.deleteProperty('LOGGED_IN_ROLE');
+    sp.deleteProperty('LOGGED_IN_AT');
   } catch (e) {}
 
   ui.alert(

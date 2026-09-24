@@ -1509,6 +1509,30 @@
         || '';
     }
 
+    // Helper to get active session ID isolated per browser tab
+    function getActiveSessionId() {
+      try {
+        // 1. Template-injected session ID from server
+        var serverSid = '<?= typeof sessionId !== "undefined" ? sessionId : "" ?>';
+        if (serverSid && serverSid !== 'undefined' && serverSid.indexOf('<?=') === -1) {
+          sessionStorage.setItem('sms_session_id', serverSid);
+          return serverSid;
+        }
+        // 2. Query parameter
+        var params = new URLSearchParams(window.location.search);
+        var urlSid = params.get('sessionId');
+        if (urlSid) {
+          sessionStorage.setItem('sms_session_id', urlSid);
+          return urlSid;
+        }
+        // 3. Tab-isolated sessionStorage
+        var storedSid = sessionStorage.getItem('sms_session_id') || sessionStorage.getItem('currentSessionId');
+        if (storedSid) return storedSid;
+      } catch (e) {}
+      return '';
+    }
+    window.getActiveSessionId = getActiveSessionId;
+
     // Initialize the dashboard after DOM and Google Apps Script API are ready
     function initializeDashboard() {
       // --- LOAD SCHOOL SETTINGS (Logo and Alias) ---
@@ -1540,26 +1564,67 @@
         })
         .getParameters();
 
-      // --- LOAD USER PROFILE ---
-      google.script.run
-        .withSuccessHandler(function(user) {
-          if (user) {
-            const initials = user.initials || 'U';
-            const fullName = user.fullName || 'User';
-            const role     = user.role     || '';
-            // Topnav pill
-            document.getElementById('userAvatar').textContent    = initials;
-            document.getElementById('userFullName').textContent  = fullName;
-            // Dropdown header
-            document.getElementById('dropdownAvatar').textContent = initials;
-            document.getElementById('dropdownName').textContent   = fullName;
-            document.getElementById('dropdownRole').textContent   = role;
-          }
-        })
-        .withFailureHandler(function() {
-          document.getElementById('userFullName').textContent = 'User';
-        })
-        .getLoggedInUser();
+      // --- LOAD USER PROFILE (DYNAMIC & PER-SESSION) ---
+      window.refreshUserProfile = function() {
+        const activeSid = getActiveSessionId();
+        google.script.run
+          .withSuccessHandler(function(user) {
+            if (user && (user.fullName || user.username)) {
+              const initials = user.initials || 'U';
+              const fullName = user.fullName || user.username || 'User';
+              const role     = user.role     || '';
+              
+              // Topnav pill
+              const userAvatarEl = document.getElementById('userAvatar');
+              const userFullNameEl = document.getElementById('userFullName');
+              if (userAvatarEl) userAvatarEl.textContent = initials;
+              if (userFullNameEl) userFullNameEl.textContent = fullName;
+              
+              // Dropdown header
+              const dropdownAvatarEl = document.getElementById('dropdownAvatar');
+              const dropdownNameEl = document.getElementById('dropdownName');
+              const dropdownRoleEl = document.getElementById('dropdownRole');
+              if (dropdownAvatarEl) dropdownAvatarEl.textContent = initials;
+              if (dropdownNameEl) dropdownNameEl.textContent = fullName;
+              if (dropdownRoleEl) dropdownRoleEl.textContent = role;
+
+              // Cache in tab sessionStorage
+              try {
+                sessionStorage.setItem('currentUserName', fullName);
+                sessionStorage.setItem('currentUserRole', role);
+                sessionStorage.setItem('currentUserInitials', initials);
+              } catch (e) {}
+            }
+          })
+          .withFailureHandler(function(err) {
+            console.warn('Could not load user profile from server:', err);
+            try {
+              const cachedName = sessionStorage.getItem('currentUserName');
+              const cachedRole = sessionStorage.getItem('currentUserRole');
+              const cachedInitials = sessionStorage.getItem('currentUserInitials');
+              if (cachedName) {
+                const uNameEl = document.getElementById('userFullName');
+                const dNameEl = document.getElementById('dropdownName');
+                if (uNameEl) uNameEl.textContent = cachedName;
+                if (dNameEl) dNameEl.textContent = cachedName;
+              }
+              if (cachedInitials) {
+                const uAvEl = document.getElementById('userAvatar');
+                const dAvEl = document.getElementById('dropdownAvatar');
+                if (uAvEl) uAvEl.textContent = cachedInitials;
+                if (dAvEl) dAvEl.textContent = cachedInitials;
+              }
+              if (cachedRole) {
+                const dRoleEl = document.getElementById('dropdownRole');
+                if (dRoleEl) dRoleEl.textContent = cachedRole;
+              }
+            } catch (e) {}
+          })
+          .getLoggedInUser(activeSid);
+      };
+
+      // Load user profile immediately
+      window.refreshUserProfile();
 
       // --- LOAD TEST MODE STATUS (sets owner toggle visibility + badge) ---
       function loadTestModeStatus() {
@@ -1939,19 +2004,25 @@
         btn.addEventListener('click', function() {
           btn.disabled = true; btn.innerText = 'Logging out...';
           
-          // Clear localStorage before logging out
+          // Clear sessionStorage and localStorage before logging out
+          const activeSid = typeof getActiveSessionId === 'function' ? getActiveSessionId() : '';
           try {
+            sessionStorage.removeItem('sms_session_id');
+            sessionStorage.removeItem('currentSessionId');
+            sessionStorage.removeItem('currentUserName');
+            sessionStorage.removeItem('currentUserRole');
+            sessionStorage.removeItem('currentUserInitials');
             localStorage.removeItem('currentPage');
             localStorage.removeItem('currentPageTitle');
-            console.log('Cleared saved page data on logout');
+            console.log('Cleared saved page and session data on logout');
           } catch (e) {
-            console.warn('Could not clear localStorage:', e);
+            console.warn('Could not clear storage:', e);
           }
           
           google.script.run
             .withSuccessHandler(function() { window.location.href = SCRIPT_URL + '?page=Login'; })
             .withFailureHandler(function() { window.location.href = SCRIPT_URL + '?page=Login'; })
-            .logoutUser();
+            .logoutUser(activeSid);
         });
       })();
 
@@ -3114,12 +3185,7 @@
       const MAX_SESSION_CHECK_ATTEMPTS = 5;
 
       function getSessionIdFromUrl() {
-        try {
-          const params = new URLSearchParams(window.location.search);
-          return params.get('sessionId') || '';
-        } catch (e) {
-          return '';
-        }
+        return typeof getActiveSessionId === 'function' ? getActiveSessionId() : '';
       }
 
       function checkBackendSession() {
@@ -3149,13 +3215,18 @@
       }
 
       function redirectToLogin() {
-        // Clear saved page data when session expires
+        // Clear saved page and session data when session expires
         try {
+          sessionStorage.removeItem('sms_session_id');
+          sessionStorage.removeItem('currentSessionId');
+          sessionStorage.removeItem('currentUserName');
+          sessionStorage.removeItem('currentUserRole');
+          sessionStorage.removeItem('currentUserInitials');
           localStorage.removeItem('currentPage');
           localStorage.removeItem('currentPageTitle');
           console.log('Session expired - cleared saved page data');
         } catch (e) {
-          console.warn('Could not clear localStorage on session expiry:', e);
+          console.warn('Could not clear storage on session expiry:', e);
         }
         window.location.href = SCRIPT_URL + '?page=Login';
       }

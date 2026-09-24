@@ -633,6 +633,15 @@
 
     // Load School Parameters from Google Apps Script Backend (Settings Sheet)
     document.addEventListener('DOMContentLoaded', function() {
+      // Clear any previous tab session data on login page
+      try {
+        sessionStorage.removeItem('sms_session_id');
+        sessionStorage.removeItem('currentSessionId');
+        sessionStorage.removeItem('currentUserName');
+        sessionStorage.removeItem('currentUserRole');
+        sessionStorage.removeItem('currentUserInitials');
+      } catch (e) {}
+
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         google.script.run
           .withSuccessHandler(function(params) {
@@ -679,6 +688,11 @@
         .withSuccessHandler(function(res) {
           if (res.success) {
             btn.innerText = 'Redirecting...';
+            try {
+              sessionStorage.setItem('sms_session_id', res.sessionId);
+              if (res.fullName) sessionStorage.setItem('currentUserName', res.fullName);
+              if (res.role) sessionStorage.setItem('currentUserRole', res.role);
+            } catch (e) {}
             const sessionParam = res.sessionId ? '&sessionId=' + encodeURIComponent(res.sessionId) : '';
             const target = BASE_SCRIPT_URL + '?page=Index' + sessionParam + '&login=1&_=' + Date.now();
             try {

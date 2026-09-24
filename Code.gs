@@ -100,6 +100,7 @@ function doGet(e) {
   }
 
   var template = HtmlService.createTemplateFromFile(page);
+  template.sessionId = requestSessionId || '';
   if (page === "Index") {
     template.scriptUrl = ScriptApp.getService().getUrl();
     try {
