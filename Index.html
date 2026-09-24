@@ -168,6 +168,24 @@
       background: #94a3b8;
     }
 
+    .nav-section {
+      list-style: none;
+      margin-top: 12px;
+      padding: 0 8px 0 8px;
+    }
+
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #64748b;
+      padding: 0 2px 6px;
+      border-bottom: 1px solid #e2e8f0;
+      margin-bottom: 6px;
+      display: block;
+    }
+
     .nav-item {
       padding: 8px 10px;
       border-radius: 8px;
@@ -2361,6 +2379,16 @@
             return;
           }
 
+          const sectionDefinitions = [
+            { title: 'People', matches: (nameLower, route) => ['student','teacher','parent','user','permission'].some(token => nameLower.includes(token) || (route && route.page && route.page.toLowerCase().includes(token))) },
+            { title: 'Academics', matches: (nameLower, route) => ['course','subject','class','attendance','academic','performance','enroll'].some(token => nameLower.includes(token) || (route && route.page && route.page.toLowerCase().includes(token))) },
+            { title: 'Finance', matches: (nameLower, route) => ['billing','invoice','payment'].some(token => nameLower.includes(token) || (route && route.page && route.page.toLowerCase().includes(token))) },
+            { title: 'System', matches: (nameLower, route) => ['settings','report'].some(token => nameLower.includes(token) || (route && route.page && route.page.toLowerCase().includes(token))) }
+          ];
+
+          const sectionMap = new Map(sectionDefinitions.map(section => [section.title, []]));
+          const ungrouped = [];
+
           const requestedPage = extractRequestedPage(normalizeHashValue(window.location.hash));
           let pageToActivate = null;
 
@@ -2458,8 +2486,33 @@
               pageToActivate = item;
             }
 
-            sidebar.appendChild(item);
+            const matchingSection = sectionDefinitions.find(section => section.matches(nameLower, route));
+            if (matchingSection) {
+              sectionMap.get(matchingSection.title).push(item);
+            } else {
+              ungrouped.push(item);
+            }
           });
+
+          sectionDefinitions.forEach(function(section) {
+            const items = sectionMap.get(section.title) || [];
+            if (!items.length) return;
+
+            const sectionElm = document.createElement('li');
+            sectionElm.className = 'nav-section';
+            sectionElm.innerHTML = `<span class="nav-section-label">${section.title}</span>`;
+            sidebar.appendChild(sectionElm);
+
+            items.forEach(item => sidebar.appendChild(item));
+          });
+
+          if (ungrouped.length) {
+            const sectionElm = document.createElement('li');
+            sectionElm.className = 'nav-section';
+            sectionElm.innerHTML = '<span class="nav-section-label">More</span>';
+            sidebar.appendChild(sectionElm);
+            ungrouped.forEach(item => sidebar.appendChild(item));
+          }
 
           if (pageToActivate) {
             pageToActivate.click();

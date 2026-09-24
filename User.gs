@@ -267,12 +267,17 @@ function updateUser(userId, userData) {
   const row = findUserRowById(sheet, userId);
   if (row === -1) throw new Error("User record not found.");
 
-  // Hash password if it's being updated and not already hashed
-  let passwordToStore = userData.password;
-  if (passwordToStore) {
+  // Keep the existing password unless the admin actually types a new one.
+  const submittedPassword = typeof userData.password === 'string' ? userData.password.trim() : '';
+  const currentStoredPassword = String(sheet.getRange(row, 8).getValue() || '').trim();
+  let passwordToStore = currentStoredPassword;
+
+  if (submittedPassword) {
     // Only hash if it's not already a hash (64 hex characters)
-    if (!(passwordToStore.length === 64 && /^[a-f0-9]+$/.test(passwordToStore))) {
-      passwordToStore = hashPassword(passwordToStore);
+    if (!(submittedPassword.length === 64 && /^[a-f0-9]+$/.test(submittedPassword))) {
+      passwordToStore = hashPassword(submittedPassword);
+    } else {
+      passwordToStore = submittedPassword;
     }
   }
 
