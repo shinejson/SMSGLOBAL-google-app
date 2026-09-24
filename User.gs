@@ -426,31 +426,21 @@ function loginUser(username, password) {
     const loginTrials = parseInt(data[i][7], 10) || 0;
     const lockedUntilValue = data[i][8];
 
-    if (user !== normalizedUsername) continue;
+    // Case-insensitive username matching
+    if (user.toLowerCase() !== normalizedUsername.toLowerCase()) continue;
 
-    const lockedUntil = parseLockedUntilValue_(lockedUntilValue);
-    if (lockedUntil && lockedUntil.getTime() <= Date.now()) {
-      safeResetUserLoginLock_(sheet, rowNum);
-    } else if (isUserAccountLocked_(loginTrials, lockedUntilValue)) {
-      const minutesLeft = getRemainingLockMinutes_(lockedUntilValue) || LOGIN_LOCK_MINUTES;
-      return {
-        success: false,
-        message: 'Account temporarily locked after ' + MAX_LOGIN_ATTEMPTS + ' failed attempts. Try again in ' + minutesLeft + ' minute(s).'
-      };
-    }
-
-    if (accountStatus.toLowerCase() !== "active") {
+    // Check account status: only block if explicitly inactive / disabled
+    if (accountStatus && ['inactive', 'suspended', 'disabled', 'blocked'].indexOf(accountStatus.toLowerCase()) !== -1) {
       return { success: false, message: "Account is inactive. Contact administrator." };
     }
 
+    // Verify password first
     const check = verifyPasswordWithDetails_(password, storedPasswordHash);
     if (check.matched) {
-      // A correct password must never be blocked by a bookkeeping write
-      // (e.g. the account running the script only has view access to the file).
+      // Correct password! Immediately clear failed attempts and unlock account
       safeResetUserLoginLock_(sheet, rowNum);
 
-      // Quietly normalise legacy formats to the current salted hash so that the
-      // original project and any imported copy keep agreeing on the stored hash.
+      // Quietly normalise plain-text or legacy formats to the current salted hash
       if (check.mode !== 'salted-current' && check.mode !== 'salted-legacy') {
         safeUpgradeStoredPassword_(sheet, rowNum, password);
       }
@@ -467,6 +457,18 @@ function loginUser(username, password) {
       };
     }
 
+    // Password did NOT match: check account lockout
+    const lockedUntil = parseLockedUntilValue_(lockedUntilValue);
+    if (lockedUntil && lockedUntil.getTime() <= Date.now()) {
+      safeResetUserLoginLock_(sheet, rowNum);
+    } else if (isUserAccountLocked_(loginTrials, lockedUntilValue)) {
+      const minutesLeft = getRemainingLockMinutes_(lockedUntilValue) || LOGIN_LOCK_MINUTES;
+      return {
+        success: false,
+        message: 'Account temporarily locked after ' + MAX_LOGIN_ATTEMPTS + ' failed attempts. Try again in ' + minutesLeft + ' minute(s).'
+      };
+    }
+
     const failureResult = safeRecordFailedLoginAttempt_(sheet, rowNum, loginTrials);
     return { success: false, message: failureResult.message };
   }
@@ -475,10 +477,17 @@ function loginUser(username, password) {
 }
 
 // 8. Check if user is logged in - SECURE VERSION
-function checkSession() {
-  // Get session ID from user properties
-  const props = PropertiesService.getUserProperties();
-  const sessionId = props.getProperty('CURRENT_SESSION_ID');
+function checkSession(paramSessionId) {
+  let sessionId = paramSessionId || null;
+  
+  if (!sessionId) {
+    try {
+      const props = PropertiesService.getUserProperties();
+      sessionId = props.getProperty('CURRENT_SESSION_ID');
+    } catch (e) {
+      // UserProperties might be unavailable in some environments
+    }
+  }
   
   if (!sessionId) {
     // Try to migrate old session format
@@ -494,9 +503,19 @@ function checkSession() {
   const session = validateSession(sessionId);
   if (!session) {
     // Session expired or invalid - clean up
-    storeSessionIdInProperties(null);
+    try {
+      storeSessionIdInProperties(null);
+    } catch (e) {}
     return false;
   }
+  
+  // If sessionId was provided externally and UserProperties is accessible, sync it
+  try {
+    const props = PropertiesService.getUserProperties();
+    if (props && !props.getProperty('CURRENT_SESSION_ID')) {
+      props.setProperty('CURRENT_SESSION_ID', sessionId);
+    }
+  } catch (e) {}
   
   // Session is valid and activity timestamp was updated by validateSession
   return true;
@@ -567,4 +586,373 @@ function getInitials(name) {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
+// --- ADMIN FORGOT PASSWORD RECOVERY ---
+
+/**
+ * Helper to mask an email address for privacy (e.g. s***8@gmail.com)
+ */
+function maskEmail_(email) {
+  if (!email || email.indexOf('@') === -1) return '***';
+  const parts = email.split('@');
+  const user = parts[0];
+  const domain = parts[1];
+  if (user.length <= 2) return user.charAt(0) + '***@' + domain;
+  return user.charAt(0) + '***' + user.charAt(user.length - 1) + '@' + domain;
+}
+
+/**
+ * 1. Request Password Reset for an Admin user.
+ * Generates a 6-digit verification code and emails it to the Admin's registered email.
+ * @param {string} identifier - Admin username or email
+ * @returns {object} { success: boolean, message: string, resetToken?: string, maskedEmail?: string }
+ */
+function requestAdminPasswordReset(identifier) {
+  try {
+    const rawId = String(identifier || '').trim();
+    if (!rawId) {
+      return { success: false, message: 'Please enter your Admin username or email address.' };
+    }
+
+    const ss = typeof getSpreadsheet_ === 'function' ? getSpreadsheet_() : SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      return { success: false, message: 'Spreadsheet connection unavailable.' };
+    }
+    const sheet = ss.getSheetByName('Users');
+    if (!sheet) {
+      return { success: false, message: 'Users sheet not found.' };
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < USER_SHEET_FIRST_DATA_ROW) {
+      return { success: false, message: 'No users found in the system.' };
+    }
+
+    const colCount = getUserSheetColumnCount_(sheet);
+    const dataRange = sheet.getRange(USER_SHEET_FIRST_DATA_ROW, USER_SHEET_FIRST_COL, lastRow - (USER_SHEET_FIRST_DATA_ROW - 1), colCount);
+    const data = dataRange.getValues();
+
+    const normalizedId = rawId.toLowerCase();
+    let targetUser = null;
+
+    for (let i = 0; i < data.length; i++) {
+      const userId = String(data[i][0] || '').trim();
+      const googleEmail = String(data[i][1] || '').trim();
+      const fullName = String(data[i][2] || '').trim();
+      const role = String(data[i][3] || '').trim();
+      const username = String(data[i][5] || '').trim();
+
+      if (username.toLowerCase() === normalizedId || googleEmail.toLowerCase() === normalizedId) {
+        targetUser = {
+          userId: userId,
+          googleEmail: googleEmail,
+          fullName: fullName,
+          role: role,
+          username: username
+        };
+        break;
+      }
+    }
+
+    if (!targetUser) {
+      return { success: false, message: 'No user account found with that username or email.' };
+    }
+
+    // SECURITY CHECK: Must be an Admin role
+    if (String(targetUser.role || '').trim().toLowerCase() !== 'admin') {
+      return {
+        success: false,
+        message: 'Password self-reset is only available for Administrator accounts. Please contact an Admin to reset your password.'
+      };
+    }
+
+    // Determine destination email: user's googleEmail or system owner email
+    let recipientEmail = targetUser.googleEmail;
+    if (!recipientEmail || recipientEmail.indexOf('@') === -1) {
+      if (typeof getSystemOwnerEmail === 'function') {
+        recipientEmail = getSystemOwnerEmail();
+      }
+    }
+
+    if (!recipientEmail || recipientEmail.indexOf('@') === -1) {
+      return {
+        success: false,
+        message: 'No valid email address is linked to this Admin account in the Users sheet. Please update Column C in the Users sheet or use the Master Password.'
+      };
+    }
+
+    // Generate 6-digit verification code
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const resetToken = Utilities.getUuid();
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+    const sessionPayload = JSON.stringify({
+      userId: targetUser.userId,
+      username: targetUser.username,
+      email: recipientEmail,
+      code: code,
+      expiresAt: expiresAt,
+      attempts: 0
+    });
+
+    // Store in ScriptCache (15 minutes = 900 seconds)
+    try {
+      CacheService.getScriptCache().put('pw_reset_' + resetToken, sessionPayload, 900);
+    } catch (e) {
+      Logger.log('CacheService put error: ' + e.message);
+    }
+
+    // Also store in ScriptProperties as backup
+    try {
+      PropertiesService.getScriptProperties().setProperty('pw_reset_' + resetToken, sessionPayload);
+    } catch (e) {}
+
+    // Send the email with the code
+    const schoolName = typeof getSchoolNameFromSettings === 'function' ? getSchoolNameFromSettings() : 'School Management System';
+    const subject = '🔐 Password Reset Code for Admin (' + targetUser.username + ')';
+    const plainBody = 
+      'Hello ' + (targetUser.fullName || targetUser.username) + ',\n\n' +
+      'A request was received to reset the password for your Admin account (' + targetUser.username + ') on ' + schoolName + '.\n\n' +
+      'Your 6-digit verification code is:\n\n' +
+      '   👉 ' + code + ' 👈\n\n' +
+      'This code is valid for 15 minutes.\n\n' +
+      'Enter this code on the login page to choose a new password and unlock your account.\n\n' +
+      'If you did not request this reset, your account password remains unchanged. Please check with your team.';
+
+    try {
+      GmailApp.sendEmail(recipientEmail, subject, plainBody, {
+        name: schoolName,
+        noReply: true
+      });
+    } catch (gErr) {
+      try {
+        MailApp.sendEmail({
+          to: recipientEmail,
+          subject: subject,
+          body: plainBody,
+          name: schoolName
+        });
+      } catch (mErr) {
+        Logger.log('Failed to send reset email: ' + mErr.message);
+        return {
+          success: false,
+          message: 'Failed to send email to ' + maskEmail_(recipientEmail) + ': ' + mErr.message + '. You can also use the Master Password to reset.'
+        };
+      }
+    }
+
+    return {
+      success: true,
+      resetToken: resetToken,
+      maskedEmail: maskEmail_(recipientEmail),
+      message: 'A 6-digit verification code has been sent to ' + maskEmail_(recipientEmail) + '.'
+    };
+  } catch (err) {
+    Logger.log('Error in requestAdminPasswordReset: ' + err.toString());
+    return { success: false, message: 'System error: ' + err.message };
+  }
+}
+
+/**
+ * 2. Verify Code & Set New Password for Admin.
+ * @param {string} resetToken
+ * @param {string} code
+ * @param {string} newPassword
+ * @returns {object} { success: boolean, message: string }
+ */
+function verifyAndResetAdminPassword(resetToken, code, newPassword) {
+  try {
+    const token = String(resetToken || '').trim();
+    const providedCode = String(code || '').trim();
+    const pass = String(newPassword || '').trim();
+
+    if (!token) return { success: false, message: 'Invalid or missing reset token.' };
+    if (!providedCode) return { success: false, message: 'Please enter the 6-digit verification code.' };
+    if (!pass || pass.length < 6) return { success: false, message: 'Password must be at least 6 characters long.' };
+
+    // Retrieve session payload from CacheService or ScriptProperties
+    let payloadStr = '';
+    try {
+      payloadStr = CacheService.getScriptCache().get('pw_reset_' + token);
+    } catch (e) {}
+
+    if (!payloadStr) {
+      try {
+        payloadStr = PropertiesService.getScriptProperties().getProperty('pw_reset_' + token);
+      } catch (e) {}
+    }
+
+    if (!payloadStr) {
+      return { success: false, message: 'Password reset session has expired or is invalid. Please request a new code.' };
+    }
+
+    const session = JSON.parse(payloadStr);
+    if (!session || Date.now() > session.expiresAt) {
+      return { success: false, message: 'This verification code has expired. Please request a new one.' };
+    }
+
+    // Check code attempt count
+    session.attempts = (session.attempts || 0) + 1;
+    if (session.attempts > 5) {
+      try {
+        CacheService.getScriptCache().remove('pw_reset_' + token);
+        PropertiesService.getScriptProperties().deleteProperty('pw_reset_' + token);
+      } catch (e) {}
+      return { success: false, message: 'Too many incorrect attempts. Please request a new code.' };
+    }
+
+    if (session.code !== providedCode) {
+      try {
+        CacheService.getScriptCache().put('pw_reset_' + token, JSON.stringify(session), 900);
+      } catch (e) {}
+      return { success: false, message: 'Invalid verification code. Please check your email and try again.' };
+    }
+
+    // CODE MATCHES! Perform password update in Users sheet
+    const ss = typeof getSpreadsheet_ === 'function' ? getSpreadsheet_() : SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet connection unavailable.' };
+    const sheet = ss.getSheetByName('Users');
+    if (!sheet) return { success: false, message: 'Users sheet not found.' };
+
+    const rowNum = findUserRowById(sheet, session.userId);
+    if (rowNum === -1) {
+      return { success: false, message: 'User record could not be found in Users sheet.' };
+    }
+
+    // Hash password with active salt (and ensure salt is stored in sheet)
+    const activeSalt = getSalt();
+    writeSaltToSheet_(activeSalt);
+    const hashedPassword = hashPassword(pass);
+
+    // Update password in Column H (8)
+    sheet.getRange(rowNum, 8).setValue(hashedPassword);
+    // Ensure status is Active in Column F (6)
+    sheet.getRange(rowNum, 6).setValue('Active');
+    // Clear failed attempts and lockout in Column I & J (9 & 10)
+    sheet.getRange(rowNum, 9, 1, 2).setValues([[0, '']]);
+
+    // Clean up reset token
+    try {
+      CacheService.getScriptCache().remove('pw_reset_' + token);
+      PropertiesService.getScriptProperties().deleteProperty('pw_reset_' + token);
+    } catch (e) {}
+
+    // Invalidate caches
+    invalidateCacheOnModify('Users');
+    invalidateIndex('Users');
+
+    safeLogAuditEvent(
+      'Update',
+      'Users',
+      session.userId,
+      'Admin password reset via self-service email verification for ' + session.username,
+      null,
+      null
+    );
+
+    return {
+      success: true,
+      message: 'Admin password reset successfully! You can now sign in with your new password.'
+    };
+  } catch (err) {
+    Logger.log('Error in verifyAndResetAdminPassword: ' + err.toString());
+    return { success: false, message: 'System error: ' + err.message };
+  }
+}
+
+/**
+ * 3. Immediate Admin Password Reset using Master Password (no email required).
+ * @param {string} username
+ * @param {string} masterPassword
+ * @param {string} newPassword
+ * @returns {object} { success: boolean, message: string }
+ */
+function resetAdminPasswordWithMasterPassword(username, masterPassword, newPassword) {
+  try {
+    const userNorm = String(username || '').trim().toLowerCase();
+    const masterPass = String(masterPassword || '').trim();
+    const pass = String(newPassword || '').trim();
+
+    if (!userNorm) return { success: false, message: 'Please enter your Admin username.' };
+    if (!masterPass) return { success: false, message: 'Please enter the Master Password.' };
+    if (!pass || pass.length < 6) return { success: false, message: 'New password must be at least 6 characters long.' };
+
+    // Verify Master Password from Settings sheet
+    const storedMaster = typeof getSystemParameter === 'function' ? (getSystemParameter('Master Password') || getSystemParameter('MasterPass')) : null;
+    if (!storedMaster) {
+      return { success: false, message: 'No Master Password is configured in the Settings sheet. Please use email verification or reset via Google Sheets menu.' };
+    }
+
+    if (typeof isMasterPasswordMatch === 'function') {
+      if (!isMasterPasswordMatch(masterPass, storedMaster)) {
+        return { success: false, message: 'Incorrect Master Password.' };
+      }
+    } else {
+      if (masterPass !== String(storedMaster)) {
+        return { success: false, message: 'Incorrect Master Password.' };
+      }
+    }
+
+    const ss = typeof getSpreadsheet_ === 'function' ? getSpreadsheet_() : SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return { success: false, message: 'Spreadsheet connection unavailable.' };
+    const sheet = ss.getSheetByName('Users');
+    if (!sheet) return { success: false, message: 'Users sheet not found.' };
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < USER_SHEET_FIRST_DATA_ROW) return { success: false, message: 'No users found.' };
+
+    const colCount = getUserSheetColumnCount_(sheet);
+    const data = sheet.getRange(USER_SHEET_FIRST_DATA_ROW, USER_SHEET_FIRST_COL, lastRow - (USER_SHEET_FIRST_DATA_ROW - 1), colCount).getValues();
+
+    let targetRow = -1;
+    let targetUserId = '';
+    let targetRole = '';
+
+    for (let i = 0; i < data.length; i++) {
+      const u = String(data[i][5] || '').trim().toLowerCase();
+      if (u === userNorm) {
+        targetRow = USER_SHEET_FIRST_DATA_ROW + i;
+        targetUserId = String(data[i][0] || '').trim();
+        targetRole = String(data[i][3] || '').trim();
+        break;
+      }
+    }
+
+    if (targetRow === -1) {
+      return { success: false, message: 'Admin username "' + username + '" not found.' };
+    }
+
+    if (targetRole.toLowerCase() !== 'admin') {
+      return { success: false, message: 'Master Password reset is only available for Admin accounts.' };
+    }
+
+    const activeSalt = getSalt();
+    writeSaltToSheet_(activeSalt);
+    const hashedPassword = hashPassword(pass);
+
+    sheet.getRange(targetRow, 8).setValue(hashedPassword);
+    sheet.getRange(targetRow, 6).setValue('Active');
+    sheet.getRange(targetRow, 9, 1, 2).setValues([[0, '']]);
+
+    invalidateCacheOnModify('Users');
+    invalidateIndex('Users');
+
+    safeLogAuditEvent(
+      'Update',
+      'Users',
+      targetUserId,
+      'Admin password reset using Master Password for ' + username,
+      null,
+      null
+    );
+
+    return {
+      success: true,
+      message: 'Admin password reset successfully! You can now sign in with your new password.'
+    };
+  } catch (err) {
+    Logger.log('Error in resetAdminPasswordWithMasterPassword: ' + err.toString());
+    return { success: false, message: 'System error: ' + err.message };
+  }
 }

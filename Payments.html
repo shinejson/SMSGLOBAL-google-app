@@ -1592,8 +1592,7 @@
 
       const schoolName  = (systemParameters.find(p => p.param === 'School Name')?.value  || 'School Name').trim();
       const schoolEmail = (systemParameters.find(p => p.param === 'School Email')?.value || '').trim();
-      const schoolPhone = (systemParameters.find(p => p.param === 'School Phone')?.value || '').trim();
-      const rawLogoUrl  = (systemParameters.find(p => p.param === 'School Logo URL')?.value || '').trim();
+      const rawLogoUrl  = (systemParameters.find(p => p.param === 'School Logo URL' || p.param === 'School Logo' || p.param === 'Logo URL' || p.param === 'schoolLogoUrl')?.value || '').trim();
 
       const historyTotal   = payList
         .filter(p => p.studentId === payment.studentId && p.academicYear === payment.academicYear && p.term === payment.term && p.paymentDate < payment.paymentDate)

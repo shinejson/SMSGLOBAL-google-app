@@ -1488,9 +1488,11 @@
     function formatDriveImageUrl(url) {
       if (!url) return '';
       const strUrl = String(url).trim();
+      if (strUrl.startsWith('data:image/')) return strUrl;
       const fileDMatch = strUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
       const idParamMatch = strUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      const fileId = (fileDMatch && fileDMatch[1]) || (idParamMatch && idParamMatch[1]);
+      const directDMatch = strUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const fileId = (fileDMatch && fileDMatch[1]) || (idParamMatch && idParamMatch[1]) || (directDMatch && directDMatch[1]) || (/^[a-zA-Z0-9_-]{25,}$/.test(strUrl) ? strUrl : null);
       if (fileId) {
         return 'https://lh3.googleusercontent.com/d/' + fileId;
       }
@@ -3111,7 +3113,17 @@
       let sessionCheckAttempts = 0;
       const MAX_SESSION_CHECK_ATTEMPTS = 5;
 
+      function getSessionIdFromUrl() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          return params.get('sessionId') || '';
+        } catch (e) {
+          return '';
+        }
+      }
+
       function checkBackendSession() {
+        const urlSessionId = getSessionIdFromUrl();
         google.script.run
           .withSuccessHandler(function(isLoggedIn) {
             if (!isLoggedIn) {
@@ -3133,7 +3145,7 @@
             }
             redirectToLogin();
           })
-          .checkSession();
+          .checkSession(urlSessionId);
       }
 
       function redirectToLogin() {

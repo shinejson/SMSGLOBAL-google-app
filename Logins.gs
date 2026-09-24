@@ -41,14 +41,23 @@ function getSchoolNameFromSettings() {
 // Helper to fetch direct school logo URL from Settings sheet
 function getSchoolLogoFromSettings() {
   try {
+    if (typeof getSchoolLogoUrl === 'function') {
+      const logo = getSchoolLogoUrl();
+      if (logo) return logo;
+    }
     if (typeof getParameters === 'function') {
       const params = getParameters();
-      if (params && (params['schoolLogoDirectUrl'] || params['School Logo URL'])) {
-        return params['schoolLogoDirectUrl'] || params['School Logo URL'];
+      if (params) {
+        const logo = params['School Logo URL'] || params['School Logo'] || params['Logo URL'] || params['schoolLogoDirectUrl'] || params['schoolLogoUrl'];
+        if (logo) return typeof formatDriveImageUrl_ === 'function' ? formatDriveImageUrl_(logo) : logo;
       }
     }
+    if (typeof getSystemParameter === 'function') {
+      const logo = getSystemParameter('School Logo URL') || getSystemParameter('School Logo') || getSystemParameter('Logo URL');
+      if (logo) return typeof formatDriveImageUrl_ === 'function' ? formatDriveImageUrl_(logo) : logo;
+    }
   } catch(e) {}
-  return 'https://lh3.googleusercontent.com/d/1MVnH55BHBynLBOD4pLIZE-5Y9gMaJbOe';
+  return '';
 }
 
 // 4. Gather comprehensive data for the Reports page

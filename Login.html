@@ -266,6 +266,157 @@
       border-color: #3b82f6;
       background: #0f172a;
     }
+
+    /* FORGOT PASSWORD LINK */
+    .forgot-pw-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: -4px;
+      margin-bottom: 14px;
+    }
+    .forgot-pw-link {
+      font-size: 13px;
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.15s ease;
+    }
+    .forgot-pw-link:hover {
+      color: #1d4ed8;
+      text-decoration: underline;
+    }
+    body.dark-mode .forgot-pw-link {
+      color: #60a5fa;
+    }
+
+    /* RESET MODAL */
+    .reset-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .reset-modal-card {
+      background: #ffffff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.95) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .reset-modal-header {
+      padding: 18px 24px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .reset-modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .reset-modal-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      color: #94a3b8;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+      transition: color 0.15s;
+    }
+    .reset-modal-close:hover { color: #0f172a; }
+    .reset-modal-body {
+      padding: 24px;
+    }
+    .reset-desc {
+      font-size: 13.5px;
+      color: #475569;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+    .reset-desc strong {
+      color: #0f172a;
+    }
+    .reset-msg-box {
+      display: none;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.4;
+      margin-top: 14px;
+    }
+    .reset-msg-box.error {
+      display: block;
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+    }
+    .reset-msg-box.success {
+      display: block;
+      background: #dcfce7;
+      border: 1px solid #86efac;
+      color: #166534;
+    }
+    .reset-msg-box.info {
+      display: block;
+      background: #e0f2fe;
+      border: 1px solid #bae6fd;
+      color: #0369a1;
+    }
+    .reset-tabs {
+      display: flex;
+      gap: 8px;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 10px;
+      margin-bottom: 18px;
+    }
+    .reset-tab-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      background: transparent;
+      border-radius: 7px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .reset-tab-btn.active {
+      background: #ffffff;
+      color: #2563eb;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    body.dark-mode .reset-modal-card {
+      background: #1e293b;
+      color: #f1f5f9;
+    }
+    body.dark-mode .reset-modal-header {
+      background: #0f172a;
+      border-bottom-color: #334155;
+    }
+    body.dark-mode .reset-modal-title { color: #f1f5f9; }
+    body.dark-mode .reset-desc { color: #94a3b8; }
+    body.dark-mode .reset-desc strong { color: #f1f5f9; }
+    body.dark-mode .reset-tabs { background: #0f172a; }
+    body.dark-mode .reset-tab-btn.active { background: #334155; color: #60a5fa; }
   </style>
 </head>
 <body>
@@ -299,6 +450,10 @@
           </div>
         </div>
 
+        <div class="forgot-pw-row">
+          <a href="javascript:void(0)" class="forgot-pw-link" onclick="openForgotPasswordModal()">Forgot password? (Admin)</a>
+        </div>
+
         <button type="submit" class="login-btn" id="loginBtn">
           <span>Sign In to Portal</span> &rarr;
         </button>
@@ -314,6 +469,139 @@
     </div>
   </div>
 
+  <!-- ADMIN FORGOT PASSWORD MODAL -->
+  <div id="resetPasswordModal" class="reset-modal-overlay">
+    <div class="reset-modal-card">
+      <div class="reset-modal-header">
+        <div class="reset-modal-title">
+          <span>🔐</span> Admin Password Recovery
+        </div>
+        <button type="button" class="reset-modal-close" onclick="closeForgotPasswordModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="reset-modal-body">
+        
+        <!-- TABS -->
+        <div class="reset-tabs">
+          <button type="button" id="tabEmailBtn" class="reset-tab-btn active" onclick="switchResetTab('email')">✉️ Email OTP Code</button>
+          <button type="button" id="tabMasterBtn" class="reset-tab-btn" onclick="switchResetTab('master')">🔑 Master Password</button>
+        </div>
+
+        <!-- TAB 1: EMAIL OTP FLOW -->
+        <div id="tabEmailContent">
+          <!-- STEP 1: Enter Username/Email -->
+          <div id="resetStep1">
+            <p class="reset-desc">
+              Enter your Admin username or registered Google email. A 6-digit verification code will be sent to your email.
+            </p>
+            <form id="step1Form" onsubmit="handleSendResetCode(event)">
+              <div class="form-group">
+                <label class="form-label" for="resetIdentifier">Admin Username or Email</label>
+                <div class="input-wrapper">
+                  <span class="input-icon">👤</span>
+                  <input type="text" id="resetIdentifier" class="form-input" placeholder="e.g. admin or admin@gmail.com" required autocomplete="username">
+                </div>
+              </div>
+              <button type="submit" class="login-btn" id="sendCodeBtn" style="margin-top: 10px;">
+                <span>Send Verification Code</span> &rarr;
+              </button>
+              <div id="resetMsgStep1" class="reset-msg-box"></div>
+            </form>
+          </div>
+
+          <!-- STEP 2: Enter Code & New Password -->
+          <div id="resetStep2" style="display: none;">
+            <p class="reset-desc">
+              We sent a 6-digit code to <strong id="maskedEmailDisplay"></strong>. Enter the code and your new password below.
+            </p>
+            <form id="step2Form" onsubmit="handleVerifyAndReset(event)">
+              <div class="form-group">
+                <label class="form-label" for="resetCode">6-Digit Verification Code</label>
+                <div class="input-wrapper">
+                  <span class="input-icon">🔢</span>
+                  <input type="text" id="resetCode" class="form-input" placeholder="e.g. 123456" maxlength="6" pattern="[0-9]{6}" required autocomplete="one-time-code">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="resetNewPassword">New Password</label>
+                <div class="input-wrapper">
+                  <span class="input-icon">🔒</span>
+                  <input type="password" id="resetNewPassword" class="form-input" placeholder="At least 6 characters" minlength="6" required autocomplete="new-password">
+                  <button type="button" class="toggle-pw-btn" onclick="togglePasswordVisibilityFor('resetNewPassword')" title="Toggle visibility">👁️</button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="resetConfirmPassword">Confirm New Password</label>
+                <div class="input-wrapper">
+                  <span class="input-icon">🔒</span>
+                  <input type="password" id="resetConfirmPassword" class="form-input" placeholder="Re-enter new password" minlength="6" required autocomplete="new-password">
+                </div>
+              </div>
+
+              <button type="submit" class="login-btn" id="verifyResetBtn" style="margin-top: 10px;">
+                <span>Reset & Unlock Account</span> &rarr;
+              </button>
+              
+              <div style="margin-top: 12px; text-align: center;">
+                <a href="javascript:void(0)" class="forgot-pw-link" onclick="goToStep1()" style="font-size: 12.5px;">&larr; Request a different code</a>
+              </div>
+              <div id="resetMsgStep2" class="reset-msg-box"></div>
+            </form>
+          </div>
+        </div>
+
+        <!-- TAB 2: MASTER PASSWORD FLOW -->
+        <div id="tabMasterContent" style="display: none;">
+          <p class="reset-desc">
+            Instantly reset any Admin password using the <strong>School Master Password</strong> configured in your Google Sheets Settings.
+          </p>
+          <form id="masterResetForm" onsubmit="handleMasterReset(event)">
+            <div class="form-group">
+              <label class="form-label" for="masterAdminUsername">Admin Username</label>
+              <div class="input-wrapper">
+                <span class="input-icon">👤</span>
+                <input type="text" id="masterAdminUsername" class="form-input" placeholder="Enter Admin username" required autocomplete="username">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="masterPasswordInput">School Master Password</label>
+              <div class="input-wrapper">
+                <span class="input-icon">🛡️</span>
+                <input type="password" id="masterPasswordInput" class="form-input" placeholder="Enter Master Password" required autocomplete="current-password">
+                <button type="button" class="toggle-pw-btn" onclick="togglePasswordVisibilityFor('masterPasswordInput')" title="Toggle visibility">👁️</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="masterNewPassword">New Password</label>
+              <div class="input-wrapper">
+                <span class="input-icon">🔒</span>
+                <input type="password" id="masterNewPassword" class="form-input" placeholder="At least 6 characters" minlength="6" required autocomplete="new-password">
+                <button type="button" class="toggle-pw-btn" onclick="togglePasswordVisibilityFor('masterNewPassword')" title="Toggle visibility">👁️</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="masterConfirmPassword">Confirm New Password</label>
+              <div class="input-wrapper">
+                <span class="input-icon">🔒</span>
+                <input type="password" id="masterConfirmPassword" class="form-input" placeholder="Re-enter new password" minlength="6" required autocomplete="new-password">
+              </div>
+            </div>
+
+            <button type="submit" class="login-btn" id="masterResetBtn" style="margin-top: 10px;">
+              <span>Verify & Set New Password</span> &rarr;
+            </button>
+            <div id="resetMsgMaster" class="reset-msg-box"></div>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
   <script>
     document.getElementById('yearSpan').textContent = new Date().getFullYear();
     const BASE_SCRIPT_URL = '<?= scriptUrl ?>' || window.location.href.split('?')[0];
@@ -322,9 +610,11 @@
     function formatDriveImageUrl(url) {
       if (!url) return '';
       const strUrl = String(url).trim();
+      if (strUrl.startsWith('data:image/')) return strUrl;
       const fileDMatch = strUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
       const idParamMatch = strUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      const fileId = (fileDMatch && fileDMatch[1]) || (idParamMatch && idParamMatch[1]);
+      const directDMatch = strUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const fileId = (fileDMatch && fileDMatch[1]) || (idParamMatch && idParamMatch[1]) || (directDMatch && directDMatch[1]) || (/^[a-zA-Z0-9_-]{25,}$/.test(strUrl) ? strUrl : null);
       if (fileId) {
         return 'https://lh3.googleusercontent.com/d/' + fileId;
       }
@@ -352,17 +642,13 @@
                 document.getElementById('schoolTitle').textContent = name;
                 document.getElementById('footerSchoolName').textContent = name;
               }
-              const logo = params['schoolLogoDirectUrl'] || params['School Logo URL'] || params['schoolLogoUrl'];
+              const logo = params['School Logo URL'] || params['School Logo'] || params['Logo URL'] || params['schoolLogoDirectUrl'] || params['schoolLogoUrl'];
               if (logo) {
                 applySchoolLogo(logo);
               }
             }
           })
           .getParameters();
-      } else {
-        // Fallback for hardcoded Google Drive logo link
-        const driveLogoUrl = 'https://drive.google.com/file/d/1MVnH55BHBynLBOD4pLIZE-5Y9gMaJbOe/view?usp=drive_link';
-        applySchoolLogo(driveLogoUrl);
       }
     });
 
@@ -393,14 +679,15 @@
         .withSuccessHandler(function(res) {
           if (res.success) {
             btn.innerText = 'Redirecting...';
-            const target = BASE_SCRIPT_URL + '?page=Index&login=1&_=' + Date.now();
+            const sessionParam = res.sessionId ? '&sessionId=' + encodeURIComponent(res.sessionId) : '';
+            const target = BASE_SCRIPT_URL + '?page=Index' + sessionParam + '&login=1&_=' + Date.now();
             try {
               top.location.href = target;
             } catch (e) {
               try {
                 window.location.href = target;
               } catch (e2) {
-                setTimeout(function() { redirectToIndex(); }, 100);
+                setTimeout(function() { redirectToIndex(res.sessionId); }, 100);
               }
             }
           } else {
@@ -421,12 +708,13 @@
         .loginUser(username, password);
     }
 
-    function redirectToIndex(attempt) {
+    function redirectToIndex(sessionId, attempt) {
       attempt = attempt || 0;
+      const sessionParam = sessionId ? '&sessionId=' + encodeURIComponent(sessionId) : '';
       google.script.run
         .withSuccessHandler(function(isLoggedIn) {
           if (isLoggedIn) {
-            const target = BASE_SCRIPT_URL + '?page=Index&login=1&_=' + Date.now();
+            const target = BASE_SCRIPT_URL + '?page=Index' + sessionParam + '&login=1&_=' + Date.now();
             try {
               if (window.top && window.top !== window) {
                 window.top.location.href = target;
@@ -441,10 +729,10 @@
             return;
           }
           if (attempt < 5) {
-            setTimeout(function() { redirectToIndex(attempt + 1); }, 300);
+            setTimeout(function() { redirectToIndex(sessionId, attempt + 1); }, 300);
             return;
           }
-          const target = BASE_SCRIPT_URL + '?page=Index&login=1&_=' + Date.now();
+          const target = BASE_SCRIPT_URL + '?page=Index' + sessionParam + '&login=1&_=' + Date.now();
           try {
             if (window.top && window.top !== window) {
               window.top.location.href = target;
@@ -457,8 +745,228 @@
             }
           }
         })
-        .checkSession();
+        .checkSession(sessionId);
     }
+
+    // --- ADMIN FORGOT PASSWORD CLIENT-SIDE LOGIC ---
+    let currentResetToken = null;
+
+    function openForgotPasswordModal() {
+      // Pre-fill username if entered on main login form
+      const currentUsername = (document.getElementById('username').value || '').trim();
+      if (currentUsername) {
+        document.getElementById('resetIdentifier').value = currentUsername;
+        document.getElementById('masterAdminUsername').value = currentUsername;
+      }
+      switchResetTab('email');
+      goToStep1();
+      clearResetMessages();
+      document.getElementById('resetPasswordModal').style.display = 'flex';
+    }
+
+    function closeForgotPasswordModal() {
+      document.getElementById('resetPasswordModal').style.display = 'none';
+      clearResetMessages();
+    }
+
+    function switchResetTab(tab) {
+      const emailBtn = document.getElementById('tabEmailBtn');
+      const masterBtn = document.getElementById('tabMasterBtn');
+      const emailContent = document.getElementById('tabEmailContent');
+      const masterContent = document.getElementById('tabMasterContent');
+      clearResetMessages();
+
+      if (tab === 'master') {
+        emailBtn.classList.remove('active');
+        masterBtn.classList.add('active');
+        emailContent.style.display = 'none';
+        masterContent.style.display = 'block';
+      } else {
+        masterBtn.classList.remove('active');
+        emailBtn.classList.add('active');
+        masterContent.style.display = 'none';
+        emailContent.style.display = 'block';
+      }
+    }
+
+    function goToStep1() {
+      document.getElementById('resetStep1').style.display = 'block';
+      document.getElementById('resetStep2').style.display = 'none';
+      clearResetMessages();
+    }
+
+    function clearResetMessages() {
+      ['resetMsgStep1', 'resetMsgStep2', 'resetMsgMaster'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.className = 'reset-msg-box';
+          el.style.display = 'none';
+          el.textContent = '';
+        }
+      });
+    }
+
+    function showResetMessage(containerId, text, type) {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      el.className = 'reset-msg-box ' + (type || 'info');
+      el.textContent = text;
+      el.style.display = 'block';
+    }
+
+    function togglePasswordVisibilityFor(inputId) {
+      const input = document.getElementById(inputId);
+      if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
+      }
+    }
+
+    function handleSendResetCode(e) {
+      e.preventDefault();
+      const identifier = (document.getElementById('resetIdentifier').value || '').trim();
+      const btn = document.getElementById('sendCodeBtn');
+      if (!identifier) {
+        showResetMessage('resetMsgStep1', 'Please enter your Admin username or email.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = 'Sending verification code... ⏳';
+      clearResetMessages();
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Send Verification Code</span> &rarr;';
+          if (res && res.success) {
+            currentResetToken = res.resetToken;
+            document.getElementById('maskedEmailDisplay').textContent = res.maskedEmail || 'your email';
+            document.getElementById('resetStep1').style.display = 'none';
+            document.getElementById('resetStep2').style.display = 'block';
+            showResetMessage('resetMsgStep2', res.message, 'info');
+          } else {
+            showResetMessage('resetMsgStep1', (res && res.message) || 'Unable to process reset request.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Send Verification Code</span> &rarr;';
+          showResetMessage('resetMsgStep1', 'System error: ' + (err ? err.message : 'Request failed'), 'error');
+        })
+        .requestAdminPasswordReset(identifier);
+    }
+
+    function handleVerifyAndReset(e) {
+      e.preventDefault();
+      const code = (document.getElementById('resetCode').value || '').trim();
+      const newPassword = document.getElementById('resetNewPassword').value;
+      const confirmPassword = document.getElementById('resetConfirmPassword').value;
+      const btn = document.getElementById('verifyResetBtn');
+
+      if (!code || code.length !== 6) {
+        showResetMessage('resetMsgStep2', 'Please enter the 6-digit code sent to your email.', 'error');
+        return;
+      }
+      if (newPassword.length < 6) {
+        showResetMessage('resetMsgStep2', 'Password must be at least 6 characters.', 'error');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        showResetMessage('resetMsgStep2', 'New passwords do not match. Please verify.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = 'Updating password... ⏳';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Reset & Unlock Account</span> &rarr;';
+          if (res && res.success) {
+            showResetMessage('resetMsgStep2', res.message, 'success');
+            // Auto-fill login form
+            const adminId = (document.getElementById('resetIdentifier').value || '').trim();
+            if (adminId) document.getElementById('username').value = adminId;
+            document.getElementById('password').value = newPassword;
+            setTimeout(function() {
+              closeForgotPasswordModal();
+            }, 1800);
+          } else {
+            showResetMessage('resetMsgStep2', (res && res.message) || 'Failed to reset password.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Reset & Unlock Account</span> &rarr;';
+          showResetMessage('resetMsgStep2', 'System error: ' + (err ? err.message : 'Reset failed'), 'error');
+        })
+        .verifyAndResetAdminPassword(currentResetToken, code, newPassword);
+    }
+
+    function handleMasterReset(e) {
+      e.preventDefault();
+      const username = (document.getElementById('masterAdminUsername').value || '').trim();
+      const masterPassword = document.getElementById('masterPasswordInput').value;
+      const newPassword = document.getElementById('masterNewPassword').value;
+      const confirmPassword = document.getElementById('masterConfirmPassword').value;
+      const btn = document.getElementById('masterResetBtn');
+
+      if (!username) {
+        showResetMessage('resetMsgMaster', 'Please enter your Admin username.', 'error');
+        return;
+      }
+      if (!masterPassword) {
+        showResetMessage('resetMsgMaster', 'Please enter the School Master Password.', 'error');
+        return;
+      }
+      if (newPassword.length < 6) {
+        showResetMessage('resetMsgMaster', 'New password must be at least 6 characters.', 'error');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        showResetMessage('resetMsgMaster', 'New passwords do not match. Please verify.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = 'Verifying & resetting... ⏳';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Verify & Set New Password</span> &rarr;';
+          if (res && res.success) {
+            showResetMessage('resetMsgMaster', res.message, 'success');
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = newPassword;
+            setTimeout(function() {
+              closeForgotPasswordModal();
+            }, 1800);
+          } else {
+            showResetMessage('resetMsgMaster', (res && res.message) || 'Failed to reset password.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Verify & Set New Password</span> &rarr;';
+          showResetMessage('resetMsgMaster', 'System error: ' + (err ? err.message : 'Reset failed'), 'error');
+        })
+        .resetAdminPasswordWithMasterPassword(username, masterPassword, newPassword);
+    }
+
+    // Close modal on click outside or Escape
+    window.addEventListener('click', function(e) {
+      const modal = document.getElementById('resetPasswordModal');
+      if (e.target === modal) {
+        closeForgotPasswordModal();
+      }
+    });
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeForgotPasswordModal();
+      }
+    });
   </script>
 </body>
 </html>

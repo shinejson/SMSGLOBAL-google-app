@@ -84,7 +84,8 @@ function doGet(e) {
   var skipSessionCheck = embedded && EMBEDDED_ALLOWED.indexOf(page) !== -1;
 
   // Protect whitelisted pages / protect all pages except Login/skipSessionCheck whitelisted
-  if (page !== "Login" && !skipSessionCheck && !checkSession()) {
+  var requestSessionId = (e && e.parameter && e.parameter.sessionId) || null;
+  if (page !== "Login" && !skipSessionCheck && !checkSession(requestSessionId)) {
     page = "Login";
   }
 
@@ -864,6 +865,11 @@ function getSystemOwnerEmail() {
       const fromSettings = String(getSystemParameter('System Owner Email') || '').trim();
       if (fromSettings.indexOf('@') !== -1) return fromSettings.toLowerCase();
     }
+  } catch (e) { /* ignore */ }
+
+  try {
+    const effective = String(Session.getEffectiveUser().getEmail() || '').trim();
+    if (effective.indexOf('@') !== -1) return effective.toLowerCase();
   } catch (e) { /* ignore */ }
 
   return String(TEST_MODE_OWNER_EMAIL || '').trim().toLowerCase();
@@ -5252,8 +5258,11 @@ function generateSingleTerminalReport(reportData, student) {
   const schoolName = getSystemParameter('School Name') || 'GLOBAL EVANGELICAL BASIC SCHOOL, TETTEKOPE';
   const schoolAddress = getSystemParameter('School Address') || getSystemParameter('Address') || 'P.O. BOX KW 182, KETA';
   const schoolEmail = getSystemParameter('School Email') || getSystemParameter('Email') || '';
-  const schoolPhone = getSystemParameter('School Phone') || getSystemParameter('Phone') || '';
-  const rawSchoolLogo = getSystemParameter('School Logo') || getSystemParameter('Logo URL') || 'https://drive.google.com/uc?export=view&id=1MVnH55BHBynLBOD4pLIZE-5Y9gMaJbOe';
+  const rawSchoolLogo = (typeof getSchoolLogoUrl === 'function' ? getSchoolLogoUrl() : '')
+    || getSystemParameter('School Logo URL')
+    || getSystemParameter('School Logo')
+    || getSystemParameter('Logo URL')
+    || '';
   const schoolLogo = getImageAsBase64(rawSchoolLogo);
   
   Logger.log('School Info - Name: ' + schoolName + ', Address: ' + schoolAddress + ', Email: ' + schoolEmail);
@@ -5637,18 +5646,23 @@ function hashString(value) {
 // prefixed and plain-text formats.
 
 function getSystemParameter(paramName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = typeof getSpreadsheet_ === 'function' ? getSpreadsheet_() : SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return null;
   const settingsSheet = ss.getSheetByName('Settings');
   if (!settingsSheet) return null;
   
   const data = settingsSheet.getDataRange().getValues();
   const normalizedTarget = normalizeParamName(paramName);
 
+  // If asking for school logo, accept all common variations
+  const isLogoQuery = (normalizedTarget === 'schoollogo' || normalizedTarget === 'schoollogourl' || normalizedTarget === 'logourl');
+
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     for (let j = 0; j < row.length - 1; j++) {
       const cellVal = String(row[j] || '').trim();
-      if (cellVal && normalizeParamName(cellVal) === normalizedTarget) {
+      const normCell = normalizeParamName(cellVal);
+      if (cellVal && (normCell === normalizedTarget || (isLogoQuery && (normCell === 'schoollogo' || normCell === 'schoollogourl' || normCell === 'logourl')))) {
         // Find the next non-empty cell in the row
         for (let k = j + 1; k < row.length; k++) {
           const val = String(row[k] || '').trim();
@@ -5660,6 +5674,45 @@ function getSystemParameter(paramName) {
     }
   }
   return null;
+}
+
+/**
+ * Universal helper to retrieve the school logo URL from Settings sheet.
+ * Supports Google Drive links, direct URLs, and Base64 images.
+ * @returns {string} Direct image URL or empty string
+ */
+function getSchoolLogoUrl() {
+  try {
+    if (typeof getParameters === 'function') {
+      const params = getParameters();
+      if (params) {
+        const logo = params['School Logo URL'] || params['School Logo'] || params['Logo URL'] || params['schoolLogoDirectUrl'] || params['schoolLogoUrl'];
+        if (logo) return formatDriveImageUrl_(logo);
+      }
+    }
+    const logo = getSystemParameter('School Logo URL') || getSystemParameter('School Logo') || getSystemParameter('Logo URL');
+    if (logo) return formatDriveImageUrl_(logo);
+  } catch (e) {
+    Logger.log('Error in getSchoolLogoUrl: ' + e.message);
+  }
+  return '';
+}
+
+/**
+ * Convert any Google Drive share/view URL or file ID to a high-speed direct web image URL
+ */
+function formatDriveImageUrl_(url) {
+  if (!url) return '';
+  const str = String(url).trim();
+  if (str.startsWith('data:image/')) return str;
+  const matchFileD = str.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  const matchIdParam = str.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  const matchDirectD = str.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const fileId = (matchFileD && matchFileD[1]) || (matchIdParam && matchIdParam[1]) || (matchDirectD && matchDirectD[1]) || (/^[a-zA-Z0-9_-]{25,}$/.test(str) ? str : null);
+  if (fileId) {
+    return 'https://lh3.googleusercontent.com/d/' + fileId;
+  }
+  return str;
 }
 
 /**
@@ -5700,6 +5753,9 @@ function getAttendanceStatuses() {
  * Convert a logo URL or Drive ID to a base64 Data URI for reliable PDF rendering
  */
 function getImageAsBase64(logoUrl) {
+  if (!logoUrl) {
+    logoUrl = getSchoolLogoUrl();
+  }
   if (!logoUrl) return '';
   const str = String(logoUrl).trim();
   if (str.startsWith('data:image/')) return str; // Already base64
@@ -5709,9 +5765,12 @@ function getImageAsBase64(logoUrl) {
 
     // Check if string contains a Google Drive file ID
     let fileId = null;
-    const matchId = str.match(/id=([a-zA-Z0-9_-]+)/);
+    const matchId = str.match(/[?&]id=([a-zA-Z0-9_-]+)/);
     const matchD = str.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (matchId) {
+    const matchFileD = str.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (matchFileD) {
+      fileId = matchFileD[1];
+    } else if (matchId) {
       fileId = matchId[1];
     } else if (matchD) {
       fileId = matchD[1];
@@ -5722,21 +5781,39 @@ function getImageAsBase64(logoUrl) {
     if (fileId) {
       try {
         const file = DriveApp.getFileById(fileId);
+        // Ensure the file is viewable with link so browser direct links work
+        try {
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        } catch (shareErr) {}
         blob = file.getBlob();
       } catch (e) {
         Logger.log('DriveApp failed to get file by ID (' + fileId + '): ' + e.message);
       }
     }
 
-    // Fallback: fetch via UrlFetchApp if DriveApp didn't get a blob
-    if (!blob && (str.startsWith('http://') || str.startsWith('https://'))) {
-      try {
-        const response = UrlFetchApp.fetch(str, { muteHttpExceptions: true });
-        if (response.getResponseCode() === 200) {
-          blob = response.getBlob();
+    // Fallback: fetch via direct HTTP if DriveApp didn't get a blob
+    if (!blob) {
+      const urlsToTry = [];
+      if (fileId) {
+        urlsToTry.push('https://lh3.googleusercontent.com/d/' + fileId);
+        urlsToTry.push('https://drive.google.com/uc?export=view&id=' + fileId);
+      } else if (str.startsWith('http://') || str.startsWith('https://')) {
+        urlsToTry.push(str);
+      }
+
+      for (let u = 0; u < urlsToTry.length && !blob; u++) {
+        try {
+          const response = UrlFetchApp.fetch(urlsToTry[u], { muteHttpExceptions: true });
+          if (response.getResponseCode() === 200) {
+            const fetchedBlob = response.getBlob();
+            const ct = (fetchedBlob.getContentType() || '').toLowerCase();
+            if (ct.indexOf('image/') !== -1 || ct.indexOf('application/octet-stream') !== -1) {
+              blob = fetchedBlob;
+            }
+          }
+        } catch (e) {
+          Logger.log('UrlFetchApp attempt failed for ' + urlsToTry[u] + ': ' + e.message);
         }
-      } catch (e) {
-        Logger.log('UrlFetchApp failed for logo URL: ' + e.message);
       }
     }
 
@@ -5749,7 +5826,7 @@ function getImageAsBase64(logoUrl) {
     Logger.log('Error converting logo to Base64: ' + err.toString());
   }
 
-  return logoUrl; // Fallback to original string if conversion fails
+  return ''; // Return empty string rather than broken raw URL if conversion fails
 }
 
 function createDailyBackup() {
@@ -5801,10 +5878,13 @@ function onOpen(e) {
     Logger.log("onOpen menu registration notice: " + err.message);
   }
 
-  // Login repair tools - see CrossAccountLoginFix.gs
+  // Login repair & portal setup tools - see CrossAccountLoginFix.gs
   try {
     SpreadsheetApp.getUi()
-      .createMenu("🔑 Login Fix")
+      .createMenu("🔑 Login Fix & Admin")
+      .addItem("🔓 Reset Admin Password & Unlock Accounts", "resetAdminPasswordAndUnlockDialog")
+      .addItem("🖼️ Set School Logo URL", "setSchoolLogoDialog")
+      .addSeparator()
       .addItem("1️⃣ Publish salt to this sheet (run on the original project)", "publishPasswordSaltToSheet")
       .addItem("2️⃣ Sync salt from this sheet (run on the imported copy)", "syncPasswordSaltFromSheet")
       .addItem("🔍 Run login diagnostics", "showLoginDiagnostics")

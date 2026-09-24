@@ -611,3 +611,184 @@ function setSpreadsheetId(id) {
     return { success: false, message: 'Could not open that spreadsheet: ' + e.message };
   }
 }
+
+/**
+ * UI Tool: Reset Admin Password & Unlock Accounts
+ * Accessible from Google Sheets menu: "🔑 Login Fix & Admin"
+ */
+function resetAdminPasswordAndUnlockDialog() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = typeof getSpreadsheet_ === 'function' ? getSpreadsheet_() : SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    ui.alert('Error', 'No spreadsheet connected.', ui.ButtonSet.OK);
+    return;
+  }
+
+  const promptResult = ui.prompt(
+    'Reset Admin Password & Unlock All Accounts',
+    'Enter a new password for the Admin account (or click OK/leave blank to use "password123"):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (promptResult.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  let newPassword = String(promptResult.getResponseText() || '').trim();
+  if (!newPassword) {
+    newPassword = 'password123';
+  }
+
+  const sheet = ss.getSheetByName('Users');
+  if (!sheet) {
+    ui.alert('Error', 'Worksheet "Users" was not found in this spreadsheet.', ui.ButtonSet.OK);
+    return;
+  }
+
+  const layout = usersSheetLayout_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < layout.firstRow) {
+    ui.alert('Error', 'No user data rows found in the Users sheet.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Ensure active salt is ready and persisted in both Settings and _SystemConfig
+  const activeSalt = getSalt();
+  writeSaltToSheet_(activeSalt);
+
+  const hashedPassword = hashWithSalt_(newPassword, activeSalt);
+
+  // Read all user rows
+  const dataRange = sheet.getRange(layout.firstRow, layout.firstCol, lastRow - (layout.firstRow - 1), layout.colCount);
+  const data = dataRange.getValues();
+
+  let adminFound = false;
+  let adminUsername = '';
+  let adminRow = -1;
+
+  // 1. Clear lockout on ALL users
+  for (let i = 0; i < data.length; i++) {
+    const rowNum = layout.firstRow + i;
+    const role = String(data[i][3] || '').trim();
+    const username = String(data[i][5] || '').trim();
+
+    // Reset loginTrials and lockedUntil for every row
+    sheet.getRange(rowNum, 9, 1, 2).setValues([[0, '']]);
+
+    if (!adminFound && (role.toLowerCase() === 'admin' || username.toLowerCase() === 'admin' || i === 0)) {
+      adminFound = true;
+      adminUsername = username || 'admin';
+      adminRow = rowNum;
+    }
+  }
+
+  // 2. Set new password for Admin
+  if (adminRow !== -1) {
+    sheet.getRange(adminRow, 8).setValue(hashedPassword); // Column H (Password)
+    sheet.getRange(adminRow, 6).setValue('Active'); // Column F (Account Status)
+    if (!sheet.getRange(adminRow, 7).getValue()) {
+      sheet.getRange(adminRow, 7).setValue(adminUsername);
+    }
+  }
+
+  // Invalidate caches
+  try {
+    if (typeof invalidateCacheOnModify === 'function') invalidateCacheOnModify('Users');
+    if (typeof invalidateIndex === 'function') invalidateIndex('Users');
+  } catch (e) {}
+
+  ui.alert(
+    '✅ Admin Account Ready!',
+    'Password has been reset and all accounts have been unlocked!\n\n' +
+    '• Username: ' + adminUsername + '\n' +
+    '• New Password: ' + newPassword + '\n' +
+    '• Salt status: Synchronized & saved into spreadsheet\n\n' +
+    'You can now open the Web App and sign in immediately.',
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * UI Tool: Set School Logo URL
+ * Accessible from Google Sheets menu: "🔑 Login Fix & Admin"
+ */
+function setSchoolLogoDialog() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = typeof getSpreadsheet_ === 'function' ? getSpreadsheet_() : SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    ui.alert('Error', 'No spreadsheet connected.', ui.ButtonSet.OK);
+    return;
+  }
+
+  const promptResult = ui.prompt(
+    'Set School Logo URL',
+    'Paste your Google Drive link or direct image URL for the school logo:\n(Tip: In Google Drive, make sure "Anyone with the link can view" is enabled)',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (promptResult.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const rawUrl = String(promptResult.getResponseText() || '').trim();
+  if (!rawUrl) {
+    ui.alert('Notice', 'No URL entered. Nothing was changed.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Format Drive link if applicable
+  const directUrl = typeof formatDriveImageUrl_ === 'function' ? formatDriveImageUrl_(rawUrl) : rawUrl;
+
+  // Extract Drive file ID if present and attempt auto-sharing
+  const matchFileD = rawUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  const matchIdParam = rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  const matchDirectD = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const fileId = (matchFileD && matchFileD[1]) || (matchIdParam && matchIdParam[1]) || (matchDirectD && matchDirectD[1]) || (/^[a-zA-Z0-9_-]{25,}$/.test(rawUrl) ? rawUrl : null);
+
+  let permissionNote = '';
+  if (fileId) {
+    try {
+      const file = DriveApp.getFileById(fileId);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      permissionNote = '\n• Google Drive permission: Automatically set to "Anyone with link can view".';
+    } catch (e) {
+      permissionNote = '\n• Note: If the image does not show, open Google Drive -> right-click image -> Share -> set to "Anyone with the link".';
+    }
+  }
+
+  // Update Settings sheet
+  const settingsSheet = ss.getSheetByName('Settings');
+  if (settingsSheet && settingsSheet.getLastRow() >= 5) {
+    const lastRow = settingsSheet.getLastRow();
+    const data = settingsSheet.getRange(5, 2, lastRow - 4, 1).getValues();
+    let updatedLogoUrl = false;
+    let updatedSchoolLogo = false;
+
+    for (let i = 0; i < data.length; i++) {
+      const paramName = String(data[i][0] || '').trim().toLowerCase().replace(/[\s_\-]+/g, '');
+      if (paramName === 'schoollogourl' || paramName === 'logourl') {
+        settingsSheet.getRange(5 + i, 3).setValue(directUrl);
+        updatedLogoUrl = true;
+      }
+      if (paramName === 'schoollogo') {
+        settingsSheet.getRange(5 + i, 3).setValue(directUrl);
+        updatedSchoolLogo = true;
+      }
+    }
+
+    if (!updatedLogoUrl) {
+      settingsSheet.getRange(settingsSheet.getLastRow() + 1, 2, 1, 2).setValues([['School Logo URL', directUrl]]);
+    }
+    if (!updatedSchoolLogo) {
+      settingsSheet.getRange(settingsSheet.getLastRow() + 1, 2, 1, 2).setValues([['School Logo', directUrl]]);
+    }
+  }
+
+  ui.alert(
+    '✅ School Logo Updated!',
+    'The school logo URL has been saved to Settings.' + permissionNote + '\n\n' +
+    'Direct URL: ' + directUrl + '\n\n' +
+    'The logo will now display on the Login page, Main Dashboard, and PDF reports.',
+    ui.ButtonSet.OK
+  );
+}

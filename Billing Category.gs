@@ -449,8 +449,11 @@ function generatePupilBill(invoiceId) {
 
     // Get school information
     const schoolName = getSystemParameter('School Name') || 'GLOBAL EVANGELICAL BASIC SCHOOL - TETTEKOPE';
-    const schoolAddress = getSystemParameter('School Address') || 'P.O. BOX 182, KETA';
-    const rawSchoolLogo = getSystemParameter('School Logo') || getSystemParameter('Logo URL') || '';
+    const rawSchoolLogo = (typeof getSchoolLogoUrl === 'function' ? getSchoolLogoUrl() : '')
+      || getSystemParameter('School Logo URL')
+      || getSystemParameter('School Logo')
+      || getSystemParameter('Logo URL')
+      || '';
     const schoolLogo = getImageAsBase64(rawSchoolLogo);
 
     // Parse debit items
@@ -598,8 +601,11 @@ function generateSinglePupilBill(reportData, student) {
     
     // Get school information
     const schoolName = getSystemParameter('School Name') || 'GLOBAL EVANGELICAL BASIC SCHOOL - TETTEKOPE';
-    const schoolAddress = getSystemParameter('School Address') || 'P.O. BOX 182, KETA';
-    const rawSchoolLogo = getSystemParameter('School Logo') || getSystemParameter('Logo URL') || '';
+    const rawSchoolLogo = (typeof getSchoolLogoUrl === 'function' ? getSchoolLogoUrl() : '')
+      || getSystemParameter('School Logo URL')
+      || getSystemParameter('School Logo')
+      || getSystemParameter('Logo URL')
+      || '';
     const schoolLogo = getImageAsBase64(rawSchoolLogo);
 
     // Parse debit items

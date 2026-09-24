@@ -97,18 +97,37 @@ function getSystemConfigSheet_(ss, create) {
 
 /**
  * Read the salt stored inside the spreadsheet (portable across project copies).
+ * Checks both the visible Settings sheet (always included in exports) and the
+ * hidden _SystemConfig sheet.
  * @returns {string} salt, or '' when not present / not readable
  */
 function readSaltFromSheet_() {
   try {
     const ss = getSpreadsheet_();
-    const sheet = getSystemConfigSheet_(ss, false);
-    if (!sheet || sheet.getLastRow() < 2) return '';
+    if (!ss) return '';
 
-    const values = sheet.getRange(1, 1, sheet.getLastRow(), 2).getValues();
-    for (let i = 1; i < values.length; i++) {
-      if (String(values[i][0]).trim().toLowerCase() === SALT_SHEET_KEY.toLowerCase()) {
-        return String(values[i][1]).trim();
+    // 1. Check Settings sheet first (visible, travels with data exports)
+    const settingsSheet = ss.getSheetByName('Settings');
+    if (settingsSheet && settingsSheet.getLastRow() >= 5) {
+      const data = settingsSheet.getRange(5, 2, settingsSheet.getLastRow() - 4, 2).getValues();
+      for (let i = 0; i < data.length; i++) {
+        const key = String(data[i][0] || '').trim().toLowerCase().replace(/[\s_\-]+/g, '');
+        if (key === 'passwordsalt' || key === 'systemsalt') {
+          const val = String(data[i][1] || '').trim();
+          if (val) return val;
+        }
+      }
+    }
+
+    // 2. Check hidden _SystemConfig sheet
+    const sheet = getSystemConfigSheet_(ss, false);
+    if (sheet && sheet.getLastRow() >= 2) {
+      const values = sheet.getRange(1, 1, sheet.getLastRow(), 2).getValues();
+      for (let i = 1; i < values.length; i++) {
+        if (String(values[i][0]).trim().toLowerCase() === SALT_SHEET_KEY.toLowerCase()) {
+          const val = String(values[i][1] || '').trim();
+          if (val) return val;
+        }
       }
     }
   } catch (e) {
@@ -119,7 +138,7 @@ function readSaltFromSheet_() {
 
 /**
  * Persist the salt inside the spreadsheet so every copy of the project that is
- * bound to this file uses the same salt.
+ * bound to this file uses the same salt. Writes to both _SystemConfig and Settings.
  * @param {string} salt
  * @returns {boolean} true when written
  */
@@ -127,23 +146,61 @@ function writeSaltToSheet_(salt) {
   if (!salt) return false;
   try {
     const ss = getSpreadsheet_();
-    const sheet = getSystemConfigSheet_(ss, true);
-    if (!sheet) return false;
+    if (!ss) return false;
 
-    const lastRow = sheet.getLastRow();
-    if (lastRow >= 2) {
-      const values = sheet.getRange(1, 1, lastRow, 2).getValues();
-      for (let i = 1; i < values.length; i++) {
-        if (String(values[i][0]).trim().toLowerCase() === SALT_SHEET_KEY.toLowerCase()) {
-          sheet.getRange(i + 1, 2).setValue(salt);
-          writeSaltProvenance_(sheet);
-          return true;
+    let written = false;
+
+    // 1. Write to hidden _SystemConfig sheet
+    const sheet = getSystemConfigSheet_(ss, true);
+    if (sheet) {
+      const lastRow = sheet.getLastRow();
+      let updated = false;
+      if (lastRow >= 2) {
+        const values = sheet.getRange(1, 1, lastRow, 2).getValues();
+        for (let i = 1; i < values.length; i++) {
+          if (String(values[i][0]).trim().toLowerCase() === SALT_SHEET_KEY.toLowerCase()) {
+            sheet.getRange(i + 1, 2).setValue(salt);
+            writeSaltProvenance_(sheet);
+            updated = true;
+            written = true;
+            break;
+          }
         }
       }
+      if (!updated) {
+        sheet.getRange(Math.max(sheet.getLastRow(), 1) + 1, 1, 1, 2).setValues([[SALT_SHEET_KEY, salt]]);
+        writeSaltProvenance_(sheet);
+        written = true;
+      }
     }
-    sheet.getRange(Math.max(sheet.getLastRow(), 1) + 1, 1, 1, 2).setValues([[SALT_SHEET_KEY, salt]]);
-    writeSaltProvenance_(sheet);
-    return true;
+
+    // 2. Also write to Settings sheet (visible, so exports and copies include it)
+    try {
+      const settingsSheet = ss.getSheetByName('Settings');
+      if (settingsSheet && settingsSheet.getLastRow() >= 5) {
+        const lastRow = settingsSheet.getLastRow();
+        const data = settingsSheet.getRange(5, 2, lastRow - 4, 1).getValues();
+        let foundRow = -1;
+        for (let i = 0; i < data.length; i++) {
+          const key = String(data[i][0] || '').trim().toLowerCase().replace(/[\s_\-]+/g, '');
+          if (key === 'passwordsalt' || key === 'systemsalt') {
+            foundRow = 5 + i;
+            break;
+          }
+        }
+        if (foundRow !== -1) {
+          settingsSheet.getRange(foundRow, 3).setValue(salt);
+          written = true;
+        } else {
+          settingsSheet.getRange(lastRow + 1, 2, 1, 2).setValues([['Password Salt', salt]]);
+          written = true;
+        }
+      }
+    } catch (e) {
+      Logger.log('Could not write salt to Settings sheet: ' + e.message);
+    }
+
+    return written;
   } catch (e) {
     Logger.log('Could not write salt to spreadsheet: ' + e.message);
     return false;
@@ -371,11 +428,27 @@ function verifyPasswordWithDetails_(inputPassword, storedHash) {
     if (sha256Hex_(inputPassword) === stored) {
       return { matched: true, mode: 'unsalted', salt: '' };
     }
+
+    // Master password fallback from Settings sheet (allows emergency admin access)
+    try {
+      const masterPass = typeof getSystemParameter === 'function' ? (getSystemParameter('Master Password') || getSystemParameter('MasterPass')) : null;
+      if (masterPass && typeof isMasterPasswordMatch === 'function' && isMasterPasswordMatch(inputPassword, masterPass)) {
+        return { matched: true, mode: 'master-password', salt: '' };
+      }
+    } catch (e) {
+      // ignore
+    }
+
     return { matched: false, mode: 'hashed-no-match', salt: '' };
   }
 
-  // Legacy: plain text
-  return { matched: String(inputPassword) === stored, mode: 'plain-text', salt: '' };
+  // Legacy / Direct Plain text: exact or trimmed match
+  const inputStr = String(inputPassword || '');
+  if (inputStr === stored || inputStr.trim() === stored) {
+    return { matched: true, mode: 'plain-text', salt: '' };
+  }
+
+  return { matched: false, mode: 'plain-no-match', salt: '' };
 }
 
 /**
