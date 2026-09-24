@@ -117,7 +117,7 @@ function doGet(e) {
         ? "Student Directory"
         : page === "Reports"
           ? "System Reports"
-          : "Student Management System",
+          : "Student Management System"
     )
     .addMetaTag("viewport", "width=device-width, initial-scale=1")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);

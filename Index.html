@@ -1531,8 +1531,8 @@
     function getActiveSessionId() {
       try {
         // 1. Template-injected session ID from server
-        var serverSid = '<?= typeof sessionId !== "undefined" ? sessionId : "" ?>';
-        if (serverSid && serverSid !== 'undefined' && serverSid.indexOf('<?=') === -1) {
+        var serverSid = '<?= sessionId ?>';
+        if (serverSid && serverSid !== 'undefined' && serverSid.indexOf('<' + '?=') === -1) {
           sessionStorage.setItem('sms_session_id', serverSid);
           return serverSid;
         }
